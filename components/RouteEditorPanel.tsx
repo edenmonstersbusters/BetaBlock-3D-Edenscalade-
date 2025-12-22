@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, RefreshCcw, Settings2, Download } from 'lucide-react';
-import { HoldDefinition, PlacedHold, OrientationMap } from '../types';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle } from 'lucide-react';
+import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
   onBack: () => void;
@@ -15,9 +15,6 @@ interface RouteEditorPanelProps {
   onUpdatePlacedHold: (id: string, updates: Partial<PlacedHold>) => void;
   onSelectPlacedHold: (id: string | null) => void;
   onDeselect: () => void;
-  calibratedOrientations: OrientationMap;
-  onOpenCalibration: (hold: HoldDefinition) => void;
-  onExport: () => void;
 }
 
 const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
@@ -33,10 +30,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   selectedPlacedHoldId,
   onUpdatePlacedHold,
   onSelectPlacedHold,
-  onDeselect,
-  calibratedOrientations,
-  onOpenCalibration,
-  onExport
+  onDeselect
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,13 +76,6 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
               <p className="text-xs text-gray-500 truncate">Étape 2: Pose de prises</p>
           </div>
         </div>
-        <button 
-          onClick={onExport}
-          className="p-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-lg transition-all border border-blue-500/20"
-          title="Exporter les orientations"
-        >
-          <Download size={18} />
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-700">
@@ -101,16 +88,6 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                   <span>Édition Prise</span>
                </div>
                <div className="flex gap-2">
-                 <button 
-                  onClick={() => {
-                    const def = library.find(l => l.id === selectedPlacedHold.modelId);
-                    if (def) onOpenCalibration(def);
-                  }}
-                  className="p-1 hover:bg-gray-800 rounded text-gray-400 hover:text-white"
-                  title="Ajuster l'orientation du modèle"
-                 >
-                   <Settings2 size={16} />
-                 </button>
                  <button onClick={onDeselect} className="text-xs text-gray-500 hover:text-white underline">Annuler</button>
                </div>
              </div>
@@ -224,18 +201,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                             <button key={hold.id} onClick={() => onSelectHold(hold)} className={`relative rounded-lg bg-gray-800 border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}>
                                 <div className="flex justify-between items-center w-full">
                                   <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
-                                  {calibratedOrientations[hold.id] && <CheckCircle size={10} className="text-emerald-400 flex-shrink-0 ml-1" />}
                                 </div>
                                 <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
-                                
-                                {selectedHold?.id === hold.id && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); onOpenCalibration(hold); }}
-                                    className="mt-2 w-full py-1 bg-gray-900/50 hover:bg-gray-900 text-[9px] text-blue-400 rounded flex items-center justify-center gap-1 border border-blue-900/50"
-                                  >
-                                    <Settings2 size={10} /> Calibrer
-                                  </button>
-                                )}
                             </button>
                         ))}
                     </div>

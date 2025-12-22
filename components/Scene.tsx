@@ -5,7 +5,7 @@ import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/d
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
-import { WallConfig, PlacedHold, AppMode, HoldDefinition, OrientationMap } from '../types';
+import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
 
 interface SceneProps {
   config: WallConfig;
@@ -16,7 +16,6 @@ interface SceneProps {
   holdSettings: { scale: number; rotation: number; color: string };
   selectedPlacedHoldId: string | null;
   onSelectPlacedHold: (id: string | null) => void;
-  calibratedOrientations: OrientationMap;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -27,8 +26,7 @@ export const Scene: React.FC<SceneProps> = ({
   selectedHoldDef,
   holdSettings,
   selectedPlacedHoldId,
-  onSelectPlacedHold,
-  calibratedOrientations
+  onSelectPlacedHold
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
@@ -78,7 +76,15 @@ export const Scene: React.FC<SceneProps> = ({
   };
   
   return (
-    <Canvas shadows camera={{ position: [5, 5, 8], fov: 45 }}>
+    <Canvas 
+      shadows 
+      camera={{ position: [5, 5, 8], fov: 45 }}
+      onCreated={({ gl }) => {
+        // Activation explicite du renderer pour les ombres
+        gl.shadowMap.enabled = true;
+        gl.shadowMap.type = THREE.PCFSoftShadowMap;
+      }}
+    >
       <color attach="background" args={['#1a1a1a']} />
       
       <OrbitControls 
@@ -89,16 +95,21 @@ export const Scene: React.FC<SceneProps> = ({
         enabled={true}
       />
 
-      <ambientLight intensity={0.4} />
+      <ambientLight intensity={0.2} />
+      <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#444444" />
+      
       <directionalLight 
-        position={[10, 10, 5]} 
-        intensity={1} 
+        position={[10, 15, 10]} 
+        intensity={1.5} 
         castShadow 
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0005} // Aide à éviter l'auto-ombrage parasite tout en gardant le relief
       >
-        <orthographicCamera attach="shadow-camera" args={[-10, 10, 10, -10]} />
+        {/* On resserre la caméra d'ombre pour plus de détails sur les prises */}
+        <orthographicCamera attach="shadow-camera" args={[-8, 8, 8, -8, 0.5, 50]} />
       </directionalLight>
-      <pointLight position={[-10, 5, -5]} intensity={0.5} color="#3b82f6" />
+
+      <pointLight position={[-10, 5, 5]} intensity={0.4} color="#3b82f6" />
 
       <group position={[0, 0, 0]}>
         <WallMesh 
@@ -119,7 +130,6 @@ export const Scene: React.FC<SceneProps> = ({
                     scale={hold.scale}
                     color={hold.color}
                     isSelected={selectedPlacedHoldId === hold.id}
-                    baseRotation={calibratedOrientations[hold.modelId]}
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelectPlacedHold(hold.id);
@@ -139,7 +149,6 @@ export const Scene: React.FC<SceneProps> = ({
                     opacity={0.6}
                     color={holdSettings.color}
                     preview={true}
-                    baseRotation={calibratedOrientations[selectedHoldDef.id]}
                 />
             </Suspense>
         )}
@@ -160,7 +169,7 @@ export const Scene: React.FC<SceneProps> = ({
       />
       
       <ContactShadows 
-        opacity={0.5} 
+        opacity={0.4} 
         scale={20} 
         blur={2} 
         far={4} 

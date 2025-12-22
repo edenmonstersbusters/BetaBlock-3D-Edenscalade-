@@ -42,21 +42,20 @@ export const CalibrationOverlay: React.FC<CalibrationOverlayProps> = ({ hold, on
         <Canvas shadows>
           <PerspectiveCamera makeDefault position={[0, 0, 4]} fov={30} />
           
-          {/* Éclairage Fort et Normal (Type Studio) */}
-          <ambientLight intensity={0.7} />
-          {/* Standard Three.js lights should be used as lowercase intrinsic components */}
-          <hemisphereLight intensity={0.5} groundColor="#000000" color="#ffffff" />
+          {/* SETUP LUMIERE CONTRASTÉ POUR CALIBRATION */}
+          <ambientLight intensity={0.2} />
+          <hemisphereLight intensity={0.8} color="#ffffff" groundColor="#222222" />
           
-          {/* Lumière principale pour les volumes */}
+          {/* Lumière principale forte pour accentuer les volumes */}
           <directionalLight 
-            position={[5, 5, 5]} 
+            position={[5, 10, 5]} 
             intensity={1.5} 
             castShadow 
             shadow-mapSize={[1024, 1024]}
           />
           
-          {/* Lumière d'appoint frontale pour déboucher les noirs */}
-          <pointLight position={[0, 0, 5]} intensity={0.8} />
+          {/* Lumière frontale très faible pour éviter les zones de noir pur */}
+          <pointLight position={[0, 0, 5]} intensity={0.3} />
           
           <OrbitControls makeDefault minDistance={1.5} maxDistance={6} />
           
@@ -82,8 +81,7 @@ export const CalibrationOverlay: React.FC<CalibrationOverlayProps> = ({ hold, on
               modelFilename={hold.filename}
               baseScale={hold.baseScale}
               position={[0, 0, 0]}
-              rotation={[0, 0, 0]} 
-              baseRotation={rotation} 
+              rotation={rotation} 
               scale={[1.2, 1.2, 1.2]}
               color="#ff4400" 
             />

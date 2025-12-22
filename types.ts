@@ -30,5 +30,3 @@ export interface PlacedHold {
 }
 
 export type AppMode = 'BUILD' | 'SET';
-
-export type OrientationMap = Record<string, [number, number, number]>;

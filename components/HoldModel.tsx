@@ -15,10 +15,11 @@ interface HoldModelProps {
   preview?: boolean;
   isSelected?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
-  baseRotation?: [number, number, number]; 
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
+// URL vers les décodeurs Draco versionnés pour assurer la compatibilité
+const DRACO_DECODER_URL = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
 
 export const HoldModel: React.FC<HoldModelProps> = ({ 
   modelFilename, 
@@ -30,18 +31,19 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   color,
   preview = false,
   isSelected = false,
-  onClick,
-  baseRotation = [0, 0, 0]
+  onClick
 }) => {
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
-  const { scene } = useGLTF(url);
+  
+  // useGLTF accepte l'URL du décodeur Draco en second argument
+  const { scene } = useGLTF(url, DRACO_DECODER_URL);
 
   const { clonedScene, offset } = useMemo(() => {
     const clone = scene.clone(true);
     
     clone.position.set(0, 0, 0);
-    // On applique la rotation de calibration (tranches de 90°)
-    clone.rotation.set(baseRotation[0], baseRotation[1], baseRotation[2]);
+    // Suppression de la logique de calibration, on utilise l'orientation native du fichier
+    clone.rotation.set(0, 0, 0);
     clone.scale.set(1, 1, 1);
     clone.updateMatrixWorld(true);
 
@@ -56,20 +58,21 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         box.getCenter(center);
         offsetX = -center.x;
         offsetY = -center.y;
-        
-        // CORRECTION : On aligne le MINIMUM Z de l'objet sur Z=0.
-        // Dans Three.js, si le mur est à Z=0 et que le grimpeur est vers Z+, 
-        // l'objet doit avoir ses coordonnées Z >= 0 pour être visible devant le mur.
         offsetZ = -box.min.z + 0.005; // Petit offset pour éviter le z-fighting
     }
 
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
+        
+        // Force le recalcul des normales pour un relief précis
+        mesh.geometry.computeVertexNormals();
+
         const material = new THREE.MeshStandardMaterial({
           color: color || '#ff4400',
-          roughness: 0.5, // Équilibre pour voir les reflets et le relief
-          metalness: 0.1,
+          roughness: 0.7, 
+          metalness: 0.2,
+          flatShading: false, 
           transparent: opacity < 1 || isSelected,
           opacity: isSelected ? 0.7 : opacity,
           side: THREE.DoubleSide
@@ -81,6 +84,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         }
 
         mesh.material = material;
+        
+        // ACTIVER LES OMBRES POUR LE RELIEF
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }
@@ -90,7 +95,7 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         clonedScene: clone, 
         offset: [offsetX, offsetY, offsetZ] as [number, number, number] 
     };
-  }, [scene, opacity, color, preview, isSelected, baseRotation]);
+  }, [scene, opacity, color, preview, isSelected]);
 
   return (
     <group 

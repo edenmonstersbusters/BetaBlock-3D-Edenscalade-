@@ -16,8 +16,8 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
   const thickness = 0.3; 
 
   const geometry = useMemo(() => {
-    const spinePoints: { x: number; y: number; z: number }[] = [
-      { x: 0, y: 0, z: 0 },
+    const spinePoints: { y: number; z: number }[] = [
+      { y: 0, z: 0 },
     ];
 
     let currentY = 0;
@@ -29,7 +29,7 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
       const dz = seg.height * Math.sin(rad);
       currentY += dy;
       currentZ += dz;
-      spinePoints.push({ x: 0, y: currentY, z: currentZ });
+      spinePoints.push({ y: currentY, z: currentZ });
     });
 
     const wHalf = config.width / 2;
@@ -37,69 +37,82 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     const indices: number[] = [];
     const uvs: number[] = [];
 
-    const pushVertex = (x: number, y: number, z: number) => {
+    const pushV = (x: number, y: number, z: number, u: number, v: number) => {
       vertices.push(x, y, z);
+      uvs.push(u, v);
       return (vertices.length / 3) - 1;
     };
 
-    // --- FRONT FACE (Orientée vers le grimpeur Z+) ---
-    const frontIndicesMap: number[] = [];
-    for (let i = 0; i < spinePoints.length; i++) {
-      const p = spinePoints[i];
-      const idxL = pushVertex(-wHalf, p.y, p.z);
-      pushVertex(wHalf, p.y, p.z);
-      frontIndicesMap.push(idxL);
-      uvs.push(0, p.y / 3); 
-      uvs.push(1, p.y / 3); 
-    }
-
+    // Pour garantir des "Hard Edges" (arêtes vives), nous créons des sommets distincts par face.
+    
+    // 1. FRONT FACE (Z+)
     for (let i = 0; i < config.segments.length; i++) {
-      const base = frontIndicesMap[i];
-      const nextBase = frontIndicesMap[i+1];
-      const FL = base;
-      const FR = base + 1;
-      const NL = nextBase;
-      const NR = nextBase + 1;
-      // Correction de l'ordre pour orienter la normale vers l'extérieur
-      indices.push(FL, FR, NL);
-      indices.push(FR, NR, NL);
+      const p1 = spinePoints[i];
+      const p2 = spinePoints[i+1];
+      
+      const v0 = pushV(-wHalf, p1.y, p1.z, 0, p1.y/3);
+      const v1 = pushV(wHalf, p1.y, p1.z, 1, p1.y/3);
+      const v2 = pushV(wHalf, p2.y, p2.z, 1, p2.y/3);
+      const v3 = pushV(-wHalf, p2.y, p2.z, 0, p2.y/3);
+      
+      indices.push(v0, v1, v2, v0, v2, v3);
     }
 
-    // --- BACK FACE ---
-    const backIndicesMap: number[] = [];
-    for (let i = 0; i < spinePoints.length; i++) {
-      const p = spinePoints[i];
-      const idxL = pushVertex(-wHalf, p.y, p.z - thickness);
-      pushVertex(wHalf, p.y, p.z - thickness);
-      backIndicesMap.push(idxL);
-      uvs.push(0, p.y / 3);
-      uvs.push(1, p.y / 3);
-    }
-
+    // 2. BACK FACE (Z-)
     for (let i = 0; i < config.segments.length; i++) {
-      const base = backIndicesMap[i];
-      const nextBase = backIndicesMap[i+1];
-      const FL = base;
-      const FR = base + 1;
-      const NL = nextBase;
-      const NR = nextBase + 1;
-      indices.push(FL, NL, FR);
-      indices.push(FR, NL, NR);
+      const p1 = spinePoints[i];
+      const p2 = spinePoints[i+1];
+      
+      const v0 = pushV(-wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
+      const v1 = pushV(wHalf, p1.y, p1.z - thickness, 1, p1.y/3);
+      const v2 = pushV(wHalf, p2.y, p2.z - thickness, 1, p2.y/3);
+      const v3 = pushV(-wHalf, p2.y, p2.z - thickness, 0, p2.y/3);
+      
+      // Inversion de l'ordre pour que la face regarde vers l'arrière
+      indices.push(v0, v2, v1, v0, v3, v2);
     }
 
-    // --- SIDE FACES ---
+    // 3. LEFT FACE (X-)
     for (let i = 0; i < config.segments.length; i++) {
-      const fBase = frontIndicesMap[i];
-      const fNext = frontIndicesMap[i+1];
-      const bBase = backIndicesMap[i];
-      const bNext = backIndicesMap[i+1];
-      // Left
-      indices.push(fBase, bBase, fNext);
-      indices.push(fNext, bBase, bNext);
-      // Right
-      indices.push(fBase + 1, fNext + 1, bBase + 1);
-      indices.push(fNext + 1, bNext + 1, bBase + 1);
+      const p1 = spinePoints[i];
+      const p2 = spinePoints[i+1];
+      
+      const v0 = pushV(-wHalf, p1.y, p1.z, 0, p1.y/3);
+      const v1 = pushV(-wHalf, p2.y, p2.z, 1, p2.y/3);
+      const v2 = pushV(-wHalf, p2.y, p2.z - thickness, 1, p2.y/3);
+      const v3 = pushV(-wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
+      
+      indices.push(v0, v1, v2, v0, v2, v3);
     }
+
+    // 4. RIGHT FACE (X+)
+    for (let i = 0; i < config.segments.length; i++) {
+      const p1 = spinePoints[i];
+      const p2 = spinePoints[i+1];
+      
+      const v0 = pushV(wHalf, p1.y, p1.z, 0, p1.y/3);
+      const v1 = pushV(wHalf, p2.y, p2.z, 1, p2.y/3);
+      const v2 = pushV(wHalf, p2.y, p2.z - thickness, 1, p2.y/3);
+      const v3 = pushV(wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
+      
+      indices.push(v0, v2, v1, v0, v3, v2);
+    }
+
+    // 5. BOTTOM CAP
+    const b = spinePoints[0];
+    const bv0 = pushV(-wHalf, b.y, b.z, 0, 0);
+    const bv1 = pushV(wHalf, b.y, b.z, 1, 0);
+    const bv2 = pushV(wHalf, b.y, b.z - thickness, 1, 1);
+    const bv3 = pushV(-wHalf, b.y, b.z - thickness, 0, 1);
+    indices.push(bv0, bv2, bv1, bv0, bv3, bv2);
+
+    // 6. TOP CAP
+    const t = spinePoints[spinePoints.length - 1];
+    const tv0 = pushV(-wHalf, t.y, t.z, 0, 0);
+    const tv1 = pushV(wHalf, t.y, t.z, 1, 0);
+    const tv2 = pushV(wHalf, t.y, t.z - thickness, 1, 1);
+    const tv3 = pushV(-wHalf, t.y, t.z - thickness, 0, 1);
+    indices.push(tv0, tv1, tv2, tv0, tv2, tv3);
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
