@@ -8,21 +8,18 @@ interface WallMeshProps {
   config: WallConfig;
   onPointerMove?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
+  onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
   interactive?: boolean;
 }
 
-export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPointerDown, interactive }) => {
+export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPointerDown, onContextMenu, interactive }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const thickness = 0.3; 
 
   const geometry = useMemo(() => {
-    const spinePoints: { y: number; z: number }[] = [
-      { y: 0, z: 0 },
-    ];
-
+    const spinePoints: { y: number; z: number }[] = [{ y: 0, z: 0 }];
     let currentY = 0;
     let currentZ = 0;
-
     config.segments.forEach((seg) => {
       const rad = (seg.angle * Math.PI) / 180;
       const dy = seg.height * Math.cos(rad);
@@ -43,75 +40,46 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
       return (vertices.length / 3) - 1;
     };
 
-    // Pour garantir des "Hard Edges" (arêtes vives), nous créons des sommets distincts par face.
-    
     // 1. FRONT FACE (Z+)
     for (let i = 0; i < config.segments.length; i++) {
       const p1 = spinePoints[i];
       const p2 = spinePoints[i+1];
-      
       const v0 = pushV(-wHalf, p1.y, p1.z, 0, p1.y/3);
       const v1 = pushV(wHalf, p1.y, p1.z, 1, p1.y/3);
       const v2 = pushV(wHalf, p2.y, p2.z, 1, p2.y/3);
       const v3 = pushV(-wHalf, p2.y, p2.z, 0, p2.y/3);
-      
       indices.push(v0, v1, v2, v0, v2, v3);
     }
-
-    // 2. BACK FACE (Z-)
+    // ... Simplified rendering for other faces to match existing geometry logic
     for (let i = 0; i < config.segments.length; i++) {
-      const p1 = spinePoints[i];
-      const p2 = spinePoints[i+1];
-      
+      const p1 = spinePoints[i]; const p2 = spinePoints[i+1];
       const v0 = pushV(-wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
       const v1 = pushV(wHalf, p1.y, p1.z - thickness, 1, p1.y/3);
       const v2 = pushV(wHalf, p2.y, p2.z - thickness, 1, p2.y/3);
       const v3 = pushV(-wHalf, p2.y, p2.z - thickness, 0, p2.y/3);
-      
-      // Inversion de l'ordre pour que la face regarde vers l'arrière
       indices.push(v0, v2, v1, v0, v3, v2);
     }
-
-    // 3. LEFT FACE (X-)
     for (let i = 0; i < config.segments.length; i++) {
-      const p1 = spinePoints[i];
-      const p2 = spinePoints[i+1];
-      
+      const p1 = spinePoints[i]; const p2 = spinePoints[i+1];
       const v0 = pushV(-wHalf, p1.y, p1.z, 0, p1.y/3);
       const v1 = pushV(-wHalf, p2.y, p2.z, 1, p2.y/3);
       const v2 = pushV(-wHalf, p2.y, p2.z - thickness, 1, p2.y/3);
       const v3 = pushV(-wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
-      
       indices.push(v0, v1, v2, v0, v2, v3);
     }
-
-    // 4. RIGHT FACE (X+)
     for (let i = 0; i < config.segments.length; i++) {
-      const p1 = spinePoints[i];
-      const p2 = spinePoints[i+1];
-      
+      const p1 = spinePoints[i]; const p2 = spinePoints[i+1];
       const v0 = pushV(wHalf, p1.y, p1.z, 0, p1.y/3);
       const v1 = pushV(wHalf, p2.y, p2.z, 1, p2.y/3);
       const v2 = pushV(wHalf, p2.y, p2.z - thickness, 1, p2.y/3);
       const v3 = pushV(wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
-      
       indices.push(v0, v2, v1, v0, v3, v2);
     }
-
-    // 5. BOTTOM CAP
     const b = spinePoints[0];
-    const bv0 = pushV(-wHalf, b.y, b.z, 0, 0);
-    const bv1 = pushV(wHalf, b.y, b.z, 1, 0);
-    const bv2 = pushV(wHalf, b.y, b.z - thickness, 1, 1);
-    const bv3 = pushV(-wHalf, b.y, b.z - thickness, 0, 1);
+    const bv0 = pushV(-wHalf, b.y, b.z, 0, 0); const bv1 = pushV(wHalf, b.y, b.z, 1, 0); const bv2 = pushV(wHalf, b.y, b.z - thickness, 1, 1); const bv3 = pushV(-wHalf, b.y, b.z - thickness, 0, 1);
     indices.push(bv0, bv2, bv1, bv0, bv3, bv2);
-
-    // 6. TOP CAP
     const t = spinePoints[spinePoints.length - 1];
-    const tv0 = pushV(-wHalf, t.y, t.z, 0, 0);
-    const tv1 = pushV(wHalf, t.y, t.z, 1, 0);
-    const tv2 = pushV(wHalf, t.y, t.z - thickness, 1, 1);
-    const tv3 = pushV(-wHalf, t.y, t.z - thickness, 0, 1);
+    const tv0 = pushV(-wHalf, t.y, t.z, 0, 0); const tv1 = pushV(wHalf, t.y, t.z, 1, 0); const tv2 = pushV(wHalf, t.y, t.z - thickness, 1, 1); const tv3 = pushV(-wHalf, t.y, t.z - thickness, 0, 1);
     indices.push(tv0, tv1, tv2, tv0, tv2, tv3);
 
     const geo = new THREE.BufferGeometry();
@@ -119,26 +87,17 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    
     return geo;
   }, [config]);
 
   return (
     <mesh 
-      ref={meshRef} 
-      name="climbing-wall"
-      geometry={geometry} 
-      castShadow 
-      receiveShadow
+      ref={meshRef} name="climbing-wall" geometry={geometry} castShadow receiveShadow
       onPointerMove={interactive ? onPointerMove : undefined}
       onPointerDown={interactive ? onPointerDown : undefined}
+      onContextMenu={interactive ? onContextMenu : undefined}
     >
-      <meshStandardMaterial 
-        color="#e5e7eb" 
-        roughness={0.9}
-        metalness={0.05}
-        side={THREE.FrontSide}
-      />
+      <meshStandardMaterial color="#e5e7eb" roughness={0.9} metalness={0.05} side={THREE.FrontSide} />
     </mesh>
   );
 };

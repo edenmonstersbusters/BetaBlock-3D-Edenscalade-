@@ -16,6 +16,7 @@ interface SceneProps {
   holdSettings: { scale: number; rotation: number; color: string };
   selectedPlacedHoldId: string | null;
   onSelectPlacedHold: (id: string | null) => void;
+  onContextMenu: (type: 'HOLD' | 'SEGMENT', id: string, x: number, y: number) => void;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -26,7 +27,8 @@ export const Scene: React.FC<SceneProps> = ({
   selectedHoldDef,
   holdSettings,
   selectedPlacedHoldId,
-  onSelectPlacedHold
+  onSelectPlacedHold,
+  onContextMenu
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
@@ -40,17 +42,12 @@ export const Scene: React.FC<SceneProps> = ({
     if (e.face && e.object.name === 'climbing-wall') {
       e.stopPropagation();
       setGhostPos(e.point.clone());
-      
       const normal = e.face.normal.clone().transformDirection(e.object.matrixWorld).normalize();
-      
       const quaternion = new THREE.Quaternion();
       quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
-      
       const spinQ = new THREE.Quaternion();
       spinQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), (holdSettings.rotation * Math.PI) / 180);
-      
       quaternion.multiply(spinQ);
-      
       const euler = new THREE.Euler().setFromQuaternion(quaternion);
       setGhostRot(euler);
     } else {
@@ -61,6 +58,9 @@ export const Scene: React.FC<SceneProps> = ({
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (mode !== 'SET') return;
     
+    // BLOQUER TOUTE ACTION SI CE N'EST PAS UN CLIC GAUCHE
+    if (e.button !== 0) return;
+
     if (e.face && e.object.name === 'climbing-wall') {
        if (selectedPlacedHoldId) {
          e.stopPropagation();
@@ -74,6 +74,18 @@ export const Scene: React.FC<SceneProps> = ({
       onSelectPlacedHold(null);
     }
   };
+
+  const handleWallContextMenu = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    // Bloquer le menu par défaut du navigateur
+    e.nativeEvent.preventDefault();
+    if (e.faceIndex !== undefined) {
+      const segmentIndex = Math.floor(e.faceIndex / 2);
+      if (segmentIndex < config.segments.length) {
+        onContextMenu('SEGMENT', config.segments[segmentIndex].id, e.nativeEvent.clientX, e.nativeEvent.clientY);
+      }
+    }
+  };
   
   return (
     <Canvas 
@@ -85,25 +97,10 @@ export const Scene: React.FC<SceneProps> = ({
       }}
     >
       <color attach="background" args={['#1a1a1a']} />
-      
-      <OrbitControls 
-        makeDefault 
-        minPolarAngle={0} 
-        maxPolarAngle={Math.PI / 1.8}
-        target={[0, 2, 0]}
-        enabled={true}
-      />
-
+      <OrbitControls makeDefault minPolarAngle={0} maxPolarAngle={Math.PI / 1.8} target={[0, 2, 0]} enabled={true} />
       <ambientLight intensity={0.2} />
       <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#444444" />
-      
-      <directionalLight 
-        position={[10, 15, 10]} 
-        intensity={1.5} 
-        castShadow 
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0005}
-      >
+      <directionalLight position={[10, 15, 10]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0005}>
         <orthographicCamera attach="shadow-camera" args={[-8, 8, 8, -8, 0.5, 50]} />
       </directionalLight>
 
@@ -113,6 +110,7 @@ export const Scene: React.FC<SceneProps> = ({
           interactive={mode === 'SET'}
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
+          onContextMenu={handleWallContextMenu}
         />
         
         <Suspense fallback={null}>
@@ -127,8 +125,15 @@ export const Scene: React.FC<SceneProps> = ({
                     color={hold.color}
                     isSelected={selectedPlacedHoldId === hold.id}
                     onClick={(e) => {
+                      if (e.button === 0) {
+                        e.stopPropagation();
+                        onSelectPlacedHold(hold.id);
+                      }
+                    }}
+                    onContextMenu={(e) => {
                       e.stopPropagation();
-                      onSelectPlacedHold(hold.id);
+                      e.nativeEvent.preventDefault();
+                      onContextMenu('HOLD', hold.id, e.nativeEvent.clientX, e.nativeEvent.clientY);
                     }}
                 />
             ))}
@@ -150,29 +155,8 @@ export const Scene: React.FC<SceneProps> = ({
         )}
       </group>
 
-      <Grid 
-        position={[0, -0.01, 0]} 
-        args={[20, 20]} 
-        cellSize={1} 
-        cellThickness={1} 
-        cellColor="#444" 
-        sectionSize={5} 
-        sectionThickness={1.5} 
-        sectionColor="#666" 
-        fadeDistance={30} 
-        fadeStrength={1} 
-        infiniteGrid 
-      />
-      
-      <ContactShadows 
-        opacity={0.4} 
-        scale={20} 
-        blur={2} 
-        far={4} 
-        resolution={256} 
-        color="#000000" 
-      />
-
+      <Grid position={[0, -0.01, 0]} args={[20, 20]} cellSize={1} cellThickness={1} cellColor="#444" sectionSize={5} sectionThickness={1.5} sectionColor="#666" fadeDistance={30} fadeStrength={1} infiniteGrid />
+      <ContactShadows opacity={0.4} scale={20} blur={2} far={4} resolution={256} color="#000000" />
       <Environment preset="city" />
     </Canvas>
   );
