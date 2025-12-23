@@ -1,15 +1,18 @@
+
 import React from 'react';
-import { WallConfig, WallSegment } from '../types';
+import { WallConfig, WallSegment, PlacedHold } from '../types';
 import { Plus, Trash2, Maximize, Ruler, ArrowRight } from 'lucide-react';
 import clsx from 'clsx';
 
 interface EditorPanelProps {
   config: WallConfig;
+  holds: PlacedHold[];
   onUpdate: (newConfig: WallConfig) => void;
   onNext: () => void;
+  showModal: (config: { title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean }) => void;
 }
 
-export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNext }) => {
+export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdate, onNext, showModal }) => {
   
   const addSegment = () => {
     const newSegment: WallSegment = {
@@ -24,13 +27,39 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
   };
 
   const removeSegment = (id: string) => {
-    onUpdate({
-      ...config,
-      segments: config.segments.filter((s) => s.id !== id),
+    const segmentHolds = holds.filter(h => h.segmentId === id);
+    const message = segmentHolds.length > 0 
+      ? `Ce pan contient ${segmentHolds.length} prise(s). Elles seront supprimées. Confirmer la suppression ?`
+      : "Voulez-vous vraiment supprimer ce pan de mur ?";
+      
+    showModal({
+      title: "Supprimer le pan",
+      message,
+      confirmText: "Supprimer",
+      onConfirm: () => {
+        onUpdate({
+          ...config,
+          segments: config.segments.filter((s) => s.id !== id),
+        });
+      }
     });
   };
 
   const updateSegment = (id: string, updates: Partial<WallSegment>) => {
+    if (updates.height !== undefined) {
+      const segmentHolds = holds.filter(h => h.segmentId === id);
+      const outOfBounds = segmentHolds.some(h => h.y > updates.height!);
+      
+      if (outOfBounds) {
+        showModal({
+          title: "Action impossible",
+          message: "Des prises se trouvent au-dessus de la hauteur demandée. Déplacez les prises avant de réduire ce pan.",
+          isAlert: true
+        });
+        return;
+      }
+    }
+
     onUpdate({
       ...config,
       segments: config.segments.map((s) => 
@@ -40,6 +69,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
   };
 
   const updateGlobal = (updates: Partial<WallConfig>) => {
+    if (updates.width !== undefined) {
+      const outOfBounds = holds.some(h => Math.abs(h.x) > updates.width! / 2);
+      
+      if (outOfBounds) {
+        showModal({
+          title: "Action impossible",
+          message: "Des prises se trouvent en dehors de la largeur demandée. Resserrez les prises vers le centre avant de réduire la largeur.",
+          isAlert: true
+        });
+        return;
+      }
+    }
     onUpdate({ ...config, ...updates });
   };
 
@@ -49,7 +90,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
         <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
           BetaBlock 3D
         </h1>
-        <p className="text-xs text-gray-500 mt-1">Wall Configuration Tool</p>
+        <p className="text-xs text-gray-500 mt-1">Configuration du Mur</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-700">
@@ -109,7 +150,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
                 </div>
 
                 <div className="space-y-4">
-                  {/* Height Control */}
                   <div>
                     <div className="flex justify-between text-xs mb-1 text-gray-400">
                       <span>Hauteur</span>
@@ -126,7 +166,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
                     />
                   </div>
 
-                  {/* Angle Control */}
                   <div>
                     <div className="flex justify-between text-xs mb-1 text-gray-400">
                       <span>Inclinaison</span>
@@ -150,10 +189,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
                       />
                       <span className="text-[10px] text-gray-600">+85°</span>
                     </div>
-                    <div className="flex justify-between mt-1">
-                        <span className="text-[10px] text-gray-500">Dalle</span>
-                        <span className="text-[10px] text-gray-500">Dévers</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -175,7 +210,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, onUpdate, onNe
           onClick={onNext}
           className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center justify-center space-x-2 font-bold transition-colors shadow-lg shadow-emerald-900/20"
         >
-          <span>Sauvegarder & Continuer</span>
+          <span>Passer à la pose des prises</span>
           <ArrowRight size={18} />
         </button>
       </div>

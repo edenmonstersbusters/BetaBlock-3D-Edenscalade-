@@ -10,8 +10,8 @@ import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
 interface SceneProps {
   config: WallConfig;
   mode: AppMode;
-  holds: PlacedHold[];
-  onPlaceHold: (position: THREE.Vector3, normal: THREE.Vector3) => void;
+  holds: (PlacedHold & { position: [number, number, number], rotation: [number, number, number] })[];
+  onPlaceHold: (position: THREE.Vector3, normal: THREE.Vector3, faceIndex?: number) => void;
   selectedHoldDef: HoldDefinition | null;
   holdSettings: { scale: number; rotation: number; color: string };
   selectedPlacedHoldId: string | null;
@@ -68,7 +68,7 @@ export const Scene: React.FC<SceneProps> = ({
        } else if (selectedHoldDef) {
          e.stopPropagation();
          const normal = e.face.normal.clone().transformDirection(e.object.matrixWorld).normalize();
-         onPlaceHold(e.point.clone(), normal);
+         onPlaceHold(e.point.clone(), normal, e.faceIndex);
        }
     } else {
       onSelectPlacedHold(null);
@@ -80,7 +80,6 @@ export const Scene: React.FC<SceneProps> = ({
       shadows 
       camera={{ position: [5, 5, 8], fov: 45 }}
       onCreated={({ gl }) => {
-        // Activation explicite du renderer pour les ombres
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
       }}
@@ -103,13 +102,10 @@ export const Scene: React.FC<SceneProps> = ({
         intensity={1.5} 
         castShadow 
         shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0005} // Aide à éviter l'auto-ombrage parasite tout en gardant le relief
+        shadow-bias={-0.0005}
       >
-        {/* On resserre la caméra d'ombre pour plus de détails sur les prises */}
         <orthographicCamera attach="shadow-camera" args={[-8, 8, 8, -8, 0.5, 50]} />
       </directionalLight>
-
-      <pointLight position={[-10, 5, 5]} intensity={0.4} color="#3b82f6" />
 
       <group position={[0, 0, 0]}>
         <WallMesh 

@@ -127,21 +127,14 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     <div className="flex justify-between text-xs mb-1 text-gray-400">
                       <span className="flex items-center gap-1"><RotateCw size={12}/> Rotation</span>
                       <span className="text-white">
-                        {Math.round((selectedPlacedHold.rotation[2] * 180) / Math.PI)}°
+                        {Math.round(selectedPlacedHold.spin)}°
                       </span>
                     </div>
                     <input
                       type="range" min="0" max="360" step="15"
-                      value={(selectedPlacedHold.rotation[2] * 180) / Math.PI}
+                      value={selectedPlacedHold.spin}
                       onChange={(e) => {
-                        const deg = parseFloat(e.target.value);
-                        const rad = (deg * Math.PI) / 180;
-                        const newRot: [number, number, number] = [
-                          selectedPlacedHold.rotation[0],
-                          selectedPlacedHold.rotation[1],
-                          rad
-                        ];
-                        onUpdatePlacedHold(selectedPlacedHold.id, { rotation: newRot });
+                        onUpdatePlacedHold(selectedPlacedHold.id, { spin: parseFloat(e.target.value) });
                       }}
                       className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                     />

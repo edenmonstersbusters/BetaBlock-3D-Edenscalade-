@@ -23,10 +23,15 @@ export interface PlacedHold {
   modelId: string; // Reference to HoldDefinition.id
   filename: string; // The actual filename to load from GitHub
   modelBaseScale?: number;
-  position: [number, number, number]; // World position
-  rotation: [number, number, number]; // Euler rotation
+  
+  // Attachement local au mur en mètres
+  segmentId: string;
+  x: number; // Position horizontale en mètres par rapport au centre
+  y: number; // Position verticale en mètres par rapport au bas du segment
+  spin: number; // Rotation de la prise sur elle-même en degrés
+  
   scale: [number, number, number];
-  color?: string; // Optional override
+  color?: string;
 }
 
 export type AppMode = 'BUILD' | 'SET';
