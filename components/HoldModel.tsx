@@ -55,14 +55,14 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         const mesh = child as THREE.Mesh;
         mesh.geometry.computeVertexNormals();
         const material = new THREE.MeshStandardMaterial({
-          color: color || '#ff4400',
+          color: color || '#ff8800', // Orange accentué par défaut
           roughness: 0.7, metalness: 0.2, flatShading: false, 
           transparent: opacity < 1 || isSelected,
           opacity: isSelected ? 0.7 : opacity,
           side: THREE.DoubleSide
         });
         if (preview || isSelected) {
-           material.emissive = new THREE.Color(isSelected ? '#3b82f6' : (color || '#ff4400'));
+           material.emissive = new THREE.Color(isSelected ? '#3b82f6' : (color || '#ff8800'));
            material.emissiveIntensity = isSelected ? 0.4 : 0.2;
         }
         mesh.material = material;

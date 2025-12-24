@@ -27,6 +27,10 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Couleurs accentuées pour le contraste Orange/Rouge
+  // Orange: #ff8800 | Rouge: #9f0000
+  const palette = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000'];
+
   useEffect(() => {
     const fetchLibrary = async () => {
       try {
@@ -68,7 +72,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                 <div>
                     <label className="text-xs text-gray-400 mb-2 block">Couleur</label>
                     <div className="flex flex-wrap gap-2">
-                        {['#ff4400', '#fbbf24', '#22c55e', '#3b82f6', '#ef4444', '#f472b6', '#ffffff', '#000000'].map(c => (
+                        {palette.map(c => (
                             <button key={c} className={`w-6 h-6 rounded-full border-2 ${selectedPlacedHold.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => { onActionStart(); onUpdatePlacedHold(selectedPlacedHold.id, { color: c }); }} />
                         ))}
                     </div>
@@ -100,7 +104,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     <div>
                         <label className="text-xs text-gray-400 mb-2 block">Couleur</label>
                         <div className="flex space-x-2">
-                            {['#ff4400', '#fbbf24', '#22c55e', '#3b82f6', '#ef4444', '#f472b6', '#ffffff', '#000000'].map(c => (
+                            {palette.map(c => (
                                 <button key={c} className={`w-6 h-6 rounded-full border-2 ${holdSettings.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => onUpdateSettings({ color: c })} />
                             ))}
                         </div>

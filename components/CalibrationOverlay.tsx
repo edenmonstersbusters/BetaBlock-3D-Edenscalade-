@@ -83,7 +83,7 @@ export const CalibrationOverlay: React.FC<CalibrationOverlayProps> = ({ hold, on
               position={[0, 0, 0]}
               rotation={rotation} 
               scale={[1.2, 1.2, 1.2]}
-              color="#ff4400" 
+              color="#ff8800" // Orange accentué pour le calibrage
             />
           </Suspense>
 

@@ -140,7 +140,8 @@ function App() {
 
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
   const [selectedPlacedHoldId, setSelectedPlacedHoldId] = useState<string | null>(null);
-  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff4400' });
+  // Orange par défaut accentué : #ff8800
+  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
 
   const renderableHolds = useMemo(() => {
     return holds.map(h => {
@@ -185,7 +186,6 @@ function App() {
     });
   };
 
-  // Fix: Definition of removeSegmentAction used in the context menu
   const removeSegmentAction = (id: string) => {
     const segmentHolds = holds.filter(h => h.segmentId === id);
     const message = segmentHolds.length > 0 
@@ -295,7 +295,8 @@ function App() {
                 if (h) { recordAction(); setHolds(holds.map(item => item.id === h.id ? { ...item, spin: (item.spin + 90) % 360 } : item)); }
               }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-blue-400" /> Rotation +90°</button>
               <button onClick={() => { 
-                const colors = ['#ff4400', '#fbbf24', '#22c55e', '#3b82f6', '#ef4444', '#f472b6', '#ffffff', '#000000'];
+                // Palette mise à jour pour accentuer le contraste Orange/Rouge
+                const colors = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000'];
                 const h = holds.find(h => h.id === contextMenu.id);
                 if (h) { recordAction(); const idx = colors.indexOf(h.color || ''); setHolds(holds.map(item => item.id === h.id ? { ...item, color: colors[(idx + 1) % colors.length] } : item)); }
               }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-emerald-400" /> Couleur Suivante</button>
