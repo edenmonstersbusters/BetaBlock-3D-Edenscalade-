@@ -78,7 +78,6 @@ function App() {
     } catch { return []; }
   });
 
-  // --- UNDO / REDO LOGIC ---
   const [past, setPast] = useState<{config: WallConfig, holds: PlacedHold[]}[]>([]);
   const [future, setFuture] = useState<{config: WallConfig, holds: PlacedHold[]}[]>([]);
 
@@ -105,7 +104,6 @@ function App() {
     setFuture(prev => prev.slice(1));
   }, [future, config, holds]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -120,7 +118,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // --- UI MODALS & MENUS ---
   const [modal, setModal] = useState<{
     title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean;
   } | null>(null);
@@ -139,7 +136,7 @@ function App() {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.HOLDS, JSON.stringify(holds)); }, [holds]);
 
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
-  const [selectedPlacedHoldId, setSelectedPlacedHoldId] = useState<string | null>(null);
+  const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
   const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
 
   const renderableHolds = useMemo(() => {
@@ -151,7 +148,7 @@ function App() {
   }, [holds, config]);
 
   const handlePlaceHold = (position: THREE.Vector3, normal: THREE.Vector3, faceIndex?: number) => {
-    if (!selectedHold || selectedPlacedHoldId || faceIndex === undefined) return;
+    if (!selectedHold || selectedPlacedHoldIds.length > 0 || faceIndex === undefined) return;
     const segmentIndex = Math.floor(faceIndex / 2);
     if (segmentIndex >= config.segments.length) return;
     
@@ -174,9 +171,10 @@ function App() {
     setHolds([...holds, newHold]);
   };
 
-  const handleReplaceHold = (id: string, holdDef: HoldDefinition) => {
+  const handleReplaceHold = (ids: string[], holdDef: HoldDefinition) => {
     recordAction();
-    setHolds(prev => prev.map(h => h.id === id ? { 
+    const idSet = new Set(ids);
+    setHolds(prev => prev.map(h => idSet.has(h.id) ? { 
       ...h, 
       modelId: holdDef.id, 
       filename: holdDef.filename, 
@@ -184,13 +182,17 @@ function App() {
     } : h));
   };
 
-  const removeHoldAction = (id: string) => {
+  const removeHoldsAction = (ids: string[]) => {
+    const isMultiple = ids.length > 1;
     setModal({
-      title: "Suppression", message: "Voulez-vous vraiment supprimer cette prise ?", confirmText: "Supprimer",
+      title: "Suppression", 
+      message: isMultiple ? `Voulez-vous vraiment supprimer ces ${ids.length} prises ?` : "Voulez-vous vraiment supprimer cette prise ?", 
+      confirmText: "Supprimer",
       onConfirm: () => {
         recordAction();
-        setHolds(holds.filter(h => h.id !== id));
-        if (selectedPlacedHoldId === id) setSelectedPlacedHoldId(null);
+        const idSet = new Set(ids);
+        setHolds(holds.filter(h => !idSet.has(h.id)));
+        setSelectedPlacedHoldIds(prev => prev.filter(id => !idSet.has(id)));
       }
     });
   };
@@ -204,7 +206,7 @@ function App() {
       onConfirm: () => {
         recordAction();
         setHolds([]);
-        setSelectedPlacedHoldId(null);
+        setSelectedPlacedHoldIds([]);
       }
     });
   };
@@ -215,7 +217,7 @@ function App() {
       title: "Confirmation du changement",
       message: `Appliquer la couleur choisie à l'intégralité des ${holds.length} prises ?`,
       confirmText: "Confirmer",
-      isAlert: false, // Permet d'afficher le bouton Annuler
+      isAlert: false,
       onConfirm: () => {
         recordAction();
         setHolds(holds.map(h => ({ ...h, color: newColor })));
@@ -264,6 +266,25 @@ function App() {
     }));
   };
 
+  const handleSelectHold = (id: string | null, multi: boolean = false) => {
+    if (id === null) {
+      setSelectedPlacedHoldIds([]);
+      return;
+    }
+
+    if (multi) {
+      setSelectedPlacedHoldIds(prev => {
+        if (prev.includes(id)) {
+          return prev.filter(i => i !== id);
+        } else {
+          return [...prev, id];
+        }
+      });
+    } else {
+      setSelectedPlacedHoldIds([id]);
+    }
+  };
+
   useEffect(() => {
     const handleGlobalClick = () => setContextMenu(null);
     window.addEventListener('click', handleGlobalClick);
@@ -282,10 +303,15 @@ function App() {
         <RouteEditorPanel 
             onBack={() => setMode('BUILD')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
             holdSettings={holdSettings} onUpdateSettings={(s) => setHoldSettings(prev => ({ ...prev, ...s }))}
-            placedHolds={holds} onRemoveHold={removeHoldAction} onRemoveAllHolds={removeAllHoldsAction} onChangeAllHoldsColor={changeAllHoldsColorAction} selectedPlacedHoldId={selectedPlacedHoldId}
-            onUpdatePlacedHold={(id, u) => setHolds(holds.map(h => h.id === id ? { ...h, ...u } : h))}
-            onSelectPlacedHold={setSelectedPlacedHoldId} onDeselect={() => setSelectedPlacedHoldId(null)}
+            placedHolds={holds} onRemoveHold={(id) => removeHoldsAction([id])} onRemoveAllHolds={removeAllHoldsAction} 
+            onChangeAllHoldsColor={changeAllHoldsColorAction} selectedPlacedHoldIds={selectedPlacedHoldIds}
+            onUpdatePlacedHold={(ids, u) => {
+              const idSet = new Set(ids);
+              setHolds(holds.map(h => idSet.has(h.id) ? { ...h, ...u } : h));
+            }}
+            onSelectPlacedHold={handleSelectHold} onDeselect={() => setSelectedPlacedHoldIds([])}
             onActionStart={recordAction} onReplaceHold={handleReplaceHold}
+            onRemoveMultiple={() => removeHoldsAction(selectedPlacedHoldIds)}
         />
       )}
 
@@ -297,8 +323,8 @@ function App() {
       <div className="flex-1 relative h-full">
         <Scene 
             config={config} mode={mode} holds={renderableHolds} onPlaceHold={handlePlaceHold}
-            selectedHoldDef={selectedHold} holdSettings={holdSettings} selectedPlacedHoldId={selectedPlacedHoldId}
-            onSelectPlacedHold={setSelectedPlacedHoldId}
+            selectedHoldDef={selectedHold} holdSettings={holdSettings} selectedPlacedHoldIds={selectedPlacedHoldIds}
+            onSelectPlacedHold={handleSelectHold}
             onContextMenu={(type, id, x, y) => setContextMenu({ type, id, x, y })}
         />
       </div>
@@ -308,11 +334,26 @@ function App() {
           {contextMenu.type === 'HOLD' ? (
             <>
               <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
-              <button onClick={() => { const h = holds.find(h => h.id === contextMenu.id); if (h) { recordAction(); setHolds(holds.map(item => item.id === h.id ? { ...item, spin: (item.spin + 90) % 360 } : item)); } }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
-              <button onClick={() => { const h = holds.find(h => h.id === contextMenu.id); if (h) { recordAction(); setHolds(holds.map(item => item.id === h.id ? { ...item, spin: (item.spin - 90 + 360) % 360 } : item)); } }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCcw size={16} className="text-blue-400" /> Rotation -90°</button>
-              <button onClick={() => { const colors = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000']; const h = holds.find(h => h.id === contextMenu.id); if (h) { recordAction(); const idx = colors.indexOf(h.color || ''); setHolds(holds.map(item => item.id === h.id ? { ...item, color: colors[(idx + 1) % colors.length] } : item)); } }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Couleur Suivante</button>
+              <button onClick={() => { 
+                const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                recordAction();
+                const idSet = new Set(targetIds);
+                setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin + 90) % 360 } : item)); 
+              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
+              
+              <button onClick={() => { 
+                const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                recordAction();
+                const idSet = new Set(targetIds);
+                setHolds(holds.map(item => idSet.has(item.id) ? { ...item, color: holdSettings.color } : item)); 
+              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Appliquer couleur actuelle</button>
+              
               <div className="h-px bg-white/5 my-1" />
-              <button onClick={() => { removeHoldAction(contextMenu.id); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
+              <button onClick={() => { 
+                const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                removeHoldsAction(targetIds); 
+                setContextMenu(null); 
+              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
             </>
           ) : (
             <>

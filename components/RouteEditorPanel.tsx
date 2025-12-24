@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X } from 'lucide-react';
+// Added Info to the imports from lucide-react
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Info } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
@@ -11,20 +12,21 @@ interface RouteEditorPanelProps {
   onUpdateSettings: (settings: any) => void;
   placedHolds: PlacedHold[];
   onRemoveHold: (id: string) => void;
+  onRemoveMultiple: () => void;
   onRemoveAllHolds: () => void;
   onChangeAllHoldsColor: (color: string) => void;
-  selectedPlacedHoldId: string | null;
-  onUpdatePlacedHold: (id: string, updates: Partial<PlacedHold>) => void;
-  onSelectPlacedHold: (id: string | null) => void;
+  selectedPlacedHoldIds: string[];
+  onUpdatePlacedHold: (ids: string[], updates: Partial<PlacedHold>) => void;
+  onSelectPlacedHold: (id: string | null, multi?: boolean) => void;
   onDeselect: () => void;
   onActionStart: () => void;
-  onReplaceHold: (id: string, holdDef: HoldDefinition) => void;
+  onReplaceHold: (ids: string[], holdDef: HoldDefinition) => void;
 }
 
 const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,11 +56,15 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
     fetchLibrary();
   }, []);
 
-  const selectedPlacedHold = placedHolds.find(h => h.id === selectedPlacedHoldId);
+  const isMultiSelection = selectedPlacedHoldIds.length > 1;
+  const anyHoldSelected = selectedPlacedHoldIds.length > 0;
+  
+  // Utilise les valeurs du premier élément sélectionné pour les contrôles de groupe
+  const firstSelectedHold = placedHolds.find(h => h.id === selectedPlacedHoldIds[0]);
 
   const handleCatalogueItemClick = (hold: HoldDefinition) => {
-    if (selectedPlacedHoldId && isReplacingMode) {
-      onReplaceHold(selectedPlacedHoldId, hold);
+    if (anyHoldSelected && isReplacingMode) {
+      onReplaceHold(selectedPlacedHoldIds, hold);
       setIsReplacingMode(false);
     } else {
       onSelectHold(hold);
@@ -80,13 +86,16 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {selectedPlacedHold ? (
+        {anyHoldSelected ? (
           <section className="space-y-4 animate-in slide-in-from-right duration-300">
              <div className="flex items-center justify-between">
-               <div className="flex items-center space-x-2 text-sm font-medium text-blue-400 uppercase tracking-wider"><CheckCircle size={14} /><span>Édition Prise</span></div>
+               <div className="flex items-center space-x-2 text-sm font-medium text-blue-400 uppercase tracking-wider">
+                 {isMultiSelection ? <Layers size={14} /> : <CheckCircle size={14} />}
+                 <span>{isMultiSelection ? `Groupe (${selectedPlacedHoldIds.length})` : 'Édition Prise'}</span>
+               </div>
                <button onClick={onDeselect} className="text-xs text-gray-500 hover:text-white underline">Fermer</button>
              </div>
-             <div className="bg-gray-800 p-4 rounded-lg space-y-4 border border-blue-500/30">
+             <div className={`bg-gray-800 p-4 rounded-lg space-y-4 border ${isMultiSelection ? 'border-emerald-500/30 bg-emerald-950/5' : 'border-blue-500/30'}`}>
                 <div className="flex flex-col gap-2">
                     <button 
                       onClick={() => {
@@ -96,7 +105,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                       className={`w-full py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-bold transition-all border ${isReplacingMode ? 'bg-orange-600 border-orange-500 text-white animate-pulse' : 'bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border-blue-600/50'}`}
                     >
                       <RefreshCw size={16} className={isReplacingMode ? 'animate-spin' : ''} />
-                      <span>{isReplacingMode ? 'Sélectionnez une prise...' : 'Changer le type'}</span>
+                      <span>{isReplacingMode ? 'Sélectionnez une prise...' : isMultiSelection ? 'Changer le type du groupe' : 'Changer le type'}</span>
                     </button>
                     {isReplacingMode && (
                       <p className="text-[10px] text-orange-400 text-center italic">Cliquez sur une prise du catalogue ci-dessous</p>
@@ -107,53 +116,57 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     <label className="text-xs text-gray-400 mb-2 block">Couleur</label>
                     <div className="flex flex-wrap gap-2">
                         {palette.map(c => (
-                            <button key={c} className={`w-6 h-6 rounded-full border-2 ${selectedPlacedHold.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => { onActionStart(); onUpdatePlacedHold(selectedPlacedHold.id, { color: c }); }} />
+                            <button key={c} className={`w-6 h-6 rounded-full border-2 ${firstSelectedHold?.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => { onActionStart(); onUpdatePlacedHold(selectedPlacedHoldIds, { color: c }); }} />
                         ))}
                     </div>
                 </div>
                 <div>
-                    <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><Scaling size={12}/> Taille</span><span className="text-white">x{selectedPlacedHold.scale[0].toFixed(1)}</span></div>
-                    <input type="range" min="0.5" max="3" step="0.1" value={selectedPlacedHold.scale[0]} 
+                    <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><Scaling size={12}/> Taille</span><span className="text-white">x{firstSelectedHold?.scale[0].toFixed(1)}</span></div>
+                    <input type="range" min="0.5" max="3" step="0.1" value={firstSelectedHold?.scale[0] || 1} 
                       onPointerDown={onActionStart}
-                      onChange={(e) => { const s = parseFloat(e.target.value); onUpdatePlacedHold(selectedPlacedHold.id, { scale: [s, s, s] }); }}
+                      onChange={(e) => { const s = parseFloat(e.target.value); onUpdatePlacedHold(selectedPlacedHoldIds, { scale: [s, s, s] }); }}
                       className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                 </div>
                 <div>
-                    <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><RotateCw size={12}/> Rotation</span><span className="text-white">{Math.round(selectedPlacedHold.spin)}°</span></div>
-                    <input type="range" min="0" max="360" step="15" value={selectedPlacedHold.spin} 
+                    <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><RotateCw size={12}/> Rotation</span><span className="text-white">{Math.round(firstSelectedHold?.spin || 0)}°</span></div>
+                    <input type="range" min="0" max="360" step="15" value={firstSelectedHold?.spin || 0} 
                       onPointerDown={onActionStart}
-                      onChange={(e) => onUpdatePlacedHold(selectedPlacedHold.id, { spin: parseFloat(e.target.value) })}
+                      onChange={(e) => onUpdatePlacedHold(selectedPlacedHoldIds, { spin: parseFloat(e.target.value) })}
                       className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
                 </div>
                 <div className="pt-2">
-                    <button onClick={() => onRemoveHold(selectedPlacedHold.id)} className="w-full py-2 text-xs bg-red-900/20 text-red-400 border border-red-900/50 rounded hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2"><Trash2 size={12}/> Supprimer la prise</button>
+                    <button onClick={onRemoveMultiple} className="w-full py-2 text-xs bg-red-900/20 text-red-400 border border-red-900/50 rounded hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2"><Trash2 size={12}/> {isMultiSelection ? 'Supprimer la sélection' : 'Supprimer la prise'}</button>
                 </div>
              </div>
           </section>
         ) : (
-          <>
-            <section className="space-y-4">
-                 <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Box size={14} /><span>Nouvelle Prise</span></div>
-                 <div className="bg-gray-800 p-4 rounded-lg space-y-4 border border-gray-700">
-                    <div>
-                        <label className="text-xs text-gray-400 mb-2 block">Couleur</label>
-                        <div className="flex space-x-2">
-                            {palette.map(c => (
-                                <button key={c} className={`w-6 h-6 rounded-full border-2 ${holdSettings.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => onUpdateSettings({ color: c })} />
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><Scaling size={12}/> Taille</span><span className="text-white">x{holdSettings.scale.toFixed(1)}</span></div>
-                        <input type="range" min="0.5" max="3" step="0.1" value={holdSettings.scale} onChange={(e) => onUpdateSettings({ scale: parseFloat(e.target.value) })} className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" />
-                    </div>
-                    <div>
-                        <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><RotateCw size={12}/> Rotation</span><span className="text-white">{holdSettings.rotation}°</span></div>
-                        <input type="range" min="0" max="360" step="15" value={holdSettings.rotation} onChange={(e) => onUpdateSettings({ rotation: parseFloat(e.target.value) })} className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-                    </div>
-                 </div>
-            </section>
-          </>
+          <section className="space-y-4">
+               <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Box size={14} /><span>Nouvelle Prise</span></div>
+               <div className="bg-gray-800 p-4 rounded-lg space-y-4 border border-gray-700">
+                  <div>
+                      <label className="text-xs text-gray-400 mb-2 block">Couleur</label>
+                      <div className="flex space-x-2">
+                          {palette.map(c => (
+                              <button key={c} className={`w-6 h-6 rounded-full border-2 ${holdSettings.color === c ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => onUpdateSettings({ color: c })} />
+                          ))}
+                      </div>
+                  </div>
+                  <div>
+                      <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><Scaling size={12}/> Taille</span><span className="text-white">x{holdSettings.scale.toFixed(1)}</span></div>
+                      <input type="range" min="0.5" max="3" step="0.1" value={holdSettings.scale} onChange={(e) => onUpdateSettings({ scale: parseFloat(e.target.value) })} className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+                  </div>
+                  <div>
+                      <div className="flex justify-between text-xs mb-1 text-gray-400"><span className="flex items-center gap-1"><RotateCw size={12}/> Rotation</span><span className="text-white">{holdSettings.rotation}°</span></div>
+                      <input type="range" min="0" max="360" step="15" value={holdSettings.rotation} onChange={(e) => onUpdateSettings({ rotation: parseFloat(e.target.value) })} className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+                  </div>
+               </div>
+               <div className="p-3 bg-blue-900/20 border border-blue-800 rounded-lg">
+                 <p className="text-[10px] text-blue-300 leading-tight flex items-start gap-2">
+                   <Info size={12} className="flex-shrink-0 mt-0.5" />
+                   Astuce : Maintenez Ctrl ou Cmd pour sélectionner plusieurs prises sur le mur.
+                 </p>
+               </div>
+          </section>
         )}
 
         <section className="space-y-2">
@@ -182,7 +195,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                           <button 
                             key={hold.id} 
                             onClick={() => handleCatalogueItemClick(hold)} 
-                            className={`relative rounded-lg border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id && !selectedPlacedHoldId ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
+                            className={`relative rounded-lg border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id && !anyHoldSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
                           >
                               <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
                               <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
@@ -194,12 +207,12 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
             )}
         </section>
 
-        {!selectedPlacedHold && (
+        {!anyHoldSelected && (
           <section className="pt-4 border-t border-gray-800">
                <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
               <div className="max-h-64 overflow-y-auto space-y-1">
                   {placedHolds.slice().reverse().map((h, i) => (
-                      <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded border cursor-pointer transition-colors ${selectedPlacedHoldId === h.id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={() => onSelectPlacedHold(h.id)}>
+                      <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded border cursor-pointer transition-colors ${selectedPlacedHoldIds.includes(h.id) ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={(e) => onSelectPlacedHold(h.id, e.ctrlKey || e.metaKey)}>
                           <span className="text-gray-300">Prise #{placedHolds.length - i}</span>
                           <button onClick={(e) => { e.stopPropagation(); onRemoveHold(h.id); }} className="text-gray-500 hover:text-red-400"><Trash2 size={12}/></button>
                       </div>

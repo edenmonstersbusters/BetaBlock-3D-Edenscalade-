@@ -14,8 +14,8 @@ interface SceneProps {
   onPlaceHold: (position: THREE.Vector3, normal: THREE.Vector3, faceIndex?: number) => void;
   selectedHoldDef: HoldDefinition | null;
   holdSettings: { scale: number; rotation: number; color: string };
-  selectedPlacedHoldId: string | null;
-  onSelectPlacedHold: (id: string | null) => void;
+  selectedPlacedHoldIds: string[];
+  onSelectPlacedHold: (id: string | null, multi?: boolean) => void;
   onContextMenu: (type: 'HOLD' | 'SEGMENT', id: string, x: number, y: number) => void;
 }
 
@@ -26,7 +26,7 @@ export const Scene: React.FC<SceneProps> = ({
   onPlaceHold, 
   selectedHoldDef,
   holdSettings,
-  selectedPlacedHoldId,
+  selectedPlacedHoldIds,
   onSelectPlacedHold,
   onContextMenu,
 }) => {
@@ -36,7 +36,7 @@ export const Scene: React.FC<SceneProps> = ({
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (mode !== 'SET') return;
 
-    if (!selectedHoldDef || selectedPlacedHoldId) {
+    if (!selectedHoldDef || selectedPlacedHoldIds.length > 0) {
       if (ghostPos) setGhostPos(null);
       return;
     }
@@ -62,7 +62,7 @@ export const Scene: React.FC<SceneProps> = ({
     if (e.button !== 0) return;
 
     if (e.face && e.object.name === 'climbing-wall') {
-       if (selectedPlacedHoldId) {
+       if (selectedPlacedHoldIds.length > 0) {
          e.stopPropagation();
          onSelectPlacedHold(null);
        } else if (selectedHoldDef) {
@@ -127,11 +127,12 @@ export const Scene: React.FC<SceneProps> = ({
                     rotation={hold.rotation}
                     scale={hold.scale}
                     color={hold.color}
-                    isSelected={selectedPlacedHoldId === hold.id}
+                    isSelected={selectedPlacedHoldIds.includes(hold.id)}
                     onClick={(e) => {
                       if (e.button === 0) {
                         e.stopPropagation();
-                        onSelectPlacedHold(hold.id);
+                        const isMulti = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
+                        onSelectPlacedHold(hold.id, isMulti);
                       }
                     }}
                     onContextMenu={(e) => {
@@ -143,7 +144,7 @@ export const Scene: React.FC<SceneProps> = ({
             ))}
         </Suspense>
 
-        {mode === 'SET' && selectedHoldDef && ghostPos && ghostRot && !selectedPlacedHoldId && (
+        {mode === 'SET' && selectedHoldDef && ghostPos && ghostRot && selectedPlacedHoldIds.length === 0 && (
             <Suspense fallback={null}>
                 <HoldModel 
                     modelFilename={selectedHoldDef.filename}
