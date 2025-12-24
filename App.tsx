@@ -5,7 +5,7 @@ import { Scene } from './components/Scene';
 import { EditorPanel } from './components/EditorPanel';
 import { RouteEditorPanel } from './components/RouteEditorPanel';
 import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment } from './types';
-import { AlertTriangle, Info, Trash2, RotateCw, MoveUp, Palette, ChevronRight, Undo2, Redo2 } from 'lucide-react';
+import { AlertTriangle, Info, Trash2, RotateCw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2 } from 'lucide-react';
 
 const INITIAL_CONFIG: WallConfig = {
   width: 4,
@@ -186,6 +186,21 @@ function App() {
     });
   };
 
+  const removeAllHoldsAction = () => {
+    if (holds.length === 0) return;
+    setModal({
+      title: "Tout supprimer", 
+      message: `Voulez-vous vraiment supprimer les ${holds.length} prises du mur ? Cette action est irréversible.`, 
+      confirmText: "Tout supprimer",
+      onConfirm: () => {
+        recordAction();
+        setHolds([]);
+        setSelectedPlacedHoldId(null);
+      }
+    });
+  };
+
+  // Fix: Definition of removeSegmentAction used in the context menu
   const removeSegmentAction = (id: string) => {
     const segmentHolds = holds.filter(h => h.segmentId === id);
     const message = segmentHolds.length > 0 
@@ -245,7 +260,7 @@ function App() {
         <RouteEditorPanel 
             onBack={() => setMode('BUILD')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
             holdSettings={holdSettings} onUpdateSettings={(s) => setHoldSettings(prev => ({ ...prev, ...s }))}
-            placedHolds={holds} onRemoveHold={removeHoldAction} selectedPlacedHoldId={selectedPlacedHoldId}
+            placedHolds={holds} onRemoveHold={removeHoldAction} onRemoveAllHolds={removeAllHoldsAction} selectedPlacedHoldId={selectedPlacedHoldId}
             onUpdatePlacedHold={(id, u) => setHolds(holds.map(h => h.id === id ? { ...h, ...u } : h))}
             onSelectPlacedHold={setSelectedPlacedHoldId} onDeselect={() => setSelectedPlacedHoldId(null)}
             onActionStart={recordAction}
@@ -309,6 +324,7 @@ function App() {
               <button onClick={() => updateSegmentQuickly(contextMenu.id, { angle: 10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-orange-400"/> Dévers +10°</span><ChevronRight size={14} className="text-gray-600"/></button>
               <button onClick={() => updateSegmentQuickly(contextMenu.id, { angle: -10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-blue-400"/> Dévers -10°</span><ChevronRight size={14} className="text-gray-600"/></button>
               <button onClick={() => updateSegmentQuickly(contextMenu.id, { height: 0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveUp size={16} className="text-emerald-400"/> Hauteur +0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
+              <button onClick={() => updateSegmentQuickly(contextMenu.id, { height: -0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveDown size={16} className="text-red-400"/> Hauteur -0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
               <div className="h-px bg-white/5 my-1" />
               <button onClick={() => { removeSegmentAction(contextMenu.id); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer le pan</button>
             </>

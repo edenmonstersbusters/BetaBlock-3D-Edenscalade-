@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
@@ -11,6 +11,7 @@ interface RouteEditorPanelProps {
   onUpdateSettings: (settings: any) => void;
   placedHolds: PlacedHold[];
   onRemoveHold: (id: string) => void;
+  onRemoveAllHolds: () => void;
   selectedPlacedHoldId: string | null;
   onUpdatePlacedHold: (id: string, updates: Partial<PlacedHold>) => void;
   onSelectPlacedHold: (id: string | null) => void;
@@ -21,11 +22,12 @@ interface RouteEditorPanelProps {
 const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveAllHolds, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [catalogueExpanded, setCatalogueExpanded] = useState(false);
 
   // Couleurs accentuées pour le contraste Orange/Rouge
   // Orange: #ff8800 | Rouge: #9f0000
@@ -120,17 +122,37 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                  </div>
             </section>
 
-            <section className="space-y-4">
-                <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider"><span>Catalogue ({library.length})</span></div>
-                {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div> : (
-                    <div className="grid grid-cols-2 gap-2">
-                        {library.map((hold) => (
-                            <button key={hold.id} onClick={() => onSelectHold(hold)} className={`relative rounded-lg bg-gray-800 border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}>
-                                <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
-                                <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
-                            </button>
-                        ))}
-                    </div>
+            <section className="space-y-2">
+                <button 
+                  onClick={() => setCatalogueExpanded(!catalogueExpanded)}
+                  className="w-full flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50 p-2 rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Box size={14} />
+                    <span>Catalogue ({library.length})</span>
+                  </div>
+                  {catalogueExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+                
+                {catalogueExpanded && (
+                  <div className="animate-in slide-in-from-top-2 duration-200">
+                    {loading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                          {library.map((hold) => (
+                              <button 
+                                key={hold.id} 
+                                onClick={() => onSelectHold(hold)} 
+                                className={`relative rounded-lg bg-gray-800 border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
+                              >
+                                  <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
+                                  <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
+                              </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 )}
             </section>
           </>
@@ -138,7 +160,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 
         <section className="pt-4 border-t border-gray-800">
              <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
-            <div className="max-h-32 overflow-y-auto space-y-1">
+            <div className="max-h-64 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-700">
                 {placedHolds.slice().reverse().map((h, i) => (
                     <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded border cursor-pointer transition-colors ${selectedPlacedHoldId === h.id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={() => onSelectPlacedHold(h.id)}>
                         <span className="text-gray-300">Prise #{placedHolds.length - i}</span>
@@ -146,6 +168,15 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     </div>
                 ))}
             </div>
+            {placedHolds.length > 0 && (
+              <button 
+                onClick={onRemoveAllHolds}
+                className="w-full mt-4 py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
+              >
+                <Trash2 size={14} />
+                <span>Supprimer toutes les prises</span>
+              </button>
+            )}
         </section>
       </div>
     </div>
