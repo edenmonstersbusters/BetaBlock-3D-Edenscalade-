@@ -72,7 +72,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-700">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {selectedPlacedHold ? (
           <section className="space-y-4 animate-in slide-in-from-right duration-300">
              <div className="flex items-center justify-between">
@@ -190,7 +190,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         {!selectedPlacedHold && (
           <section className="pt-4 border-t border-gray-800">
                <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
-              <div className="max-h-64 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-700">
+              <div className="max-h-64 overflow-y-auto space-y-1">
                   {placedHolds.slice().reverse().map((h, i) => (
                       <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded border cursor-pointer transition-colors ${selectedPlacedHoldId === h.id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={() => onSelectPlacedHold(h.id)}>
                           <span className="text-gray-300">Prise #{placedHolds.length - i}</span>

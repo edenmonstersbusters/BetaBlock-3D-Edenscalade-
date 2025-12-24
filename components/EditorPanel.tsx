@@ -82,7 +82,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdat
         <p className="text-xs text-gray-500 mt-1">Configuration du Mur</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-700">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <section className="space-y-4">
           <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Maximize size={14} /><span>Dimensions Globales</span></div>
           <div className="bg-gray-800 p-4 rounded-lg space-y-4 border border-gray-700">
