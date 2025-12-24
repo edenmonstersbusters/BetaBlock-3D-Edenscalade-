@@ -1,3 +1,7 @@
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
 # Run and deploy your AI Studio app
 
 This contains everything you need to run your app locally.
@@ -6,29 +10,11 @@ View your app in AI Studio: https://ai.studio/apps/drive/12i8PkwiFZ9Zf7xqJ5ukhYn
 
 ## Run Locally
 
-***Prerequisites:***  Node.js (https://nodejs.org/)
+**Prerequisites:**  Node.js
 
-**Install the repository**
-
-1. Download all file in the repository
-2. Open a terminal in your folder with the repository (cmd in explorate bar)
-
-**Clone the repository**
-
-If your don't want to install all file :
-   ```bash
-   git clone https://github.com/edenmonstersbusters/BetaBlock-3D-Edenscalade-.git
-   cd BetaBlock-3D-Edenscalade-
-   ```
-**Launch application**
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key :
-   - create .env.local file in the racine of the project
-   - write : GEMINI_API_KEY=votre_cle_api_ici
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-
-
-
