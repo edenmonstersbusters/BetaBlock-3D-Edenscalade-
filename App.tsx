@@ -209,6 +209,20 @@ function App() {
     });
   };
 
+  const changeAllHoldsColorAction = (newColor: string) => {
+    if (holds.length === 0) return;
+    setModal({
+      title: "Confirmation du changement",
+      message: `Appliquer la couleur choisie à l'intégralité des ${holds.length} prises ?`,
+      confirmText: "Confirmer",
+      isAlert: false, // Permet d'afficher le bouton Annuler
+      onConfirm: () => {
+        recordAction();
+        setHolds(holds.map(h => ({ ...h, color: newColor })));
+      }
+    });
+  };
+
   const removeSegmentAction = (id: string) => {
     const segmentHolds = holds.filter(h => h.segmentId === id);
     const message = segmentHolds.length > 0 
@@ -268,7 +282,7 @@ function App() {
         <RouteEditorPanel 
             onBack={() => setMode('BUILD')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
             holdSettings={holdSettings} onUpdateSettings={(s) => setHoldSettings(prev => ({ ...prev, ...s }))}
-            placedHolds={holds} onRemoveHold={removeHoldAction} onRemoveAllHolds={removeAllHoldsAction} selectedPlacedHoldId={selectedPlacedHoldId}
+            placedHolds={holds} onRemoveHold={removeHoldAction} onRemoveAllHolds={removeAllHoldsAction} onChangeAllHoldsColor={changeAllHoldsColorAction} selectedPlacedHoldId={selectedPlacedHoldId}
             onUpdatePlacedHold={(id, u) => setHolds(holds.map(h => h.id === id ? { ...h, ...u } : h))}
             onSelectPlacedHold={setSelectedPlacedHoldId} onDeselect={() => setSelectedPlacedHoldId(null)}
             onActionStart={recordAction} onReplaceHold={handleReplaceHold}
@@ -317,8 +331,8 @@ function App() {
       {modal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-white/10 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6"><div className="flex items-center gap-3 mb-4"><div className={`p-2 rounded-lg ${modal.isAlert ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'}`}>{modal.isAlert ? <Info size={24} /> : <AlertTriangle size={24} />}</div><h2 className="text-xl font-bold text-white">{modal.title}</h2></div><p className="text-gray-400 text-sm leading-relaxed">{modal.message}</p></div>
-            <div className="p-4 bg-gray-950/50 flex flex-row-reverse gap-3"><button onClick={() => { if (modal.onConfirm) modal.onConfirm(); setModal(null); }} className={`px-6 py-2 rounded-xl font-bold transition-all ${modal.isAlert ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-red-600 hover:bg-red-500 text-white'}`}>{modal.confirmText || "OK"}</button>{!modal.isAlert && <button onClick={() => setModal(null)} className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-all border border-white/5">Annuler</button>}</div>
+            <div className="p-6"><div className="flex items-center gap-3 mb-4"><div className={`p-2 rounded-lg ${modal.isAlert ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>{modal.isAlert ? <Info size={24} /> : <AlertTriangle size={24} />}</div><h2 className="text-xl font-bold text-white">{modal.title}</h2></div><p className="text-gray-400 text-sm leading-relaxed">{modal.message}</p></div>
+            <div className="p-4 bg-gray-950/50 flex flex-row-reverse gap-3"><button onClick={() => { if (modal.onConfirm) modal.onConfirm(); setModal(null); }} className={`px-6 py-2 rounded-xl font-bold transition-all ${modal.isAlert ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>{modal.confirmText || "OK"}</button>{!modal.isAlert && <button onClick={() => setModal(null)} className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-all border border-white/5">Annuler</button>}</div>
           </div>
         </div>
       )}

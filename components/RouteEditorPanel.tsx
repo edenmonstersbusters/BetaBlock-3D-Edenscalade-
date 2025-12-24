@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
@@ -12,6 +12,7 @@ interface RouteEditorPanelProps {
   placedHolds: PlacedHold[];
   onRemoveHold: (id: string) => void;
   onRemoveAllHolds: () => void;
+  onChangeAllHoldsColor: (color: string) => void;
   selectedPlacedHoldId: string | null;
   onUpdatePlacedHold: (id: string, updates: Partial<PlacedHold>) => void;
   onSelectPlacedHold: (id: string | null) => void;
@@ -23,13 +24,14 @@ interface RouteEditorPanelProps {
 const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveAllHolds, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [isReplacingMode, setIsReplacingMode] = useState(false);
+  const [isPickingAllColor, setIsPickingAllColor] = useState(false);
 
   const palette = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000'];
 
@@ -61,6 +63,11 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
     } else {
       onSelectHold(hold);
     }
+  };
+
+  const handleAllColorPick = (color: string) => {
+    onChangeAllHoldsColor(color);
+    setIsPickingAllColor(false);
   };
 
   return (
@@ -199,13 +206,37 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                   ))}
               </div>
               {placedHolds.length > 0 && (
-                <button 
-                  onClick={onRemoveAllHolds}
-                  className="w-full mt-4 py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
-                >
-                  <Trash2 size={14} />
-                  <span>Supprimer toutes les prises</span>
-                </button>
+                <div className="space-y-2 mt-4">
+                  {isPickingAllColor ? (
+                    <div className="bg-gray-800 p-3 rounded-xl border border-blue-500/50 space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Choisir la couleur</span>
+                        <button onClick={() => setIsPickingAllColor(false)} className="text-gray-500 hover:text-white"><X size={14}/></button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {palette.map(c => (
+                          <button key={c} className="w-8 h-8 rounded-full border border-white/10 hover:scale-110 transition-transform shadow-lg" style={{ backgroundColor: c }} onClick={() => handleAllColorPick(c)} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setIsPickingAllColor(true)}
+                      className="w-full py-2 px-4 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-600/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                    >
+                      <Palette size={14} />
+                      <span>Changer la couleur de toutes les prises</span>
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={onRemoveAllHolds}
+                    className="w-full py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                  >
+                    <Trash2 size={14} />
+                    <span>Supprimer toutes les prises</span>
+                  </button>
+                </div>
               )}
           </section>
         )}
