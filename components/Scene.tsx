@@ -1,6 +1,6 @@
 
-import React, { useState, Suspense } from 'react';
-import { Canvas, ThreeEvent } from '@react-three/fiber';
+import React, { useState, Suspense, useCallback, useEffect } from 'react';
+import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
@@ -28,13 +28,15 @@ export const Scene: React.FC<SceneProps> = ({
   holdSettings,
   selectedPlacedHoldId,
   onSelectPlacedHold,
-  onContextMenu
+  onContextMenu,
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-    if (mode !== 'SET' || !selectedHoldDef || selectedPlacedHoldId) {
+    if (mode !== 'SET') return;
+
+    if (!selectedHoldDef || selectedPlacedHoldId) {
       if (ghostPos) setGhostPos(null);
       return;
     }
@@ -57,8 +59,6 @@ export const Scene: React.FC<SceneProps> = ({
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (mode !== 'SET') return;
-    
-    // BLOQUER TOUTE ACTION SI CE N'EST PAS UN CLIC GAUCHE
     if (e.button !== 0) return;
 
     if (e.face && e.object.name === 'climbing-wall') {
@@ -77,7 +77,6 @@ export const Scene: React.FC<SceneProps> = ({
 
   const handleWallContextMenu = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    // Bloquer le menu par défaut du navigateur
     e.nativeEvent.preventDefault();
     if (e.faceIndex !== undefined) {
       const segmentIndex = Math.floor(e.faceIndex / 2);
@@ -86,7 +85,7 @@ export const Scene: React.FC<SceneProps> = ({
       }
     }
   };
-  
+
   return (
     <Canvas 
       shadows 
@@ -97,7 +96,12 @@ export const Scene: React.FC<SceneProps> = ({
       }}
     >
       <color attach="background" args={['#1a1a1a']} />
-      <OrbitControls makeDefault minPolarAngle={0} maxPolarAngle={Math.PI / 1.8} target={[0, 2, 0]} enabled={true} />
+      <OrbitControls 
+        makeDefault 
+        minPolarAngle={0} 
+        maxPolarAngle={Math.PI / 1.8} 
+        target={[0, 2, 0]} 
+      />
       <ambientLight intensity={0.2} />
       <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#444444" />
       <directionalLight position={[10, 15, 10]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0005}>

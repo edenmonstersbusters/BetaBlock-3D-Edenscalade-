@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
@@ -17,20 +17,20 @@ interface RouteEditorPanelProps {
   onSelectPlacedHold: (id: string | null) => void;
   onDeselect: () => void;
   onActionStart: () => void;
+  onReplaceHold: (id: string, holdDef: HoldDefinition) => void;
 }
 
 const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveAllHolds, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveAllHolds, selectedPlacedHoldId, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
+  const [isReplacingMode, setIsReplacingMode] = useState(false);
 
-  // Couleurs accentuées pour le contraste Orange/Rouge
-  // Orange: #ff8800 | Rouge: #9f0000
   const palette = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000'];
 
   useEffect(() => {
@@ -54,6 +54,15 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 
   const selectedPlacedHold = placedHolds.find(h => h.id === selectedPlacedHoldId);
 
+  const handleCatalogueItemClick = (hold: HoldDefinition) => {
+    if (selectedPlacedHoldId && isReplacingMode) {
+      onReplaceHold(selectedPlacedHoldId, hold);
+      setIsReplacingMode(false);
+    } else {
+      onSelectHold(hold);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden">
        <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
@@ -68,9 +77,25 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
           <section className="space-y-4 animate-in slide-in-from-right duration-300">
              <div className="flex items-center justify-between">
                <div className="flex items-center space-x-2 text-sm font-medium text-blue-400 uppercase tracking-wider"><CheckCircle size={14} /><span>Édition Prise</span></div>
-               <button onClick={onDeselect} className="text-xs text-gray-500 hover:text-white underline">Annuler</button>
+               <button onClick={onDeselect} className="text-xs text-gray-500 hover:text-white underline">Fermer</button>
              </div>
              <div className="bg-gray-800 p-4 rounded-lg space-y-4 border border-blue-500/30">
+                <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => {
+                        setCatalogueExpanded(true);
+                        setIsReplacingMode(true);
+                      }}
+                      className={`w-full py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-bold transition-all border ${isReplacingMode ? 'bg-orange-600 border-orange-500 text-white animate-pulse' : 'bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border-blue-600/50'}`}
+                    >
+                      <RefreshCw size={16} className={isReplacingMode ? 'animate-spin' : ''} />
+                      <span>{isReplacingMode ? 'Sélectionnez une prise...' : 'Changer le type'}</span>
+                    </button>
+                    {isReplacingMode && (
+                      <p className="text-[10px] text-orange-400 text-center italic">Cliquez sur une prise du catalogue ci-dessous</p>
+                    )}
+                </div>
+
                 <div>
                     <label className="text-xs text-gray-400 mb-2 block">Couleur</label>
                     <div className="flex flex-wrap gap-2">
@@ -121,63 +146,69 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     </div>
                  </div>
             </section>
-
-            <section className="space-y-2">
-                <button 
-                  onClick={() => setCatalogueExpanded(!catalogueExpanded)}
-                  className="w-full flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50 p-2 rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Box size={14} />
-                    <span>Catalogue ({library.length})</span>
-                  </div>
-                  {catalogueExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-                
-                {catalogueExpanded && (
-                  <div className="animate-in slide-in-from-top-2 duration-200">
-                    {loading ? (
-                      <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                          {library.map((hold) => (
-                              <button 
-                                key={hold.id} 
-                                onClick={() => onSelectHold(hold)} 
-                                className={`relative rounded-lg bg-gray-800 border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
-                              >
-                                  <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
-                                  <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
-                              </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-            </section>
           </>
         )}
 
-        <section className="pt-4 border-t border-gray-800">
-             <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
-            <div className="max-h-64 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-700">
-                {placedHolds.slice().reverse().map((h, i) => (
-                    <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded border cursor-pointer transition-colors ${selectedPlacedHoldId === h.id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={() => onSelectPlacedHold(h.id)}>
-                        <span className="text-gray-300">Prise #{placedHolds.length - i}</span>
-                        <button onClick={(e) => { e.stopPropagation(); onRemoveHold(h.id); }} className="text-gray-500 hover:text-red-400"><Trash2 size={12}/></button>
-                    </div>
-                ))}
-            </div>
-            {placedHolds.length > 0 && (
-              <button 
-                onClick={onRemoveAllHolds}
-                className="w-full mt-4 py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
-              >
-                <Trash2 size={14} />
-                <span>Supprimer toutes les prises</span>
-              </button>
+        <section className="space-y-2">
+            <button 
+              onClick={() => {
+                setCatalogueExpanded(!catalogueExpanded);
+                if (catalogueExpanded) setIsReplacingMode(false);
+              }}
+              className={`w-full flex items-center justify-between text-sm font-medium uppercase tracking-wider p-2 rounded-lg transition-colors ${isReplacingMode ? 'bg-orange-600/20 text-orange-400 ring-1 ring-orange-500/50' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'}`}
+            >
+              <div className="flex items-center gap-2">
+                <Box size={14} />
+                <span>Catalogue ({library.length})</span>
+                {isReplacingMode && <span className="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full animate-pulse ml-2">REMPLACEMENT</span>}
+              </div>
+              {catalogueExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            
+            {catalogueExpanded && (
+              <div className="animate-in slide-in-from-top-2 duration-200">
+                {loading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                      {library.map((hold) => (
+                          <button 
+                            key={hold.id} 
+                            onClick={() => handleCatalogueItemClick(hold)} 
+                            className={`relative rounded-lg border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id && !selectedPlacedHoldId ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
+                          >
+                              <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
+                              <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
+                          </button>
+                      ))}
+                  </div>
+                )}
+              </div>
             )}
         </section>
+
+        {!selectedPlacedHold && (
+          <section className="pt-4 border-t border-gray-800">
+               <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
+              <div className="max-h-64 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-700">
+                  {placedHolds.slice().reverse().map((h, i) => (
+                      <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded border cursor-pointer transition-colors ${selectedPlacedHoldId === h.id ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={() => onSelectPlacedHold(h.id)}>
+                          <span className="text-gray-300">Prise #{placedHolds.length - i}</span>
+                          <button onClick={(e) => { e.stopPropagation(); onRemoveHold(h.id); }} className="text-gray-500 hover:text-red-400"><Trash2 size={12}/></button>
+                      </div>
+                  ))}
+              </div>
+              {placedHolds.length > 0 && (
+                <button 
+                  onClick={onRemoveAllHolds}
+                  className="w-full mt-4 py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                >
+                  <Trash2 size={14} />
+                  <span>Supprimer toutes les prises</span>
+                </button>
+              )}
+          </section>
+        )}
       </div>
     </div>
   );

@@ -40,7 +40,7 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
       return (vertices.length / 3) - 1;
     };
 
-    // 1. FRONT FACE (Z+)
+    // FRONT FACE (Z+)
     for (let i = 0; i < config.segments.length; i++) {
       const p1 = spinePoints[i];
       const p2 = spinePoints[i+1];
@@ -50,7 +50,7 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
       const v3 = pushV(-wHalf, p2.y, p2.z, 0, p2.y/3);
       indices.push(v0, v1, v2, v0, v2, v3);
     }
-    // ... Simplified rendering for other faces to match existing geometry logic
+    // BACK FACE
     for (let i = 0; i < config.segments.length; i++) {
       const p1 = spinePoints[i]; const p2 = spinePoints[i+1];
       const v0 = pushV(-wHalf, p1.y, p1.z - thickness, 0, p1.y/3);
@@ -59,6 +59,7 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
       const v3 = pushV(-wHalf, p2.y, p2.z - thickness, 0, p2.y/3);
       indices.push(v0, v2, v1, v0, v3, v2);
     }
+    // SIDES
     for (let i = 0; i < config.segments.length; i++) {
       const p1 = spinePoints[i]; const p2 = spinePoints[i+1];
       const v0 = pushV(-wHalf, p1.y, p1.z, 0, p1.y/3);

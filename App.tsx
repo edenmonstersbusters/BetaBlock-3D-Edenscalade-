@@ -5,7 +5,7 @@ import { Scene } from './components/Scene';
 import { EditorPanel } from './components/EditorPanel';
 import { RouteEditorPanel } from './components/RouteEditorPanel';
 import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment } from './types';
-import { AlertTriangle, Info, Trash2, RotateCw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2 } from 'lucide-react';
+import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2 } from 'lucide-react';
 
 const INITIAL_CONFIG: WallConfig = {
   width: 4,
@@ -140,7 +140,6 @@ function App() {
 
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
   const [selectedPlacedHoldId, setSelectedPlacedHoldId] = useState<string | null>(null);
-  // Orange par défaut accentué : #ff8800
   const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
 
   const renderableHolds = useMemo(() => {
@@ -156,7 +155,7 @@ function App() {
     const segmentIndex = Math.floor(faceIndex / 2);
     if (segmentIndex >= config.segments.length) return;
     
-    recordAction(); // Save before placing
+    recordAction(); 
     const segment = config.segments[segmentIndex];
     const x = position.x;
     let segmentStartY = 0; let segmentStartZ = 0;
@@ -173,6 +172,16 @@ function App() {
       x, y, spin: holdSettings.rotation, scale: [holdSettings.scale, holdSettings.scale, holdSettings.scale], color: holdSettings.color
     };
     setHolds([...holds, newHold]);
+  };
+
+  const handleReplaceHold = (id: string, holdDef: HoldDefinition) => {
+    recordAction();
+    setHolds(prev => prev.map(h => h.id === id ? { 
+      ...h, 
+      modelId: holdDef.id, 
+      filename: holdDef.filename, 
+      modelBaseScale: holdDef.baseScale 
+    } : h));
   };
 
   const removeHoldAction = (id: string) => {
@@ -200,7 +209,6 @@ function App() {
     });
   };
 
-  // Fix: Definition of removeSegmentAction used in the context menu
   const removeSegmentAction = (id: string) => {
     const segmentHolds = holds.filter(h => h.segmentId === id);
     const message = segmentHolds.length > 0 
@@ -263,28 +271,13 @@ function App() {
             placedHolds={holds} onRemoveHold={removeHoldAction} onRemoveAllHolds={removeAllHoldsAction} selectedPlacedHoldId={selectedPlacedHoldId}
             onUpdatePlacedHold={(id, u) => setHolds(holds.map(h => h.id === id ? { ...h, ...u } : h))}
             onSelectPlacedHold={setSelectedPlacedHoldId} onDeselect={() => setSelectedPlacedHoldId(null)}
-            onActionStart={recordAction}
+            onActionStart={recordAction} onReplaceHold={handleReplaceHold}
         />
       )}
 
-      {/* UNDO REDO QUICK BUTTONS */}
       <div className="fixed bottom-6 right-6 z-[100] flex gap-2">
-          <button 
-            disabled={past.length === 0}
-            onClick={undo}
-            className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md"
-            title="Annuler (Ctrl+Z)"
-          >
-            <Undo2 size={20} />
-          </button>
-          <button 
-            disabled={future.length === 0}
-            onClick={redo}
-            className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md"
-            title="Rétablir (Ctrl+Y)"
-          >
-            <Redo2 size={20} />
-          </button>
+          <button disabled={past.length === 0} onClick={undo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md" title="Annuler (Ctrl+Z)"><Undo2 size={20} /></button>
+          <button disabled={future.length === 0} onClick={redo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md" title="Rétablir (Ctrl+Y)"><Redo2 size={20} /></button>
       </div>
 
       <div className="flex-1 relative h-full">
@@ -297,24 +290,13 @@ function App() {
       </div>
 
       {contextMenu && (
-        <div 
-          className="fixed z-[150] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-150"
-          style={{ top: Math.min(contextMenu.y, window.innerHeight - 300), left: Math.min(contextMenu.x, window.innerWidth - 240) }}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="fixed z-[150] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-150" style={{ top: Math.min(contextMenu.y, window.innerHeight - 300), left: Math.min(contextMenu.x, window.innerWidth - 240) }} onClick={(e) => e.stopPropagation()}>
           {contextMenu.type === 'HOLD' ? (
             <>
               <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
-              <button onClick={() => { 
-                const h = holds.find(h => h.id === contextMenu.id);
-                if (h) { recordAction(); setHolds(holds.map(item => item.id === h.id ? { ...item, spin: (item.spin + 90) % 360 } : item)); }
-              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-blue-400" /> Rotation +90°</button>
-              <button onClick={() => { 
-                // Palette mise à jour pour accentuer le contraste Orange/Rouge
-                const colors = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000'];
-                const h = holds.find(h => h.id === contextMenu.id);
-                if (h) { recordAction(); const idx = colors.indexOf(h.color || ''); setHolds(holds.map(item => item.id === h.id ? { ...item, color: colors[(idx + 1) % colors.length] } : item)); }
-              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-emerald-400" /> Couleur Suivante</button>
+              <button onClick={() => { const h = holds.find(h => h.id === contextMenu.id); if (h) { recordAction(); setHolds(holds.map(item => item.id === h.id ? { ...item, spin: (item.spin + 90) % 360 } : item)); } }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
+              <button onClick={() => { const h = holds.find(h => h.id === contextMenu.id); if (h) { recordAction(); setHolds(holds.map(item => item.id === h.id ? { ...item, spin: (item.spin - 90 + 360) % 360 } : item)); } }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCcw size={16} className="text-blue-400" /> Rotation -90°</button>
+              <button onClick={() => { const colors = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000']; const h = holds.find(h => h.id === contextMenu.id); if (h) { recordAction(); const idx = colors.indexOf(h.color || ''); setHolds(holds.map(item => item.id === h.id ? { ...item, color: colors[(idx + 1) % colors.length] } : item)); } }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Couleur Suivante</button>
               <div className="h-px bg-white/5 my-1" />
               <button onClick={() => { removeHoldAction(contextMenu.id); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
             </>
