@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
+// Import types to ensure global JSX intrinsic element extensions are loaded
+import '../types'; 
 
 interface SceneProps {
   config: WallConfig;
@@ -89,24 +91,42 @@ export const Scene: React.FC<SceneProps> = ({
   return (
     <Canvas 
       shadows 
-      camera={{ position: [5, 5, 8], fov: 45 }}
+      camera={{ position: [10, 8, 15], fov: 35 }}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 1.0; 
       }}
     >
-      <color attach="background" args={['#1a1a1a']} />
+      <color attach="background" args={['#111111']} />
+      
       <OrbitControls 
         makeDefault 
         minPolarAngle={0} 
         maxPolarAngle={Math.PI / 1.8} 
-        target={[0, 2, 0]} 
+        target={[0, 2.5, 0]} 
       />
-      <ambientLight intensity={0.2} />
-      <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#444444" />
-      <directionalLight position={[10, 15, 10]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0005}>
-        <orthographicCamera attach="shadow-camera" args={[-8, 8, 8, -8, 0.5, 50]} />
+      
+      <directionalLight 
+        position={[10, 15, 10]} 
+        intensity={0.8} 
+        color="#ffffff"
+        castShadow 
+        shadow-mapSize={[2048, 2048]} 
+        shadow-bias={-0.0001} // Bias fin pour éviter le détachement de l'ombre
+        shadow-normalBias={0.02} // Élimination radicale du shadow acne le long des normales
+      >
+        <orthographicCamera attach="shadow-camera" args={[-20, 20, 20, -20, 0.5, 50]} />
       </directionalLight>
+
+      <ambientLight intensity={0.4} />
+      
+      <hemisphereLight 
+        intensity={0.4} 
+        color="#ffffff" 
+        groundColor="#000000" 
+      />
 
       <group position={[0, 0, 0]}>
         <WallMesh 
@@ -131,7 +151,7 @@ export const Scene: React.FC<SceneProps> = ({
                     onClick={(e) => {
                       if (e.button === 0) {
                         e.stopPropagation();
-                        const isMulti = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
+                        const isMulti = e.nativeEvent.ctrlKey || e.metaKey;
                         onSelectPlacedHold(hold.id, isMulti);
                       }
                     }}
@@ -160,9 +180,30 @@ export const Scene: React.FC<SceneProps> = ({
         )}
       </group>
 
-      <Grid position={[0, -0.01, 0]} args={[20, 20]} cellSize={1} cellThickness={1} cellColor="#444" sectionSize={5} sectionThickness={1.5} sectionColor="#666" fadeDistance={30} fadeStrength={1} infiniteGrid />
-      <ContactShadows opacity={0.4} scale={20} blur={2} far={4} resolution={256} color="#000000" />
-      <Environment preset="city" />
+      <Grid 
+        position={[0, -0.01, 0]} 
+        args={[40, 40]} 
+        cellSize={1} 
+        cellThickness={1} 
+        cellColor="#2a2a2a" 
+        sectionSize={5} 
+        sectionThickness={1.5} 
+        sectionColor="#333" 
+        fadeDistance={50} 
+        fadeStrength={1} 
+        infiniteGrid 
+      />
+      
+      <ContactShadows 
+        opacity={0.6} 
+        scale={40} 
+        blur={2.5} 
+        far={10} 
+        resolution={1024} 
+        color="#000000" 
+      />
+      
+      <Environment preset="studio" />
     </Canvas>
   );
 };

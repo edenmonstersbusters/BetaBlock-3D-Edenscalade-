@@ -1,7 +1,10 @@
+
 import React, { useRef, useState, useMemo } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { Text, Hud, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
+// Import types to ensure global JSX intrinsic element extensions are loaded
+import '../types';
 
 export const ScaleRuler: React.FC = () => {
   const meshRef = useRef<THREE.Group>(null);

@@ -3,6 +3,8 @@ import React, { useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import { HoldDefinition } from '../types';
+// Import types to ensure global JSX intrinsic element extensions are loaded
+import '../types'; 
 import { HoldModel } from './HoldModel';
 import { RotateCw, RotateCcw, Check, X, Info, Sun } from 'lucide-react';
 

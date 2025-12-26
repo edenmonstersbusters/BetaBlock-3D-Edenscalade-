@@ -7,6 +7,9 @@ import { RouteEditorPanel } from './components/RouteEditorPanel';
 import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment } from './types';
 import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2 } from 'lucide-react';
 
+// Import types to ensure global JSX intrinsic element extensions are loaded
+import './types';
+
 const INITIAL_CONFIG: WallConfig = {
   width: 4,
   segments: [
