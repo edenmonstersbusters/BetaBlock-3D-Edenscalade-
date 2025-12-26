@@ -285,6 +285,41 @@ function App() {
     }
   };
 
+  const exportWallToJson = () => {
+    const data = {
+      version: "1.0",
+      config: config,
+      holds: holds
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mon-mur-beta-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const importWallFromJson = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        if (!json.config || !json.holds) throw new Error("Format invalide");
+        
+        recordAction();
+        setConfig(json.config);
+        setHolds(json.holds);
+        setModal({ title: "Succès", message: "Le mur a été chargé avec succès.", isAlert: true });
+      } catch (err) {
+        setModal({ title: "Erreur de chargement", message: "Impossible de lire le fichier. Assurez-vous qu'il s'agit d'un fichier exporté par BetaBlock 3D.", isAlert: true });
+      }
+    };
+    reader.readAsText(file);
+  };
+
   useEffect(() => {
     const handleGlobalClick = () => setContextMenu(null);
     window.addEventListener('click', handleGlobalClick);
@@ -298,6 +333,8 @@ function App() {
             config={config} holds={holds} onUpdate={setConfig} 
             onNext={() => setMode('SET')} showModal={(c) => setModal(c)}
             onActionStart={recordAction}
+            onExport={exportWallToJson}
+            onImport={importWallFromJson}
         />
       ) : (
         <RouteEditorPanel 
@@ -312,6 +349,8 @@ function App() {
             onSelectPlacedHold={handleSelectHold} onDeselect={() => setSelectedPlacedHoldIds([])}
             onActionStart={recordAction} onReplaceHold={handleReplaceHold}
             onRemoveMultiple={() => removeHoldsAction(selectedPlacedHoldIds)}
+            onExport={exportWallToJson}
+            onImport={importWallFromJson}
         />
       )}
 

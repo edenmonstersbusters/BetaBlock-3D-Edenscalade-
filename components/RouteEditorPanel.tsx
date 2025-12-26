@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 // Added Info to the imports from lucide-react
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Info } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Info, Save, FolderOpen } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
@@ -21,12 +21,14 @@ interface RouteEditorPanelProps {
   onDeselect: () => void;
   onActionStart: () => void;
   onReplaceHold: (ids: string[], holdDef: HoldDefinition) => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
 const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const palette = ['#ff8800', '#fbbf24', '#22c55e', '#3b82f6', '#9f0000', '#f472b6', '#ffffff', '#000000'];
 
@@ -74,6 +77,18 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const handleAllColorPick = (color: string) => {
     onChangeAllHoldsColor(color);
     setIsPickingAllColor(false);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onImport(file);
+      e.target.value = ''; // Reset input
+    }
   };
 
   return (
@@ -251,6 +266,33 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                   </button>
                 </div>
               )}
+
+              <div className="pt-6 mt-6 border-t border-gray-800 space-y-2">
+                <div className="flex items-center space-x-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1"><Save size={12} /><span>Gestion des Fichiers</span></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={onExport}
+                    className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 text-[10px] font-bold text-gray-200 rounded-lg border border-gray-700 transition-all"
+                  >
+                    <Save size={12} className="text-emerald-400" />
+                    Exporter
+                  </button>
+                  <button 
+                    onClick={handleImportClick}
+                    className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 text-[10px] font-bold text-gray-200 rounded-lg border border-gray-700 transition-all"
+                  >
+                    <FolderOpen size={12} className="text-blue-400" />
+                    Importer
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept=".json"
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </div>
           </section>
         )}
       </div>

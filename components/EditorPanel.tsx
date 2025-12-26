@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { WallConfig, WallSegment, PlacedHold } from '../types';
-import { Plus, Trash2, Maximize, Ruler, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Maximize, Ruler, ArrowRight, Save, FolderOpen } from 'lucide-react';
 import clsx from 'clsx';
 
 interface EditorPanelProps {
@@ -11,10 +11,13 @@ interface EditorPanelProps {
   onNext: () => void;
   showModal: (config: { title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean }) => void;
   onActionStart: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
-export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdate, onNext, showModal, onActionStart }) => {
-  
+export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdate, onNext, showModal, onActionStart, onExport, onImport }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const addSegment = () => {
     onActionStart();
     const newSegment: WallSegment = {
@@ -75,6 +78,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdat
     onUpdate({ ...config, ...updates });
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onImport(file);
+      e.target.value = ''; // Reset input
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden">
       <div className="p-6 border-b border-gray-800 bg-gray-950">
@@ -133,6 +148,33 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdat
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="space-y-4 pt-4 border-t border-gray-800">
+          <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Save size={14} /><span>Gestion des Fichiers</span></div>
+          <div className="grid grid-cols-2 gap-2">
+            <button 
+              onClick={onExport}
+              className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 rounded-lg border border-gray-700 transition-all"
+            >
+              <Save size={14} className="text-emerald-400" />
+              Sauvegarder
+            </button>
+            <button 
+              onClick={handleImportClick}
+              className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 rounded-lg border border-gray-700 transition-all"
+            >
+              <FolderOpen size={14} className="text-blue-400" />
+              Charger
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".json"
+              onChange={handleFileChange}
+            />
           </div>
         </section>
       </div>
