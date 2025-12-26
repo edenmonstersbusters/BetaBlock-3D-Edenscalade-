@@ -1,12 +1,11 @@
 
-import React, { useState, Suspense, useCallback, useEffect } from 'react';
-import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
+import React, { useState, Suspense } from 'react';
+import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
-// Import types to ensure global JSX intrinsic element extensions are loaded
 import '../types'; 
 
 interface SceneProps {
@@ -37,12 +36,10 @@ export const Scene: React.FC<SceneProps> = ({
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (mode !== 'SET') return;
-
     if (!selectedHoldDef || selectedPlacedHoldIds.length > 0) {
       if (ghostPos) setGhostPos(null);
       return;
     }
-    
     if (e.face && e.object.name === 'climbing-wall') {
       e.stopPropagation();
       setGhostPos(e.point.clone());
@@ -52,8 +49,7 @@ export const Scene: React.FC<SceneProps> = ({
       const spinQ = new THREE.Quaternion();
       spinQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), (holdSettings.rotation * Math.PI) / 180);
       quaternion.multiply(spinQ);
-      const euler = new THREE.Euler().setFromQuaternion(quaternion);
-      setGhostRot(euler);
+      setGhostRot(new THREE.Euler().setFromQuaternion(quaternion));
     } else {
         setGhostPos(null);
     }
@@ -62,7 +58,6 @@ export const Scene: React.FC<SceneProps> = ({
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (mode !== 'SET') return;
     if (e.button !== 0) return;
-
     if (e.face && e.object.name === 'climbing-wall') {
        if (selectedPlacedHoldIds.length > 0) {
          e.stopPropagation();
@@ -81,52 +76,48 @@ export const Scene: React.FC<SceneProps> = ({
     e.stopPropagation();
     e.nativeEvent.preventDefault();
     if (e.faceIndex !== undefined) {
-      const segmentIndex = Math.floor(e.faceIndex / 2);
-      if (segmentIndex < config.segments.length) {
-        onContextMenu('SEGMENT', config.segments[segmentIndex].id, e.nativeEvent.clientX, e.nativeEvent.clientY);
+      const y = e.point.y;
+      let cumulativeHeight = 0;
+      let foundId = config.segments[0].id;
+      for (const seg of config.segments) {
+        const rad = (seg.angle * Math.PI) / 180;
+        cumulativeHeight += seg.height * Math.cos(rad);
+        if (y <= cumulativeHeight) {
+          foundId = seg.id;
+          break;
+        }
       }
+      onContextMenu('SEGMENT', foundId, e.nativeEvent.clientX, e.nativeEvent.clientY);
     }
   };
 
   return (
     <Canvas 
       shadows 
-      camera={{ position: [10, 8, 15], fov: 35 }}
+      camera={{ position: [8, 5, 12], fov: 40 }}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.0; 
+        // Augmentation de l'exposition globale pour éclaircir le mur
+        gl.toneMappingExposure = 1.2;
       }}
     >
-      <color attach="background" args={['#111111']} />
+      <color attach="background" args={['#0a0a0a']} />
       
-      <OrbitControls 
-        makeDefault 
-        minPolarAngle={0} 
-        maxPolarAngle={Math.PI / 1.8} 
-        target={[0, 2.5, 0]} 
-      />
+      <OrbitControls makeDefault target={[0, 2, 0]} />
       
+      {/* LUMIERE AMBIANTE FORTE POUR DEBOUCHER LES OMBRES */}
+      <ambientLight intensity={1.0} />
+      
+      {/* DIRECTIONNELLE MODEREE POUR LE RELIEF SANS BRULER LES COULEURS */}
       <directionalLight 
-        position={[10, 15, 10]} 
-        intensity={0.8} 
-        color="#ffffff"
+        position={[5, 10, 5]} 
+        intensity={0.3} 
         castShadow 
-        shadow-mapSize={[2048, 2048]} 
-        shadow-bias={-0.0001} // Bias fin pour éviter le détachement de l'ombre
-        shadow-normalBias={0.02} // Élimination radicale du shadow acne le long des normales
-      >
-        <orthographicCamera attach="shadow-camera" args={[-20, 20, 20, -20, 0.5, 50]} />
-      </directionalLight>
-
-      <ambientLight intensity={0.4} />
-      
-      <hemisphereLight 
-        intensity={0.4} 
-        color="#ffffff" 
-        groundColor="#000000" 
+        shadow-mapSize={[1024, 1024]}
       />
+
+      <hemisphereLight intensity={0.2} color="#ffffff" groundColor="#000000" />
 
       <group position={[0, 0, 0]}>
         <WallMesh 
@@ -151,8 +142,7 @@ export const Scene: React.FC<SceneProps> = ({
                     onClick={(e) => {
                       if (e.button === 0) {
                         e.stopPropagation();
-                        const isMulti = e.nativeEvent.ctrlKey || e.metaKey;
-                        onSelectPlacedHold(hold.id, isMulti);
+                        onSelectPlacedHold(hold.id, e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
                       }
                     }}
                     onContextMenu={(e) => {
@@ -172,7 +162,7 @@ export const Scene: React.FC<SceneProps> = ({
                     position={[ghostPos.x, ghostPos.y, ghostPos.z]}
                     rotation={[ghostRot.x, ghostRot.y, ghostRot.z]}
                     scale={[holdSettings.scale, holdSettings.scale, holdSettings.scale]}
-                    opacity={0.6}
+                    opacity={0.5}
                     color={holdSettings.color}
                     preview={true}
                 />
@@ -180,30 +170,11 @@ export const Scene: React.FC<SceneProps> = ({
         )}
       </group>
 
-      <Grid 
-        position={[0, -0.01, 0]} 
-        args={[40, 40]} 
-        cellSize={1} 
-        cellThickness={1} 
-        cellColor="#2a2a2a" 
-        sectionSize={5} 
-        sectionThickness={1.5} 
-        sectionColor="#333" 
-        fadeDistance={50} 
-        fadeStrength={1} 
-        infiniteGrid 
-      />
+      <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#222" sectionColor="#333" infiniteGrid />
       
-      <ContactShadows 
-        opacity={0.6} 
-        scale={40} 
-        blur={2.5} 
-        far={10} 
-        resolution={1024} 
-        color="#000000" 
-      />
+      <ContactShadows opacity={0.4} scale={20} blur={2} far={10} resolution={512} color="#000000" />
       
-      <Environment preset="studio" />
+      <Environment preset="city" />
     </Canvas>
   );
 };
