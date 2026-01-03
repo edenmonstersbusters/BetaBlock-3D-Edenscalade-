@@ -1,6 +1,6 @@
 
-import React, { useState, Suspense } from 'react';
-import { Canvas, ThreeEvent } from '@react-three/fiber';
+import React, { useState, Suspense, useMemo, useEffect } from 'react';
+import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
@@ -12,12 +12,13 @@ interface SceneProps {
   config: WallConfig;
   mode: AppMode;
   holds: (PlacedHold & { position: [number, number, number], rotation: [number, number, number] })[];
-  onPlaceHold: (position: THREE.Vector3, normal: THREE.Vector3, faceIndex?: number) => void;
+  onPlaceHold: (position: THREE.Vector3, normal: THREE.Vector3, segmentId: string) => void;
   selectedHoldDef: HoldDefinition | null;
   holdSettings: { scale: number; rotation: number; color: string };
   selectedPlacedHoldIds: string[];
   onSelectPlacedHold: (id: string | null, multi?: boolean) => void;
-  onContextMenu: (type: 'HOLD' | 'SEGMENT', id: string, x: number, y: number) => void;
+  onContextMenu: (type: 'HOLD' | 'SEGMENT', id: string, x: number, y: number, wallX?: number, wallY?: number) => void;
+  onWallPointerUpdate?: (info: { x: number, y: number, segmentId: string } | null) => void;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -30,93 +31,88 @@ export const Scene: React.FC<SceneProps> = ({
   selectedPlacedHoldIds,
   onSelectPlacedHold,
   onContextMenu,
+  onWallPointerUpdate,
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
 
-  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+  const getWallCoords = (point: THREE.Vector3, segmentId: string) => {
+    const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
+    if (segmentIndex === -1) return null;
+    
+    let segmentStartY = 0; let segmentStartZ = 0;
+    for(let i = 0; i < segmentIndex; i++) {
+        const s = config.segments[i]; const r = (s.angle * Math.PI) / 180;
+        segmentStartY += s.height * Math.cos(r); segmentStartZ += s.height * Math.sin(r);
+    }
+    const dy = point.y - segmentStartY;
+    const dz = point.z - segmentStartZ;
+    const wallY = Math.sqrt(dy * dy + dz * dz);
+    return { x: point.x, y: wallY };
+  };
+
+  const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
+    // Mise à jour de la position de collage globale (App.tsx)
+    const wallCoords = getWallCoords(e.point, segmentId);
+    if (wallCoords) {
+      onWallPointerUpdate?.({ ...wallCoords, segmentId });
+    }
+
     if (mode !== 'SET') return;
     if (!selectedHoldDef || selectedPlacedHoldIds.length > 0) {
       if (ghostPos) setGhostPos(null);
       return;
     }
-    if (e.face && e.object.name === 'climbing-wall') {
-      e.stopPropagation();
-      setGhostPos(e.point.clone());
-      const normal = e.face.normal.clone().transformDirection(e.object.matrixWorld).normalize();
-      const quaternion = new THREE.Quaternion();
-      quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
-      const spinQ = new THREE.Quaternion();
-      spinQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), (holdSettings.rotation * Math.PI) / 180);
-      quaternion.multiply(spinQ);
-      setGhostRot(new THREE.Euler().setFromQuaternion(quaternion));
-    } else {
-        setGhostPos(null);
-    }
+    
+    e.stopPropagation();
+    setGhostPos(e.point.clone());
+    const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    const spinQ = new THREE.Quaternion();
+    spinQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), (holdSettings.rotation * Math.PI) / 180);
+    quaternion.multiply(spinQ);
+    setGhostRot(new THREE.Euler().setFromQuaternion(quaternion));
   };
 
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
     if (mode !== 'SET') return;
     if (e.button !== 0) return;
-    if (e.face && e.object.name === 'climbing-wall') {
-       if (selectedPlacedHoldIds.length > 0) {
-         e.stopPropagation();
-         onSelectPlacedHold(null);
-       } else if (selectedHoldDef) {
-         e.stopPropagation();
-         const normal = e.face.normal.clone().transformDirection(e.object.matrixWorld).normalize();
-         onPlaceHold(e.point.clone(), normal, e.faceIndex);
-       }
-    } else {
+    
+    if (selectedPlacedHoldIds.length > 0) {
+      e.stopPropagation();
       onSelectPlacedHold(null);
+    } else if (selectedHoldDef) {
+      e.stopPropagation();
+      const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
+      onPlaceHold(e.point.clone(), normal, segmentId);
     }
   };
 
-  const handleWallContextMenu = (e: ThreeEvent<MouseEvent>) => {
+  const handleWallContextMenu = (e: ThreeEvent<MouseEvent>, segmentId: string) => {
     e.stopPropagation();
     e.nativeEvent.preventDefault();
-    if (e.faceIndex !== undefined) {
-      const y = e.point.y;
-      let cumulativeHeight = 0;
-      let foundId = config.segments[0].id;
-      for (const seg of config.segments) {
-        const rad = (seg.angle * Math.PI) / 180;
-        cumulativeHeight += seg.height * Math.cos(rad);
-        if (y <= cumulativeHeight) {
-          foundId = seg.id;
-          break;
-        }
-      }
-      onContextMenu('SEGMENT', foundId, e.nativeEvent.clientX, e.nativeEvent.clientY);
-    }
+    const wallCoords = getWallCoords(e.point, segmentId);
+    onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, wallCoords?.x, wallCoords?.y);
   };
 
   return (
     <Canvas 
       shadows 
       camera={{ position: [8, 5, 12], fov: 40 }}
+      onPointerLeave={() => onWallPointerUpdate?.(null)}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        // Augmentation de l'exposition globale pour éclaircir le mur
         gl.toneMappingExposure = 1.2;
       }}
     >
       <color attach="background" args={['#0a0a0a']} />
       
-      <OrbitControls makeDefault target={[0, 2, 0]} />
+      <OrbitControls makeDefault target={[0, 2, 0]} minDistance={1} maxDistance={40} />
       
-      {/* LUMIERE AMBIANTE FORTE POUR DEBOUCHER LES OMBRES */}
       <ambientLight intensity={1.0} />
-      
-      {/* DIRECTIONNELLE MODEREE POUR LE RELIEF SANS BRULER LES COULEURS */}
-      <directionalLight 
-        position={[5, 10, 5]} 
-        intensity={0.3} 
-        castShadow 
-        shadow-mapSize={[1024, 1024]}
-      />
-
+      <directionalLight position={[5, 10, 5]} intensity={0.3} castShadow shadow-mapSize={[1024, 1024]} />
       <hemisphereLight intensity={0.2} color="#ffffff" groundColor="#000000" />
 
       <group position={[0, 0, 0]}>
@@ -171,9 +167,7 @@ export const Scene: React.FC<SceneProps> = ({
       </group>
 
       <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#222" sectionColor="#333" infiniteGrid />
-      
       <ContactShadows opacity={0.4} scale={20} blur={2} far={10} resolution={512} color="#000000" />
-      
       <Environment preset="city" />
     </Canvas>
   );

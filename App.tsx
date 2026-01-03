@@ -4,11 +4,13 @@ import * as THREE from 'three';
 import { Scene } from './components/Scene';
 import { EditorPanel } from './components/EditorPanel';
 import { RouteEditorPanel } from './components/RouteEditorPanel';
-import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment } from './types';
-import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2 } from 'lucide-react';
+import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment, BetaBlockFile } from './types';
+import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2, Copy, ClipboardPaste } from 'lucide-react';
 
 // Import types to ensure global JSX intrinsic element extensions are loaded
 import './types';
+
+const APP_VERSION = "1.1";
 
 const INITIAL_CONFIG: WallConfig = {
   width: 4,
@@ -66,6 +68,9 @@ const resolveHoldWorldData = (hold: PlacedHold, config: WallConfig) => {
 
 function App() {
   const [mode, setMode] = useState<AppMode>('BUILD');
+  const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
+  const globalFileInputRef = useRef<HTMLInputElement>(null);
+  const lastWallPointer = useRef<{ x: number, y: number, segmentId: string } | null>(null);
   
   const [config, setConfig] = useState<WallConfig>(() => {
     try {
@@ -107,26 +112,154 @@ function App() {
     setFuture(prev => prev.slice(1));
   }, [future, config, holds]);
 
+  const exportWallToJson = useCallback(() => {
+    const data: BetaBlockFile = {
+      version: APP_VERSION,
+      metadata: {
+        name: `Mur Beta ${new Date().toLocaleDateString()}`,
+        timestamp: new Date().toISOString(),
+        appVersion: APP_VERSION
+      },
+      config: config,
+      holds: holds
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mon-mur-beta-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [config, holds]);
+
+  const validateBetaBlockJson = (json: any): BetaBlockFile | null => {
+    if (!json || typeof json !== 'object') return null;
+    if (!json.version || !json.config || !Array.isArray(json.holds)) return null;
+    const config = json.config;
+    if (typeof config.width !== 'number' || !Array.isArray(config.segments)) return null;
+    for (const seg of config.segments) if (!seg.id || typeof seg.height !== 'number' || typeof seg.angle !== 'number') return null;
+    for (const hold of json.holds) {
+      if (!hold.id || !hold.segmentId || typeof hold.x !== 'number' || typeof hold.y !== 'number') return null;
+      const segment = config.segments.find((s: any) => s.id === hold.segmentId);
+      if (!segment || hold.y > segment.height || Math.abs(hold.x) > config.width / 2) console.warn(`Validation: Prise ${hold.id} hors limites.`);
+    }
+    return json as BetaBlockFile;
+  };
+
+  const importWallFromJson = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        const validated = validateBetaBlockJson(json);
+        if (!validated) throw new Error("Fichier corrompu ou format incompatible.");
+        recordAction();
+        setConfig(validated.config);
+        setHolds(validated.holds);
+        setModal({ title: "Succès", message: "Le mur a été chargé avec succès.", isAlert: true });
+      } catch (err: any) {
+        setModal({ title: "Erreur de chargement", message: err.message || "Impossible de lire le fichier.", isAlert: true });
+      }
+    };
+    reader.readAsText(file);
+  }, [recordAction]);
+
+  const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
+  const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
+  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
+
+  const copySelectedHolds = useCallback(() => {
+    if (selectedPlacedHoldIds.length === 0) return;
+    const toCopy = holds.filter(h => selectedPlacedHoldIds.includes(h.id));
+    setClipboard(JSON.parse(JSON.stringify(toCopy)));
+  }, [selectedPlacedHoldIds, holds]);
+
+  const pasteHolds = useCallback((targetPos?: { x: number, y: number, segmentId: string }) => {
+    if (clipboard.length === 0) return;
+    recordAction();
+
+    let newHolds: PlacedHold[] = [];
+    
+    if (targetPos) {
+      // Si on a une position cible (clique ou survol), on utilise la première prise du presse-papier comme ancre
+      const anchor = clipboard[0];
+      const dx = targetPos.x - anchor.x;
+      const dy = targetPos.y - anchor.y;
+
+      newHolds = clipboard.map(h => {
+        const seg = config.segments.find(s => s.id === targetPos.segmentId);
+        const maxHeight = seg?.height || 10;
+        return {
+          ...h,
+          id: crypto.randomUUID(),
+          segmentId: targetPos.segmentId,
+          x: h.x + dx,
+          y: Math.min(maxHeight, Math.max(0, h.y + dy))
+        };
+      });
+    } else {
+      // Comportement par défaut : léger décalage
+      newHolds = clipboard.map(h => ({
+        ...h,
+        id: crypto.randomUUID(),
+        x: h.x + 0.1,
+        y: Math.min(h.y + 0.1, config.segments.find(s => s.id === h.segmentId)?.height || h.y)
+      }));
+    }
+
+    setHolds(prev => [...prev, ...newHolds]);
+    setSelectedPlacedHoldIds(newHolds.map(h => h.id));
+  }, [clipboard, recordAction, config.segments]);
+
+  const selectAllHolds = useCallback(() => {
+    setSelectedPlacedHoldIds(holds.map(h => h.id));
+  }, [holds]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        if (e.shiftKey) redo(); else undo();
-        e.preventDefault();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        redo();
-        e.preventDefault();
+      const isCtrl = e.ctrlKey || e.metaKey;
+      
+      if (isCtrl) {
+        const key = e.key.toLowerCase();
+        
+        if (key === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) redo(); else undo();
+        } else if (key === 'y') {
+            e.preventDefault();
+            redo();
+        } else if (key === 'a') {
+            e.preventDefault();
+            selectAllHolds();
+        } else if (key === 'c') {
+            e.preventDefault();
+            copySelectedHolds();
+        } else if (key === 'v') {
+            e.preventDefault();
+            // Coller à la position de la souris si on survole le mur
+            pasteHolds(lastWallPointer.current || undefined);
+        } else if (key === 's') {
+            e.preventDefault();
+            exportWallToJson();
+        } else if (key === 'o') {
+            e.preventDefault();
+            // Déclenche l'importation de fichier JSON (identique au bouton Charger)
+            globalFileInputRef.current?.click();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, selectAllHolds, copySelectedHolds, pasteHolds, exportWallToJson]);
 
   const [modal, setModal] = useState<{
     title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean;
   } | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{
-    type: 'HOLD' | 'SEGMENT'; id: string; x: number; y: number;
+    type: 'HOLD' | 'SEGMENT'; id: string; x: number; y: number; wallX?: number; wallY?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -138,10 +271,6 @@ function App() {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config)); }, [config]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.HOLDS, JSON.stringify(holds)); }, [holds]);
 
-  const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
-  const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
-  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
-
   const renderableHolds = useMemo(() => {
     return holds.map(h => {
       const world = resolveHoldWorldData(h, config);
@@ -150,13 +279,11 @@ function App() {
     }).filter(h => h !== null) as (PlacedHold & { position: [number, number, number], rotation: [number, number, number] })[];
   }, [holds, config]);
 
-  const handlePlaceHold = (position: THREE.Vector3, normal: THREE.Vector3, faceIndex?: number) => {
-    if (!selectedHold || selectedPlacedHoldIds.length > 0 || faceIndex === undefined) return;
-    const segmentIndex = Math.floor(faceIndex / 2);
-    if (segmentIndex >= config.segments.length) return;
-    
+  const handlePlaceHold = (position: THREE.Vector3, normal: THREE.Vector3, segmentId: string) => {
+    if (!selectedHold || selectedPlacedHoldIds.length > 0) return;
+    const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
+    if (segmentIndex === -1) return;
     recordAction(); 
-    const segment = config.segments[segmentIndex];
     const x = position.x;
     let segmentStartY = 0; let segmentStartZ = 0;
     for(let i = 0; i < segmentIndex; i++) {
@@ -165,10 +292,9 @@ function App() {
     }
     const dy = position.y - segmentStartY; const dz = position.z - segmentStartZ;
     const y = Math.sqrt(dy * dy + dz * dz);
-
     const newHold: PlacedHold = {
       id: crypto.randomUUID(), modelId: selectedHold.id, filename: selectedHold.filename,
-      modelBaseScale: selectedHold.baseScale, segmentId: segment.id,
+      modelBaseScale: selectedHold.baseScale, segmentId: segmentId,
       x, y, spin: holdSettings.rotation, scale: [holdSettings.scale, holdSettings.scale, holdSettings.scale], color: holdSettings.color
     };
     setHolds([...holds, newHold]);
@@ -178,10 +304,7 @@ function App() {
     recordAction();
     const idSet = new Set(ids);
     setHolds(prev => prev.map(h => idSet.has(h.id) ? { 
-      ...h, 
-      modelId: holdDef.id, 
-      filename: holdDef.filename, 
-      modelBaseScale: holdDef.baseScale 
+      ...h, modelId: holdDef.id, filename: holdDef.filename, modelBaseScale: holdDef.baseScale 
     } : h));
   };
 
@@ -233,17 +356,13 @@ function App() {
     const message = segmentHolds.length > 0 
       ? `Ce pan contient ${segmentHolds.length} prise(s). Elles seront supprimées. Confirmer la suppression ?`
       : "Voulez-vous vraiment supprimer ce pan de mur ?";
-      
     setModal({
       title: "Supprimer le pan",
       message,
       confirmText: "Supprimer",
       onConfirm: () => {
         recordAction();
-        setConfig(prev => ({
-          ...prev,
-          segments: prev.segments.filter((s) => s.id !== id),
-        }));
+        setConfig(prev => ({ ...prev, segments: prev.segments.filter((s) => s.id !== id) }));
       }
     });
   };
@@ -253,7 +372,6 @@ function App() {
     if (!seg) return;
     const newHeight = updates.height !== undefined ? seg.height + updates.height : seg.height;
     const newAngle = updates.angle !== undefined ? seg.angle + updates.angle : seg.angle;
-    
     if (updates.height !== undefined) {
       const segmentHolds = holds.filter(h => h.segmentId === id);
       if (segmentHolds.some(h => h.y > newHeight)) {
@@ -261,7 +379,6 @@ function App() {
         return;
       }
     }
-    
     recordAction();
     setConfig(prev => ({
       ...prev,
@@ -274,53 +391,11 @@ function App() {
       setSelectedPlacedHoldIds([]);
       return;
     }
-
     if (multi) {
-      setSelectedPlacedHoldIds(prev => {
-        if (prev.includes(id)) {
-          return prev.filter(i => i !== id);
-        } else {
-          return [...prev, id];
-        }
-      });
+      setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     } else {
       setSelectedPlacedHoldIds([id]);
     }
-  };
-
-  const exportWallToJson = () => {
-    const data = {
-      version: "1.0",
-      config: config,
-      holds: holds
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mon-mur-beta-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const importWallFromJson = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const json = JSON.parse(e.target?.result as string);
-        if (!json.config || !json.holds) throw new Error("Format invalide");
-        
-        recordAction();
-        setConfig(json.config);
-        setHolds(json.holds);
-        setModal({ title: "Succès", message: "Le mur a été chargé avec succès.", isAlert: true });
-      } catch (err) {
-        setModal({ title: "Erreur de chargement", message: "Impossible de lire le fichier. Assurez-vous qu'il s'agit d'un fichier exporté par BetaBlock 3D.", isAlert: true });
-      }
-    };
-    reader.readAsText(file);
   };
 
   useEffect(() => {
@@ -331,6 +406,11 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen bg-black overflow-hidden font-sans">
+      <input 
+        type="file" ref={globalFileInputRef} className="hidden" accept=".json"
+        onChange={(e) => { const file = e.target.files?.[0]; if (file) importWallFromJson(file); e.target.value = ''; }}
+      />
+
       {mode === 'BUILD' ? (
         <EditorPanel 
             config={config} holds={holds} onUpdate={setConfig} 
@@ -367,7 +447,8 @@ function App() {
             config={config} mode={mode} holds={renderableHolds} onPlaceHold={handlePlaceHold}
             selectedHoldDef={selectedHold} holdSettings={holdSettings} selectedPlacedHoldIds={selectedPlacedHoldIds}
             onSelectPlacedHold={handleSelectHold}
-            onContextMenu={(type, id, x, y) => setContextMenu({ type, id, x, y })}
+            onContextMenu={(type, id, x, y, wx, wy) => setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
+            onWallPointerUpdate={(info) => { lastWallPointer.current = info; }}
         />
       </div>
 
@@ -376,6 +457,8 @@ function App() {
           {contextMenu.type === 'HOLD' ? (
             <>
               <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
+              <button onClick={() => { copySelectedHolds(); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Copy size={16} className="text-blue-400" /> Copier <span className="ml-auto text-[10px] text-gray-500">Ctrl+C</span></button>
+              
               <button onClick={() => { 
                 const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
                 recordAction();
@@ -388,7 +471,7 @@ function App() {
                 recordAction();
                 const idSet = new Set(targetIds);
                 setHolds(holds.map(item => idSet.has(item.id) ? { ...item, color: holdSettings.color } : item)); 
-              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Appliquer couleur actuelle</button>
+              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Appliquer couleur</button>
               
               <div className="h-px bg-white/5 my-1" />
               <button onClick={() => { 
@@ -400,6 +483,16 @@ function App() {
           ) : (
             <>
               <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Pan</div>
+              {clipboard.length > 0 && (
+                <button onClick={() => { 
+                  if (contextMenu.wallX !== undefined && contextMenu.wallY !== undefined) {
+                    pasteHolds({ x: contextMenu.wallX, y: contextMenu.wallY, segmentId: contextMenu.id });
+                  } else {
+                    pasteHolds();
+                  }
+                  setContextMenu(null); 
+                }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-500/10 text-sm text-emerald-400 font-bold"><ClipboardPaste size={16} /> Coller ici <span className="ml-auto text-[10px] text-gray-500">Ctrl+V</span></button>
+              )}
               <button onClick={() => updateSegmentQuickly(contextMenu.id, { angle: 10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-orange-400"/> Dévers +10°</span><ChevronRight size={14} className="text-gray-600"/></button>
               <button onClick={() => updateSegmentQuickly(contextMenu.id, { angle: -10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-blue-400"/> Dévers -10°</span><ChevronRight size={14} className="text-gray-600"/></button>
               <button onClick={() => updateSegmentQuickly(contextMenu.id, { height: 0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveUp size={16} className="text-emerald-400"/> Hauteur +0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
