@@ -232,58 +232,60 @@ function App() {
     title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean;
   } | null>(null);
 
-  const resetWallAction = useCallback(() => {
+  const removeHoldsAction = useCallback((ids: string[]) => {
+    const isMultiple = ids.length > 1;
     setModal({
-      title: "Nouveau Mur",
-      message: "Voulez-vous vraiment créer un nouveau mur vierge ? Les modifications non sauvegardées seront perdues.",
-      confirmText: "Nouveau mur",
+      title: "Suppression", 
+      message: isMultiple ? `Voulez-vous vraiment supprimer ces ${ids.length} prises ?` : "Voulez-vous vraiment supprimer cette prise ?", 
+      confirmText: "Supprimer",
       onConfirm: () => {
         recordAction();
-        setConfig(INITIAL_CONFIG);
-        setHolds([]);
-        setMode('BUILD');
-        setSelectedPlacedHoldIds([]);
+        const idSet = new Set(ids);
+        setHolds(prev => prev.filter(h => !idSet.has(h.id)));
+        setSelectedPlacedHoldIds(prev => prev.filter(id => !idSet.has(id)));
       }
     });
   }, [recordAction]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Éviter de supprimer si l'utilisateur est dans un champ texte (ex: nom du mur)
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
       const isCtrl = e.ctrlKey || e.metaKey;
-      
+      const key = e.key;
+      const lowerKey = key.toLowerCase();
+
       if (isCtrl) {
-        const key = e.key.toLowerCase();
-        
-        if (key === 'z') {
-            e.preventDefault();
-            if (e.shiftKey) redo(); else undo();
-        } else if (key === 'y') {
-            e.preventDefault();
-            redo();
-        } else if (key === 'a') {
-            e.preventDefault();
-            selectAllHolds();
-        } else if (key === 'c') {
-            e.preventDefault();
-            copySelectedHolds();
-        } else if (key === 'v') {
-            e.preventDefault();
-            pasteHolds(lastWallPointer.current || undefined);
-        } else if (key === 's') {
-            e.preventDefault();
-            exportWallToJson();
-        } else if (key === 'o') {
-            e.preventDefault();
-            globalFileInputRef.current?.click();
-        } else if (key === 'n') {
-            e.preventDefault();
-            resetWallAction();
+        // Liste des touches avec Ctrl que nous voulons intercepter
+        const handledCtrlKeys = ['z', 'y', 'a', 'c', 'v', 's', 'o'];
+        if (handledCtrlKeys.includes(lowerKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          switch (lowerKey) {
+            case 'z': if (e.shiftKey) redo(); else undo(); break;
+            case 'y': redo(); break;
+            case 'a': selectAllHolds(); break;
+            case 'c': copySelectedHolds(); break;
+            case 'v': pasteHolds(lastWallPointer.current || undefined); break;
+            case 's': exportWallToJson(); break;
+            case 'o': globalFileInputRef.current?.click(); break;
+          }
+        }
+      } else {
+        // Liste des touches sans Ctrl (Suppression)
+        if ((key === 'Delete' || key === 'Backspace') && selectedPlacedHoldIds.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          removeHoldsAction(selectedPlacedHoldIds);
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, selectAllHolds, copySelectedHolds, pasteHolds, exportWallToJson, resetWallAction]);
+    
+    // Utilisation de capture: true pour être certain d'intercepter avant les raccourcis système
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [undo, redo, selectAllHolds, copySelectedHolds, pasteHolds, exportWallToJson, selectedPlacedHoldIds, removeHoldsAction]);
 
   const [contextMenu, setContextMenu] = useState<{
     type: 'HOLD' | 'SEGMENT'; id: string; x: number; y: number; wallX?: number; wallY?: number; subMenu?: 'COLOR';
@@ -333,21 +335,6 @@ function App() {
     setHolds(prev => prev.map(h => idSet.has(h.id) ? { 
       ...h, modelId: holdDef.id, filename: holdDef.filename, modelBaseScale: holdDef.baseScale 
     } : h));
-  };
-
-  const removeHoldsAction = (ids: string[]) => {
-    const isMultiple = ids.length > 1;
-    setModal({
-      title: "Suppression", 
-      message: isMultiple ? `Voulez-vous vraiment supprimer ces ${ids.length} prises ?` : "Voulez-vous vraiment supprimer cette prise ?", 
-      confirmText: "Supprimer",
-      onConfirm: () => {
-        recordAction();
-        const idSet = new Set(ids);
-        setHolds(holds.filter(h => !idSet.has(h.id)));
-        setSelectedPlacedHoldIds(prev => prev.filter(id => !idSet.has(id)));
-      }
-    });
   };
 
   const removeAllHoldsAction = () => {
