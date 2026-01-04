@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Image as ImageIcon } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 
 interface RouteEditorPanelProps {
@@ -19,14 +20,16 @@ interface RouteEditorPanelProps {
   onDeselect: () => void;
   onActionStart: () => void;
   onReplaceHold: (ids: string[], holdDef: HoldDefinition) => void;
-  onExport: () => void;
-  onImport: (file: File) => void;
+  onSave: () => void;
+  onSaveAs: () => void;
+  onImport: () => void;
 }
 
-const CATALOGUE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/catalogue.json';
+const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
+const CATALOGUE_URL = `${BASE_URL}catalogue.json`;
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onSave, onSaveAs, onImport
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,20 +37,30 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // États pour la prévisualisation au survol
+  const [hoveredHold, setHoveredHold] = useState<HoldDefinition | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(1);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  // Palette Industrielle (10 teintes d'origine préservées)
+  // Effet pour l'animation cyclique des screenshots (1-4)
+  useEffect(() => {
+    if (!hoveredHold) {
+      setPreviewIndex(1);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setPreviewIndex((prev) => (prev % 4) + 1);
+    }, 1800);
+
+    return () => clearInterval(interval);
+  }, [hoveredHold]);
+
+  // Palette Industrielle
   const palette = [
-    '#990000', // Rouge Sang
-    '#004400', // Vert Forêt
-    '#002266', // Bleu de Prusse
-    '#aa4400', // Orange Industriel
-    '#ccaa00', // Jaune Ocre
-    '#440066', // Violet de Minuit
-    '#882244', // Rose Oxyde
-    '#444444', // Gris Béton
-    '#f8f8f8', // Blanc Pur
-    '#111111'  // Noir Mat
+    '#990000', '#004400', '#002266', '#aa4400', '#ccaa00',
+    '#440066', '#882244', '#444444', '#f8f8f8', '#111111'
   ];
 
   useEffect(() => {
@@ -71,7 +84,6 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 
   const isMultiSelection = selectedPlacedHoldIds.length > 1;
   const anyHoldSelected = selectedPlacedHoldIds.length > 0;
-  
   const firstSelectedHold = placedHolds.find(h => h.id === selectedPlacedHoldIds[0]);
 
   const handleCatalogueItemClick = (hold: HoldDefinition) => {
@@ -88,8 +100,11 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
     setIsPickingAllColor(false);
   };
 
-  // Composant interne pour un bouton de couleur joyeux
-  // Fix: Explicitly define prop types and return type using React.FC to satisfy TypeScript
+  const getThumbnailUrl = (filename: string, index: number) => {
+    const baseName = filename.replace(/\.[^/.]+$/, "");
+    return `${BASE_URL}screenshot/${baseName}-${index}.png`;
+  };
+
   const ColorButton: React.FC<{ color: string; isActive: boolean; onClick: () => void }> = ({ color, isActive, onClick }) => (
     <button 
         className={`relative w-11 h-11 rounded-full border-2 border-white/40 shadow-xl transition-all duration-300 transform active:scale-90 ${
@@ -112,7 +127,48 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-[60] overflow-hidden relative">
+       
+       {/* Prévisualisation flottante au survol animée */}
+       {hoveredHold && (
+         <div 
+           className="fixed z-[300] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+           style={{ 
+             top: Math.max(20, Math.min(mousePos.y - 100, window.innerHeight - 250)), 
+             left: 330 
+           }}
+         >
+           <div className="bg-gray-800 border-2 border-blue-500/50 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden w-48 transition-all duration-300">
+              <div className="aspect-square bg-gray-950 relative flex items-center justify-center overflow-hidden">
+                <img 
+                  key={`${hoveredHold.id}-${previewIndex}`} // Force un rafraîchissement propre si besoin, bien que le navigateur gère le src
+                  src={getThumbnailUrl(hoveredHold.filename, previewIndex)} 
+                  alt={hoveredHold.name}
+                  className="w-full h-full object-contain p-2 animate-in fade-in duration-300"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/111/444?text=Pas+d\'aperçu';
+                  }}
+                />
+                
+                {/* Indicateur d'angle (1-4) */}
+                <div className="absolute top-2 left-2 flex gap-1">
+                  {[1, 2, 3, 4].map(idx => (
+                    <div 
+                      key={idx} 
+                      className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${idx === previewIndex ? 'bg-blue-500 scale-125 shadow-[0_0_5px_#3b82f6]' : 'bg-gray-600'}`} 
+                    />
+                  ))}
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3">
+                  <p className="text-[10px] font-black text-white uppercase truncate">{hoveredHold.name}</p>
+                  <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tighter mt-0.5">Vue angle {previewIndex}/4</p>
+                </div>
+              </div>
+           </div>
+         </div>
+       )}
+
        <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
         <div className="flex items-center space-x-3 overflow-hidden">
           <button onClick={onBack} className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white flex-shrink-0"><ArrowLeft size={20} /></button>
@@ -234,8 +290,20 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                           <button 
                             key={hold.id} 
                             onClick={() => handleCatalogueItemClick(hold)} 
-                            className={`relative rounded-lg border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id && !anyHoldSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
+                            onMouseEnter={(e) => {
+                              setHoveredHold(hold);
+                              setMousePos({ x: e.clientX, y: e.clientY });
+                            }}
+                            onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                            onMouseLeave={() => {
+                              setHoveredHold(null);
+                              setPreviewIndex(1); // Reset index on leave
+                            }}
+                            className={`relative group rounded-lg border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id && !anyHoldSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
                           >
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ImageIcon size={12} className="text-blue-400" />
+                              </div>
                               <span className="text-[11px] font-bold text-gray-100 truncate w-full text-left">{hold.name}</span>
                               <span className="text-[9px] text-gray-500 truncate w-full text-left mt-0.5">{hold.filename}</span>
                           </button>

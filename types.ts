@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -5,11 +6,14 @@ import * as THREE from 'three';
 /**
  * Global JSX namespace augmentation for Three.js elements.
  * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
- * By extending ThreeElements, we inherit all Three.js elements while maintaining standard HTML elements.
+ * We augment React.JSX to merge Three.js elements with standard HTML elements without overwriting them.
+ * This fix addresses the "Property does not exist on type 'JSX.IntrinsicElements'" errors for both HTML and Three.js tags.
  */
 declare global {
-  namespace JSX {
-    interface IntrinsicElements extends ThreeElements {}
+  namespace React {
+    namespace JSX {
+      interface IntrinsicElements extends ThreeElements {}
+    }
   }
 }
 
