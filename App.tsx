@@ -26,9 +26,11 @@ const PALETTE = [
 ];
 
 const INITIAL_CONFIG: WallConfig = {
-  width: 4,
+  width: 4.5,
   segments: [
-    { id: '1', height: 4, angle: 0 },
+    { id: '1', height: 2.2, angle: 0 },   // Socle vertical
+    { id: '2', height: 2.0, angle: 30 },  // Dévers principal
+    { id: '3', height: 1.5, angle: 15 },  // Rétablissement
   ],
 };
 
@@ -516,6 +518,13 @@ function App() {
                         setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin + 90) % 360 } : item)); 
                     }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
                     
+                    <button onClick={() => { 
+                        const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                        recordAction();
+                        const idSet = new Set(targetIds);
+                        setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin - 90) % 360 } : item)); 
+                    }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCcw size={16} className="text-red-400" /> Rotation -90°</button>
+
                     <button onClick={() => setContextMenu({ ...contextMenu, subMenu: 'COLOR' })} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Modifier couleur</button>
                     
                     <div className="h-px bg-white/5 my-1" />

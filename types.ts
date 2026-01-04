@@ -5,19 +5,11 @@ import * as THREE from 'three';
 /**
  * Global JSX namespace augmentation for Three.js elements.
  * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
+ * By extending ThreeElements, we inherit all Three.js elements while maintaining standard HTML elements.
  */
 declare global {
   namespace JSX {
-    interface IntrinsicElements {
-      mesh: ThreeElements['mesh'];
-      group: ThreeElements['group'];
-      ambientLight: ThreeElements['ambientLight'];
-      directionalLight: ThreeElements['directionalLight'];
-      hemisphereLight: ThreeElements['hemisphereLight'];
-      primitive: ThreeElements['primitive'];
-      meshStandardMaterial: ThreeElements['meshStandardMaterial'];
-      color: ThreeElements['color'];
-    }
+    interface IntrinsicElements extends ThreeElements {}
   }
 }
 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
@@ -90,7 +89,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   };
 
   // Composant interne pour un bouton de couleur joyeux
-  const ColorButton = ({ color, isActive, onClick }: { color: string, isActive: boolean, onClick: () => void }) => (
+  // Fix: Explicitly define prop types and return type using React.FC to satisfy TypeScript
+  const ColorButton: React.FC<{ color: string; isActive: boolean; onClick: () => void }> = ({ color, isActive, onClick }) => (
     <button 
         className={`relative w-11 h-11 rounded-full border-2 border-white/40 shadow-xl transition-all duration-300 transform active:scale-90 ${
             isActive 
@@ -191,7 +191,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                                 key={c} 
                                 color={c} 
                                 isActive={holdSettings.color === c} 
-                                onClick={() => onUpdateSettings({ color: c })} 
+                                onClick={() => { onUpdateSettings({ color: c }); }} 
                               />
                           ))}
                       </div>
@@ -267,7 +267,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                       </div>
                       <div className="grid grid-cols-5 gap-4">
                         {palette.map(c => (
-                          <ColorButton key={c} color={c} isActive={false} onClick={() => handleAllColorPick(c)} />
+                          <ColorButton key={c} color={c} isActive={false} onClick={() => { handleAllColorPick(c); }} />
                         ))}
                       </div>
                     </div>
