@@ -168,7 +168,7 @@ export const Scene: React.FC<SceneProps> = ({
 
       <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#222" sectionColor="#333" infiniteGrid />
       <ContactShadows opacity={0.4} scale={20} blur={2} far={10} resolution={512} color="#000000" />
-      <Environment preset="city" />
+      <Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr" />
     </Canvas>
   );
 };

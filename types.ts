@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -8,14 +8,16 @@ import * as THREE from 'three';
  */
 declare global {
   namespace JSX {
-    interface IntrinsicElements extends ThreeElements {}
-  }
-}
-
-// In React 18 with the new JSX transform, the JSX namespace is often expected within the react module.
-declare module 'react' {
-  namespace JSX {
-    interface IntrinsicElements extends ThreeElements {}
+    interface IntrinsicElements {
+      mesh: ThreeElements['mesh'];
+      group: ThreeElements['group'];
+      ambientLight: ThreeElements['ambientLight'];
+      directionalLight: ThreeElements['directionalLight'];
+      hemisphereLight: ThreeElements['hemisphereLight'];
+      primitive: ThreeElements['primitive'];
+      meshStandardMaterial: ThreeElements['meshStandardMaterial'];
+      color: ThreeElements['color'];
+    }
   }
 }
 

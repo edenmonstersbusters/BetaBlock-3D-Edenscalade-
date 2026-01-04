@@ -5,19 +5,30 @@ import { Scene } from './components/Scene';
 import { EditorPanel } from './components/EditorPanel';
 import { RouteEditorPanel } from './components/RouteEditorPanel';
 import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment, BetaBlockFile } from './types';
-import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2, Copy, ClipboardPaste } from 'lucide-react';
+import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2, Copy, ClipboardPaste, ArrowLeft } from 'lucide-react';
 
 // Import types to ensure global JSX intrinsic element extensions are loaded
 import './types';
 
 const APP_VERSION = "1.1";
 
+const PALETTE = [
+    '#990000', // Rouge Sang
+    '#004400', // Vert Forêt
+    '#002266', // Bleu de Prusse
+    '#aa4400', // Orange Industriel
+    '#ccaa00', // Jaune Ocre
+    '#440066', // Violet de Minuit
+    '#882244', // Rose Oxyde
+    '#444444', // Gris Béton
+    '#f8f8f8', // Blanc Pur
+    '#111111'  // Noir Mat
+];
+
 const INITIAL_CONFIG: WallConfig = {
   width: 4,
   segments: [
-    { id: '1', height: 3, angle: 0 },
-    { id: '2', height: 2, angle: 20 },
-    { id: '3', height: 1.5, angle: -10 },
+    { id: '1', height: 4, angle: 0 },
   ],
 };
 
@@ -183,7 +194,6 @@ function App() {
     let newHolds: PlacedHold[] = [];
     
     if (targetPos) {
-      // Si on a une position cible (clique ou survol), on utilise la première prise du presse-papier comme ancre
       const anchor = clipboard[0];
       const dx = targetPos.x - anchor.x;
       const dy = targetPos.y - anchor.y;
@@ -200,7 +210,6 @@ function App() {
         };
       });
     } else {
-      // Comportement par défaut : léger décalage
       newHolds = clipboard.map(h => ({
         ...h,
         id: crypto.randomUUID(),
@@ -216,6 +225,25 @@ function App() {
   const selectAllHolds = useCallback(() => {
     setSelectedPlacedHoldIds(holds.map(h => h.id));
   }, [holds]);
+
+  const [modal, setModal] = useState<{
+    title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean;
+  } | null>(null);
+
+  const resetWallAction = useCallback(() => {
+    setModal({
+      title: "Nouveau Mur",
+      message: "Voulez-vous vraiment créer un nouveau mur vierge ? Les modifications non sauvegardées seront perdues.",
+      confirmText: "Nouveau mur",
+      onConfirm: () => {
+        recordAction();
+        setConfig(INITIAL_CONFIG);
+        setHolds([]);
+        setMode('BUILD');
+        setSelectedPlacedHoldIds([]);
+      }
+    });
+  }, [recordAction]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -238,28 +266,25 @@ function App() {
             copySelectedHolds();
         } else if (key === 'v') {
             e.preventDefault();
-            // Coller à la position de la souris si on survole le mur
             pasteHolds(lastWallPointer.current || undefined);
         } else if (key === 's') {
             e.preventDefault();
             exportWallToJson();
         } else if (key === 'o') {
             e.preventDefault();
-            // Déclenche l'importation de fichier JSON (identique au bouton Charger)
             globalFileInputRef.current?.click();
+        } else if (key === 'n') {
+            e.preventDefault();
+            resetWallAction();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, selectAllHolds, copySelectedHolds, pasteHolds, exportWallToJson]);
-
-  const [modal, setModal] = useState<{
-    title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean;
-  } | null>(null);
+  }, [undo, redo, selectAllHolds, copySelectedHolds, pasteHolds, exportWallToJson, resetWallAction]);
 
   const [contextMenu, setContextMenu] = useState<{
-    type: 'HOLD' | 'SEGMENT'; id: string; x: number; y: number; wallX?: number; wallY?: number;
+    type: 'HOLD' | 'SEGMENT'; id: string; x: number; y: number; wallX?: number; wallY?: number; subMenu?: 'COLOR';
   } | null>(null);
 
   useEffect(() => {
@@ -456,29 +481,51 @@ function App() {
         <div className="fixed z-[150] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-150" style={{ top: Math.min(contextMenu.y, window.innerHeight - 300), left: Math.min(contextMenu.x, window.innerWidth - 240) }} onClick={(e) => e.stopPropagation()}>
           {contextMenu.type === 'HOLD' ? (
             <>
-              <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
-              <button onClick={() => { copySelectedHolds(); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Copy size={16} className="text-blue-400" /> Copier <span className="ml-auto text-[10px] text-gray-500">Ctrl+C</span></button>
-              
-              <button onClick={() => { 
-                const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                recordAction();
-                const idSet = new Set(targetIds);
-                setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin + 90) % 360 } : item)); 
-              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
-              
-              <button onClick={() => { 
-                const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                recordAction();
-                const idSet = new Set(targetIds);
-                setHolds(holds.map(item => idSet.has(item.id) ? { ...item, color: holdSettings.color } : item)); 
-              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Appliquer couleur</button>
-              
-              <div className="h-px bg-white/5 my-1" />
-              <button onClick={() => { 
-                const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                removeHoldsAction(targetIds); 
-                setContextMenu(null); 
-              }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
+              {contextMenu.subMenu === 'COLOR' ? (
+                  <div className="p-3">
+                      <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+                          <span className="text-xs font-bold text-gray-400 uppercase">Choisir une couleur</span>
+                          <button onClick={() => setContextMenu({ ...contextMenu, subMenu: undefined })} className="text-gray-500 hover:text-white"><ArrowLeft size={16}/></button>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                          {PALETTE.map(c => (
+                              <button
+                                  key={c}
+                                  onClick={() => {
+                                      const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                                      recordAction();
+                                      const idSet = new Set(targetIds);
+                                      setHolds(holds.map(item => idSet.has(item.id) ? { ...item, color: c } : item));
+                                      setContextMenu(null);
+                                  }}
+                                  className="w-8 h-8 rounded-full border border-white/20 hover:scale-110 hover:border-white transition-all shadow-sm"
+                                  style={{ backgroundColor: c }}
+                              />
+                          ))}
+                      </div>
+                  </div>
+              ) : (
+                  <>
+                    <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
+                    <button onClick={() => { copySelectedHolds(); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Copy size={16} className="text-blue-400" /> Copier <span className="ml-auto text-[10px] text-gray-500">Ctrl+C</span></button>
+                    
+                    <button onClick={() => { 
+                        const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                        recordAction();
+                        const idSet = new Set(targetIds);
+                        setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin + 90) % 360 } : item)); 
+                    }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
+                    
+                    <button onClick={() => setContextMenu({ ...contextMenu, subMenu: 'COLOR' })} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Modifier couleur</button>
+                    
+                    <div className="h-px bg-white/5 my-1" />
+                    <button onClick={() => { 
+                        const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
+                        removeHoldsAction(targetIds); 
+                        setContextMenu(null); 
+                    }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
+                  </>
+              )}
             </>
           ) : (
             <>
