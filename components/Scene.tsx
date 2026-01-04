@@ -1,4 +1,3 @@
-
 import React, { useState, Suspense, useMemo, useEffect } from 'react';
 import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
@@ -19,6 +18,8 @@ interface SceneProps {
   onSelectPlacedHold: (id: string | null, multi?: boolean) => void;
   onContextMenu: (type: 'HOLD' | 'SEGMENT', id: string, x: number, y: number, wallX?: number, wallY?: number) => void;
   onWallPointerUpdate?: (info: { x: number, y: number, segmentId: string } | null) => void;
+  onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
+  onHoldDragEnd?: () => void;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -32,30 +33,72 @@ export const Scene: React.FC<SceneProps> = ({
   onSelectPlacedHold,
   onContextMenu,
   onWallPointerUpdate,
+  onHoldDrag,
+  onHoldDragEnd
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
-  const getWallCoords = (point: THREE.Vector3, segmentId: string) => {
+  // Calcule les coordonnées locales (x, y) relatives à un segment spécifique
+  const getSegmentLocalCoords = (point: THREE.Vector3, segmentId: string) => {
     const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
     if (segmentIndex === -1) return null;
     
-    let segmentStartY = 0; let segmentStartZ = 0;
+    // Calculer l'offset de base du segment
+    let startY = 0; 
+    let startZ = 0;
     for(let i = 0; i < segmentIndex; i++) {
-        const s = config.segments[i]; const r = (s.angle * Math.PI) / 180;
-        segmentStartY += s.height * Math.cos(r); segmentStartZ += s.height * Math.sin(r);
+        const s = config.segments[i]; 
+        const r = (s.angle * Math.PI) / 180;
+        startY += s.height * Math.cos(r); 
+        startZ += s.height * Math.sin(r);
     }
-    const dy = point.y - segmentStartY;
-    const dz = point.z - segmentStartZ;
-    const wallY = Math.sqrt(dy * dy + dz * dz);
-    return { x: point.x, y: wallY };
+
+    // Le X local est simplement le X global (le mur est centré)
+    const localX = point.x;
+
+    // Le Y local est la distance entre le point d'impact et la base du segment
+    const dy = point.y - startY;
+    const dz = point.z - startZ;
+    // Théorème de Pythagore pour obtenir la distance le long de la pente
+    const localY = Math.sqrt(dy * dy + dz * dz);
+
+    return { x: localX, y: localY };
+  };
+
+  const getWallCoords = (point: THREE.Vector3, segmentId: string) => {
+    // Legacy support for global wallY calculation if needed, though getSegmentLocalCoords is better for placement
+    const local = getSegmentLocalCoords(point, segmentId);
+    if (!local) return null;
+    
+    // Pour la compatibilité avec l'affichage global (App.tsx info)
+    // On recalcule une sorte de Y global approximatif pour l'UI si nécessaire
+    // Mais ici on retourne les coords locales car c'est ce qu'on utilise
+    return { x: local.x, y: local.y }; 
   };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
+    // Si on drag une prise
+    if (draggingId && onHoldDrag) {
+      e.stopPropagation();
+      const localCoords = getSegmentLocalCoords(e.point, segmentId);
+      if (localCoords) {
+        // Limites du mur
+        const segment = config.segments.find(s => s.id === segmentId);
+        if (segment) {
+            const clampedY = Math.max(0, Math.min(segment.height, localCoords.y));
+            const clampedX = Math.max(-config.width/2, Math.min(config.width/2, localCoords.x));
+            onHoldDrag(draggingId, clampedX, clampedY, segmentId);
+        }
+      }
+      return;
+    }
+
     // Mise à jour de la position de collage globale (App.tsx)
-    const wallCoords = getWallCoords(e.point, segmentId);
-    if (wallCoords) {
-      onWallPointerUpdate?.({ ...wallCoords, segmentId });
+    const localCoords = getSegmentLocalCoords(e.point, segmentId);
+    if (localCoords) {
+      onWallPointerUpdate?.({ ...localCoords, segmentId });
     }
 
     if (mode !== 'SET') return;
@@ -76,6 +119,7 @@ export const Scene: React.FC<SceneProps> = ({
   };
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
+    if (draggingId) return; // Déjà en train de drag
     if (mode !== 'SET') return;
     if (e.button !== 0) return;
     
@@ -89,11 +133,18 @@ export const Scene: React.FC<SceneProps> = ({
     }
   };
 
+  const handlePointerUp = () => {
+    if (draggingId) {
+      setDraggingId(null);
+      onHoldDragEnd?.();
+    }
+  };
+
   const handleWallContextMenu = (e: ThreeEvent<MouseEvent>, segmentId: string) => {
     e.stopPropagation();
     e.nativeEvent.preventDefault();
-    const wallCoords = getWallCoords(e.point, segmentId);
-    onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, wallCoords?.x, wallCoords?.y);
+    const localCoords = getSegmentLocalCoords(e.point, segmentId);
+    onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, localCoords?.x, localCoords?.y);
   };
 
   return (
@@ -101,6 +152,7 @@ export const Scene: React.FC<SceneProps> = ({
       shadows 
       camera={{ position: [8, 5, 12], fov: 40 }}
       onPointerLeave={() => onWallPointerUpdate?.(null)}
+      onPointerUp={handlePointerUp}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -109,7 +161,8 @@ export const Scene: React.FC<SceneProps> = ({
     >
       <color attach="background" args={['#0a0a0a']} />
       
-      <OrbitControls makeDefault target={[0, 2, 0]} minDistance={1} maxDistance={40} />
+      {/* Désactive les contrôles de caméra pendant le drag pour une meilleure UX */}
+      <OrbitControls makeDefault target={[0, 2, 0]} minDistance={1} maxDistance={40} enabled={!draggingId} />
       
       <ambientLight intensity={1.0} />
       <directionalLight position={[5, 10, 5]} intensity={0.3} castShadow shadow-mapSize={[1024, 1024]} />
@@ -135,10 +188,22 @@ export const Scene: React.FC<SceneProps> = ({
                     scale={hold.scale}
                     color={hold.color}
                     isSelected={selectedPlacedHoldIds.includes(hold.id)}
-                    onClick={(e) => {
+                    isDragging={draggingId === hold.id}
+                    onPointerDown={(e) => {
                       if (e.button === 0) {
                         e.stopPropagation();
-                        onSelectPlacedHold(hold.id, e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+                        // Important: Release pointer capture so subsequent pointer events are not locked to this hold,
+                        // allowing the wall behind to receive pointerMove events for dragging calculation.
+                        (e.target as any).releasePointerCapture(e.pointerId);
+
+                        // Si mode SET et aucune prise sélectionnée dans le catalogue, on commence le drag
+                        // Si Ctrl est enfoncé, on fait de la multisélection classique, pas de drag
+                        if (mode === 'SET' && !selectedHoldDef && !(e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)) {
+                           setDraggingId(hold.id);
+                           onSelectPlacedHold(hold.id, false); // Sélectionne la prise qu'on drag
+                        } else {
+                           onSelectPlacedHold(hold.id, e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+                        }
                       }
                     }}
                     onContextMenu={(e) => {
@@ -150,7 +215,7 @@ export const Scene: React.FC<SceneProps> = ({
             ))}
         </Suspense>
 
-        {mode === 'SET' && selectedHoldDef && ghostPos && ghostRot && selectedPlacedHoldIds.length === 0 && (
+        {mode === 'SET' && selectedHoldDef && ghostPos && ghostRot && selectedPlacedHoldIds.length === 0 && !draggingId && (
             <Suspense fallback={null}>
                 <HoldModel 
                     modelFilename={selectedHoldDef.filename}

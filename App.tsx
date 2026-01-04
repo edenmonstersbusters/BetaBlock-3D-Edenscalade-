@@ -329,6 +329,16 @@ function App() {
     setHolds([...holds, newHold]);
   };
 
+  const handleHoldDrag = (id: string, x: number, y: number, segmentId: string) => {
+    // Met à jour la position sans enregistrer dans l'historique (pour la fluidité)
+    setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId } : h));
+  };
+
+  const handleHoldDragEnd = () => {
+    // Enregistre l'état final dans l'historique
+    recordAction();
+  };
+
   const handleReplaceHold = (ids: string[], holdDef: HoldDefinition) => {
     recordAction();
     const idSet = new Set(ids);
@@ -463,6 +473,8 @@ function App() {
             onSelectPlacedHold={handleSelectHold}
             onContextMenu={(type, id, x, y, wx, wy) => setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
             onWallPointerUpdate={(info) => { lastWallPointer.current = info; }}
+            onHoldDrag={handleHoldDrag}
+            onHoldDragEnd={handleHoldDragEnd}
         />
       </div>
 

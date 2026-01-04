@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -15,7 +14,9 @@ interface HoldModelProps {
   color?: string;
   preview?: boolean;
   isSelected?: boolean;
+  isDragging?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
 }
 
@@ -32,7 +33,9 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   color,
   preview = false,
   isSelected = false,
+  isDragging = false,
   onClick,
+  onPointerDown,
   onContextMenu
 }) => {
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
@@ -77,16 +80,20 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         
         mesh.castShadow = true; 
         mesh.receiveShadow = true;
+
+        if (isDragging) {
+            mesh.raycast = () => null; // Ignore raycast to allow wall detection behind
+        }
       }
     });
     return { clonedScene: clone, offset: [offsetX, offsetY, offsetZ] as [number, number, number] };
-  }, [scene, opacity, color, preview, isSelected]);
+  }, [scene, opacity, color, preview, isSelected, isDragging]);
 
   return (
     <group 
       position={position} rotation={rotation} 
       scale={[scale[0] * baseScale, scale[1] * baseScale, scale[2] * baseScale]}
-      onPointerDown={(e) => { if (!preview) e.stopPropagation(); }}
+      onPointerDown={preview ? undefined : onPointerDown}
       onClick={preview ? undefined : onClick}
       onContextMenu={preview ? undefined : onContextMenu}
     >
