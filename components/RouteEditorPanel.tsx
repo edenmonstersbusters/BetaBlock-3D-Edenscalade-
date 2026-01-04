@@ -1,7 +1,11 @@
-
-import React, { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Image as ImageIcon } from 'lucide-react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Image as ImageIcon, Eye } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
+// Import types side-effect to ensure global JSX extensions for Three.js elements are active in this file
+import '../types';
+import { HoldModel } from './HoldModel';
 
 interface RouteEditorPanelProps {
   onBack: () => void;
@@ -20,16 +24,15 @@ interface RouteEditorPanelProps {
   onDeselect: () => void;
   onActionStart: () => void;
   onReplaceHold: (ids: string[], holdDef: HoldDefinition) => void;
-  onSave: () => void;
-  onSaveAs: () => void;
-  onImport: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
 const CATALOGUE_URL = `${BASE_URL}catalogue.json`;
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onSave, onSaveAs, onImport
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,22 +41,20 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
   
-  // États pour la prévisualisation au survol
+  // États pour la prévisualisation au survol (Catalogue)
   const [hoveredHold, setHoveredHold] = useState<HoldDefinition | null>(null);
   const [previewIndex, setPreviewIndex] = useState(1);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  // Effet pour l'animation cyclique des screenshots (1-4)
+  // Effet pour l'animation cyclique des screenshots (1-4) au survol dans le catalogue uniquement
   useEffect(() => {
     if (!hoveredHold) {
       setPreviewIndex(1);
       return;
     }
-
     const interval = setInterval(() => {
       setPreviewIndex((prev) => (prev % 4) + 1);
-    }, 1800);
-
+    }, 1000);
     return () => clearInterval(interval);
   }, [hoveredHold]);
 
@@ -129,7 +130,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-[60] overflow-hidden relative">
        
-       {/* Prévisualisation flottante au survol animée */}
+       {/* Prévisualisation flottante au survol (Catalogue) */}
        {hoveredHold && (
          <div 
            className="fixed z-[300] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
@@ -141,7 +142,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
            <div className="bg-gray-800 border-2 border-blue-500/50 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden w-48 transition-all duration-300">
               <div className="aspect-square bg-gray-950 relative flex items-center justify-center overflow-hidden">
                 <img 
-                  key={`${hoveredHold.id}-${previewIndex}`} // Force un rafraîchissement propre si besoin, bien que le navigateur gère le src
+                  key={`${hoveredHold.id}-${previewIndex}`}
                   src={getThumbnailUrl(hoveredHold.filename, previewIndex)} 
                   alt={hoveredHold.name}
                   className="w-full h-full object-contain p-2 animate-in fade-in duration-300"
@@ -149,20 +150,13 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/111/444?text=Pas+d\'aperçu';
                   }}
                 />
-                
-                {/* Indicateur d'angle (1-4) */}
                 <div className="absolute top-2 left-2 flex gap-1">
                   {[1, 2, 3, 4].map(idx => (
-                    <div 
-                      key={idx} 
-                      className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${idx === previewIndex ? 'bg-blue-500 scale-125 shadow-[0_0_5px_#3b82f6]' : 'bg-gray-600'}`} 
-                    />
+                    <div key={idx} className={`w-1.5 h-1.5 rounded-full ${idx === previewIndex ? 'bg-blue-500' : 'bg-gray-600'}`} />
                   ))}
                 </div>
-
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3">
                   <p className="text-[10px] font-black text-white uppercase truncate">{hoveredHold.name}</p>
-                  <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tighter mt-0.5">Vue angle {previewIndex}/4</p>
                 </div>
               </div>
            </div>
@@ -264,6 +258,55 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
           </section>
         )}
 
+        {/* PRÉVISUALISATION ACTIVE : 3D TEMPS RÉEL */}
+        {!anyHoldSelected && selectedHold && (
+          <section className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex items-center space-x-2 text-[10px] font-black text-blue-400 uppercase tracking-widest px-1">
+              <Eye size={12} />
+              <span>Rendu 3D Temps Réel</span>
+            </div>
+            <div className="bg-gray-950/50 rounded-2xl border-2 border-blue-500/20 relative overflow-hidden h-56 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+              {/* Overlay décoratif de fond */}
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1)_0%,transparent_70%)] pointer-events-none" />
+              
+              <div className="absolute inset-0">
+                  <Canvas camera={{ position: [0, 0, 0.4], fov: 45 }}>
+                      <ambientLight intensity={0.6} />
+                      <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
+                      <pointLight position={[-10, -10, -10]} intensity={0.5} />
+                      <Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr" />
+                      
+                      <Suspense fallback={
+                        <Html center>
+                          <div className="flex items-center justify-center">
+                            <Loader2 className="animate-spin text-blue-500" size={32} />
+                          </div>
+                        </Html>
+                      }>
+                          <Center>
+                              <HoldModel 
+                                  modelFilename={selectedHold.filename}
+                                  baseScale={selectedHold.baseScale}
+                                  rotation={[0, 0, (holdSettings.rotation * Math.PI) / 180]}
+                                  scale={[1, 1, 1]} 
+                                  color={holdSettings.color}
+                                  preview={true}
+                              />
+                          </Center>
+                      </Suspense>
+                      <OrbitControls makeDefault enableZoom={false} enablePan={false} minPolarAngle={0} maxPolarAngle={Math.PI} />
+                  </Canvas>
+              </div>
+
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center z-10 pointer-events-none">
+                 <span className="text-[11px] font-black text-white uppercase tracking-tighter bg-blue-600/20 px-3 py-1 rounded-full border border-blue-500/30 backdrop-blur-md shadow-lg">
+                   {selectedHold.name}
+                 </span>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="space-y-2">
             <button 
               onClick={() => {
@@ -297,7 +340,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                             onMouseLeave={() => {
                               setHoveredHold(null);
-                              setPreviewIndex(1); // Reset index on leave
+                              setPreviewIndex(1);
                             }}
                             className={`relative group rounded-lg border p-2 flex flex-col items-start transition-all ${selectedHold?.id === hold.id && !anyHoldSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-gray-700' : 'bg-gray-800 border-gray-700 hover:border-gray-500 hover:bg-gray-750'}`}
                           >
