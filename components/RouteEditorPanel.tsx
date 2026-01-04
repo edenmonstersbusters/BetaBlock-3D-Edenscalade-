@@ -54,7 +54,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
     }
     const interval = setInterval(() => {
       setPreviewIndex((prev) => (prev % 4) + 1);
-    }, 1000);
+    }, 1800);
     return () => clearInterval(interval);
   }, [hoveredHold]);
 
