@@ -1,82 +1,37 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as THREE from 'three';
-import { Scene } from './components/Scene';
-import { EditorPanel } from './components/EditorPanel';
-import { RouteEditorPanel } from './components/RouteEditorPanel';
+// Imports depuis la nouvelle structure modulaire
+import { Scene } from './core/Scene';
+import { EditorPanel } from './features/builder/EditorPanel';
+import { RouteEditorPanel } from './features/builder/RouteEditorPanel';
 import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment, BetaBlockFile } from './types';
+import { resolveHoldWorldData, calculateLocalCoords } from './utils/geometry';
+import { validateBetaBlockJson } from './utils/validation';
 import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2, Copy, ClipboardPaste, ArrowLeft } from 'lucide-react';
 
-// Import types to ensure global JSX intrinsic element extensions are loaded
+// Importation des types pour s'assurer que les extensions JSX globales de Three.js sont chargées
 import './types';
 
 const APP_VERSION = "1.1";
 
 const PALETTE = [
-    '#990000', // Rouge Sang
-    '#004400', // Vert Forêt
-    '#002266', // Bleu de Prusse
-    '#aa4400', // Orange Industriel
-    '#ccaa00', // Jaune Ocre
-    '#440066', // Violet de Minuit
-    '#882244', // Rose Oxyde
-    '#444444', // Gris Béton
-    '#f8f8f8', // Blanc Pur
-    '#111111'  // Noir Mat
+    '#990000', '#004400', '#002266', '#aa4400', '#ccaa00',
+    '#440066', '#882244', '#444444', '#f8f8f8', '#111111'
 ];
 
 const INITIAL_CONFIG: WallConfig = {
   width: 4.5,
   segments: [
-    { id: '1', height: 2.2, angle: 0 },   // Socle vertical
-    { id: '2', height: 2.0, angle: 30 },  // Dévers principal
-    { id: '3', height: 1.5, angle: 15 },  // Rétablissement
+    { id: '1', height: 2.2, angle: 0 },
+    { id: '2', height: 2.0, angle: 30 },
+    { id: '3', height: 1.5, angle: 15 },
   ],
 };
 
 const STORAGE_KEYS = {
   CONFIG: 'betablock_wall_config',
   HOLDS: 'betablock_placed_holds',
-};
-
-const resolveHoldWorldData = (hold: PlacedHold, config: WallConfig) => {
-  const segmentIndex = config.segments.findIndex(s => s.id === hold.segmentId);
-  if (segmentIndex === -1) return null;
-
-  let currentY = 0;
-  let currentZ = 0;
-  for (let i = 0; i < segmentIndex; i++) {
-    const s = config.segments[i];
-    const rad = (s.angle * Math.PI) / 180;
-    currentY += s.height * Math.cos(rad);
-    currentZ += s.height * Math.sin(rad);
-  }
-
-  const segment = config.segments[segmentIndex];
-  const rad = (segment.angle * Math.PI) / 180;
-  
-  const dirY = Math.cos(rad);
-  const dirZ = Math.sin(rad);
-
-  const posX = hold.x;
-  const posY = currentY + (hold.y * dirY);
-  const posZ = currentZ + (hold.y * dirZ);
-
-  const qBase = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 0, 1), 
-    new THREE.Vector3(0, -Math.sin(rad), Math.cos(rad))
-  );
-  const qSpin = new THREE.Quaternion().setFromAxisAngle(
-    new THREE.Vector3(0, 0, 1), 
-    (hold.spin * Math.PI) / 180
-  );
-  qBase.multiply(qSpin);
-  const euler = new THREE.Euler().setFromQuaternion(qBase);
-
-  return {
-    position: [posX, posY, posZ] as [number, number, number],
-    rotation: [euler.x, euler.y, euler.z] as [number, number, number]
-  };
 };
 
 function App() {
@@ -146,20 +101,6 @@ function App() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }, [config, holds]);
-
-  const validateBetaBlockJson = (json: any): BetaBlockFile | null => {
-    if (!json || typeof json !== 'object') return null;
-    if (!json.version || !json.config || !Array.isArray(json.holds)) return null;
-    const config = json.config;
-    if (typeof config.width !== 'number' || !Array.isArray(config.segments)) return null;
-    for (const seg of config.segments) if (!seg.id || typeof seg.height !== 'number' || typeof seg.angle !== 'number') return null;
-    for (const hold of json.holds) {
-      if (!hold.id || !hold.segmentId || typeof hold.x !== 'number' || typeof hold.y !== 'number') return null;
-      const segment = config.segments.find((s: any) => s.id === hold.segmentId);
-      if (!segment || hold.y > segment.height || Math.abs(hold.x) > config.width / 2) console.warn(`Validation: Prise ${hold.id} hors limites.`);
-    }
-    return json as BetaBlockFile;
-  };
 
   const importWallFromJson = useCallback((file: File) => {
     const reader = new FileReader();
@@ -302,6 +243,7 @@ function App() {
 
   const renderableHolds = useMemo(() => {
     return holds.map(h => {
+      // Utilisation de la fonction utilitaire importée
       const world = resolveHoldWorldData(h, config);
       if (!world) return null;
       return { ...h, ...world };
@@ -313,29 +255,24 @@ function App() {
     const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
     if (segmentIndex === -1) return;
     recordAction(); 
-    const x = position.x;
-    let segmentStartY = 0; let segmentStartZ = 0;
-    for(let i = 0; i < segmentIndex; i++) {
-        const s = config.segments[i]; const r = (s.angle * Math.PI) / 180;
-        segmentStartY += s.height * Math.cos(r); segmentStartZ += s.height * Math.sin(r);
-    }
-    const dy = position.y - segmentStartY; const dz = position.z - segmentStartZ;
-    const y = Math.sqrt(dy * dy + dz * dz);
+    
+    // Utilisation de la fonction utilitaire pour les coordonnées locales
+    const coords = calculateLocalCoords(position, segmentId, config);
+    if (!coords) return;
+
     const newHold: PlacedHold = {
       id: crypto.randomUUID(), modelId: selectedHold.id, filename: selectedHold.filename,
       modelBaseScale: selectedHold.baseScale, segmentId: segmentId,
-      x, y, spin: holdSettings.rotation, scale: [holdSettings.scale, holdSettings.scale, holdSettings.scale], color: holdSettings.color
+      x: coords.x, y: coords.y, spin: holdSettings.rotation, scale: [holdSettings.scale, holdSettings.scale, holdSettings.scale], color: holdSettings.color
     };
     setHolds([...holds, newHold]);
   };
 
   const handleHoldDrag = (id: string, x: number, y: number, segmentId: string) => {
-    // Met à jour la position sans enregistrer dans l'historique (pour la fluidité)
     setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId } : h));
   };
 
   const handleHoldDragEnd = () => {
-    // Enregistre l'état final dans l'historique
     recordAction();
   };
 

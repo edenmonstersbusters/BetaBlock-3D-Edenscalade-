@@ -4,12 +4,10 @@
  * Global JSX namespace augmentation for Three.js elements.
  * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
  * We augment React.JSX to merge Three.js elements with standard HTML elements without overwriting them.
- * Explicitly defining common elements ensures compatibility even if ThreeElements inference fails.
  */
 declare global {
   namespace React {
     namespace JSX {
-      // Fix: Removed 'extends ThreeElements' to ensure standard HTML types are merged correctly
       interface IntrinsicElements {
         mesh: any;
         group: any;
@@ -21,13 +19,11 @@ declare global {
         spotLight: any;
         primitive: any;
         color: any;
-        // Allow any other element (e.g. standard HTML elements like div, span) to avoid overwriting them
         [elemName: string]: any;
       }
     }
   }
   namespace JSX {
-    // Fix: Removed 'extends ThreeElements' to avoid overwriting standard JSX intrinsic elements
     interface IntrinsicElements {
         mesh: any;
         group: any;
@@ -52,12 +48,12 @@ export interface WallMetadata {
 
 export interface WallSegment {
   id: string;
-  height: number; // Length of the segment in meters
-  angle: number; // Angle in degrees. 0 = vertical, positive = overhang, negative = slab
+  height: number;
+  angle: number;
 }
 
 export interface WallConfig {
-  width: number; // Global width in meters
+  width: number;
   segments: WallSegment[];
 }
 
