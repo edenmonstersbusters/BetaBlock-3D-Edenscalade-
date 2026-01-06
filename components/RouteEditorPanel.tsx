@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Image as ImageIcon, Eye } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Palette, X, Layers, Image as ImageIcon, Eye, Save, FolderOpen } from 'lucide-react';
 import { HoldDefinition, PlacedHold } from '../types';
 // Import types side-effect to ensure global JSX extensions for Three.js elements are active in this file
 import '../types';
@@ -41,6 +42,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // États pour la prévisualisation au survol (Catalogue)
   const [hoveredHold, setHoveredHold] = useState<HoldDefinition | null>(null);
   const [previewIndex, setPreviewIndex] = useState(1);
@@ -104,6 +107,18 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const getThumbnailUrl = (filename: string, index: number) => {
     const baseName = filename.replace(/\.[^/.]+$/, "");
     return `${BASE_URL}screenshot/${baseName}-${index}.png`;
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onImport(file);
+      e.target.value = ''; // Reset input
+    }
   };
 
   const ColorButton: React.FC<{ color: string; isActive: boolean; onClick: () => void }> = ({ color, isActive, onClick }) => (
@@ -403,6 +418,33 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
               )}
           </section>
         )}
+
+        <section className="space-y-4 pt-4 border-t border-gray-800">
+          <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Save size={14} /><span>Gestion des Fichiers</span></div>
+          <div className="grid grid-cols-2 gap-2">
+            <button 
+              onClick={onExport}
+              className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 rounded-lg border border-gray-700 transition-all"
+            >
+              <Save size={14} className="text-emerald-400" />
+              Sauvegarder
+            </button>
+            <button 
+              onClick={handleImportClick}
+              className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 rounded-lg border border-gray-700 transition-all"
+            >
+              <FolderOpen size={14} className="text-blue-400" />
+              Charger
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".json"
+              onChange={handleFileChange}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
