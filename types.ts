@@ -1,4 +1,3 @@
-import { ThreeElements } from '@react-three/fiber';
 
 /**
  * Global JSX namespace augmentation for Three.js elements.
@@ -9,7 +8,8 @@ import { ThreeElements } from '@react-three/fiber';
 declare global {
   namespace React {
     namespace JSX {
-      interface IntrinsicElements extends ThreeElements {
+      // Fix: Removed 'extends ThreeElements' to ensure standard HTML types are merged correctly
+      interface IntrinsicElements {
         mesh: any;
         group: any;
         meshStandardMaterial: any;
@@ -20,11 +20,14 @@ declare global {
         spotLight: any;
         primitive: any;
         color: any;
+        // Allow any other element (e.g. standard HTML elements like div, span) to avoid overwriting them
+        [elemName: string]: any;
       }
     }
   }
   namespace JSX {
-    interface IntrinsicElements extends ThreeElements {
+    // Fix: Removed 'extends ThreeElements' to avoid overwriting standard JSX intrinsic elements
+    interface IntrinsicElements {
         mesh: any;
         group: any;
         meshStandardMaterial: any;
@@ -35,6 +38,8 @@ declare global {
         spotLight: any;
         primitive: any;
         color: any;
+        // Allow any other element (e.g. standard HTML elements like div, span) to avoid overwriting them
+        [elemName: string]: any;
     }
   }
 }

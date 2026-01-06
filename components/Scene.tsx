@@ -1,4 +1,4 @@
-import React, { useState, Suspense, useMemo, useEffect } from 'react';
+import React, { useState, Suspense, useMemo, useEffect, useRef } from 'react';
 import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -6,6 +6,96 @@ import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
 import '../types'; 
+
+// Utility function for coordinate calculation
+const calculateLocalCoords = (point: THREE.Vector3, segmentId: string, config: WallConfig) => {
+    const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
+    if (segmentIndex === -1) return null;
+    
+    let startY = 0; 
+    let startZ = 0;
+    for(let i = 0; i < segmentIndex; i++) {
+        const s = config.segments[i]; 
+        const r = (s.angle * Math.PI) / 180;
+        startY += s.height * Math.cos(r); 
+        startZ += s.height * Math.sin(r);
+    }
+
+    const localX = point.x;
+    const dy = point.y - startY;
+    const dz = point.z - startZ;
+    const localY = Math.sqrt(dy * dy + dz * dz);
+
+    return { x: localX, y: localY };
+};
+
+// Internal component to handle global drag logic via manual raycasting
+const DragController: React.FC<{
+  draggingId: string | null;
+  config: WallConfig;
+  onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
+  onDragEnd: () => void;
+  setDraggingId: (id: string | null) => void;
+  orbitRef: React.MutableRefObject<any>;
+}> = ({ draggingId, config, onHoldDrag, onDragEnd, setDraggingId, orbitRef }) => {
+  const { camera, scene, gl } = useThree();
+
+  useEffect(() => {
+    if (!draggingId) return;
+    console.log('[DragController] Activated for hold:', draggingId);
+
+    const onPointerMove = (e: PointerEvent) => {
+       const rect = gl.domElement.getBoundingClientRect();
+       // Normalized device coordinates
+       const mouse = new THREE.Vector2(
+         ((e.clientX - rect.left) / rect.width) * 2 - 1,
+         -((e.clientY - rect.top) / rect.height) * 2 + 1
+       );
+
+       const raycaster = new THREE.Raycaster();
+       raycaster.setFromCamera(mouse, camera);
+       
+       // Intersect recursively with the scene
+       const intersects = raycaster.intersectObjects(scene.children, true);
+       // Find the wall panel
+       const wallHit = intersects.find(hit => hit.object.name === 'climbing-wall-panel');
+
+       if (wallHit && onHoldDrag) {
+          const segmentId = wallHit.object.userData.segmentId;
+          const coords = calculateLocalCoords(wallHit.point, segmentId, config);
+          
+          if (coords) {
+             const segment = config.segments.find(s => s.id === segmentId);
+             if (segment) {
+                const clampedY = Math.max(0, Math.min(segment.height, coords.y));
+                const clampedX = Math.max(-config.width/2, Math.min(config.width/2, coords.x));
+                onHoldDrag(draggingId, clampedX, clampedY, segmentId);
+             }
+          }
+       }
+    };
+
+    const onPointerUp = () => {
+       console.log('[DragController] Global Pointer Up/Cancel detected');
+       setDraggingId(null);
+       if (orbitRef.current) orbitRef.current.enabled = true;
+       onDragEnd();
+    };
+
+    // Attach to window to catch events even if they leave the canvas or element is captured
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    return () => {
+       window.removeEventListener('pointermove', onPointerMove);
+       window.removeEventListener('pointerup', onPointerUp);
+       window.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [draggingId, camera, scene, gl, config, onHoldDrag, onDragEnd, setDraggingId, orbitRef]);
+
+  return null;
+};
 
 interface SceneProps {
   config: WallConfig;
@@ -39,66 +129,34 @@ export const Scene: React.FC<SceneProps> = ({
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [hoveredHoldId, setHoveredHoldId] = useState<string | null>(null);
+  
+  const orbitRef = useRef<any>(null);
 
-  // Calcule les coordonnées locales (x, y) relatives à un segment spécifique
-  const getSegmentLocalCoords = (point: THREE.Vector3, segmentId: string) => {
-    const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
-    if (segmentIndex === -1) return null;
-    
-    // Calculer l'offset de base du segment
-    let startY = 0; 
-    let startZ = 0;
-    for(let i = 0; i < segmentIndex; i++) {
-        const s = config.segments[i]; 
-        const r = (s.angle * Math.PI) / 180;
-        startY += s.height * Math.cos(r); 
-        startZ += s.height * Math.sin(r);
+  // Strategy: Disable orbit controls when hovering a selected hold to prioritize interaction
+  const isHoveringSelected = hoveredHoldId && selectedPlacedHoldIds.includes(hoveredHoldId);
+  const orbitEnabled = !draggingId && !isHoveringSelected;
+
+  // Cursor management
+  useEffect(() => {
+    if (draggingId) {
+      document.body.style.cursor = 'grabbing';
+    } else if (isHoveringSelected) {
+      document.body.style.cursor = 'grab';
+    } else {
+      document.body.style.cursor = 'auto';
     }
-
-    // Le X local est simplement le X global (le mur est centré)
-    const localX = point.x;
-
-    // Le Y local est la distance entre le point d'impact et la base du segment
-    const dy = point.y - startY;
-    const dz = point.z - startZ;
-    // Théorème de Pythagore pour obtenir la distance le long de la pente
-    const localY = Math.sqrt(dy * dy + dz * dz);
-
-    return { x: localX, y: localY };
-  };
-
-  const getWallCoords = (point: THREE.Vector3, segmentId: string) => {
-    // Legacy support for global wallY calculation if needed, though getSegmentLocalCoords is better for placement
-    const local = getSegmentLocalCoords(point, segmentId);
-    if (!local) return null;
-    
-    // Pour la compatibilité avec l'affichage global (App.tsx info)
-    // On recalcule une sorte de Y global approximatif pour l'UI si nécessaire
-    // Mais ici on retourne les coords locales car c'est ce qu'on utilise
-    return { x: local.x, y: local.y }; 
-  };
+    return () => { document.body.style.cursor = 'auto'; };
+  }, [draggingId, isHoveringSelected]);
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
-    // Si on drag une prise
-    if (draggingId && onHoldDrag) {
-      e.stopPropagation();
-      const localCoords = getSegmentLocalCoords(e.point, segmentId);
-      if (localCoords) {
-        // Limites du mur
-        const segment = config.segments.find(s => s.id === segmentId);
-        if (segment) {
-            const clampedY = Math.max(0, Math.min(segment.height, localCoords.y));
-            const clampedX = Math.max(-config.width/2, Math.min(config.width/2, localCoords.x));
-            onHoldDrag(draggingId, clampedX, clampedY, segmentId);
-        }
-      }
-      return;
-    }
+    // Note: Actual dragging logic is now handled by DragController
+    // This handler only manages hover updates and ghost placement
+    if (draggingId) return;
 
-    // Mise à jour de la position de collage globale (App.tsx)
-    const localCoords = getSegmentLocalCoords(e.point, segmentId);
-    if (localCoords) {
-      onWallPointerUpdate?.({ ...localCoords, segmentId });
+    const coords = calculateLocalCoords(e.point, segmentId, config);
+    if (coords) {
+      onWallPointerUpdate?.({ ...coords, segmentId });
     }
 
     if (mode !== 'SET') return;
@@ -119,7 +177,7 @@ export const Scene: React.FC<SceneProps> = ({
   };
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
-    if (draggingId) return; // Déjà en train de drag
+    if (draggingId) return;
     if (mode !== 'SET') return;
     if (e.button !== 0) return;
     
@@ -133,26 +191,21 @@ export const Scene: React.FC<SceneProps> = ({
     }
   };
 
-  const handlePointerUp = () => {
-    if (draggingId) {
-      setDraggingId(null);
-      onHoldDragEnd?.();
-    }
-  };
-
   const handleWallContextMenu = (e: ThreeEvent<MouseEvent>, segmentId: string) => {
     e.stopPropagation();
     e.nativeEvent.preventDefault();
-    const localCoords = getSegmentLocalCoords(e.point, segmentId);
-    onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, localCoords?.x, localCoords?.y);
+    const coords = calculateLocalCoords(e.point, segmentId, config);
+    onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, coords?.x, coords?.y);
   };
 
   return (
     <Canvas 
       shadows 
       camera={{ position: [8, 5, 12], fov: 40 }}
-      onPointerLeave={() => onWallPointerUpdate?.(null)}
-      onPointerUp={handlePointerUp}
+      onPointerLeave={() => {
+        onWallPointerUpdate?.(null);
+        setHoveredHoldId(null);
+      }}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -161,8 +214,23 @@ export const Scene: React.FC<SceneProps> = ({
     >
       <color attach="background" args={['#0a0a0a']} />
       
-      {/* Désactive les contrôles de caméra pendant le drag pour une meilleure UX */}
-      <OrbitControls makeDefault target={[0, 2, 0]} minDistance={1} maxDistance={40} enabled={!draggingId} />
+      <OrbitControls 
+        ref={orbitRef}
+        makeDefault 
+        target={[0, 2, 0]} 
+        minDistance={1} 
+        maxDistance={40} 
+        enabled={orbitEnabled} 
+      />
+      
+      <DragController 
+        draggingId={draggingId}
+        config={config}
+        onHoldDrag={onHoldDrag}
+        onDragEnd={() => onHoldDragEnd?.()}
+        setDraggingId={setDraggingId}
+        orbitRef={orbitRef}
+      />
       
       <ambientLight intensity={1.0} />
       <directionalLight position={[5, 10, 5]} intensity={0.3} castShadow shadow-mapSize={[1024, 1024]} />
@@ -189,20 +257,34 @@ export const Scene: React.FC<SceneProps> = ({
                     color={hold.color}
                     isSelected={selectedPlacedHoldIds.includes(hold.id)}
                     isDragging={draggingId === hold.id}
+                    onPointerOver={(e) => {
+                      e.stopPropagation();
+                      setHoveredHoldId(hold.id);
+                    }}
+                    onPointerOut={(e) => {
+                      if (hoveredHoldId === hold.id) {
+                        setHoveredHoldId(null);
+                      }
+                    }}
                     onPointerDown={(e) => {
                       if (e.button === 0) {
+                        console.log('Hold PointerDown detected:', hold.id);
                         e.stopPropagation();
-                        // Important: Release pointer capture so subsequent pointer events are not locked to this hold,
-                        // allowing the wall behind to receive pointerMove events for dragging calculation.
-                        (e.target as any).releasePointerCapture(e.pointerId);
+                        
+                        // Immediate lock
+                        if (orbitRef.current) orbitRef.current.enabled = false;
 
-                        // Si mode SET et aucune prise sélectionnée dans le catalogue, on commence le drag
-                        // Si Ctrl est enfoncé, on fait de la multisélection classique, pas de drag
-                        if (mode === 'SET' && !selectedHoldDef && !(e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)) {
+                        const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
+
+                        // FIX: Remove !selectedHoldDef constraint. 
+                        // If user clicks an existing hold, we assume they want to interact with it,
+                        // regardless of whether they have a ghost hold selected in the library.
+                        if (mode === 'SET' && !isMultiSelect) {
+                           console.log('Initiating drag for:', hold.id);
+                           onSelectPlacedHold(hold.id, false);
                            setDraggingId(hold.id);
-                           onSelectPlacedHold(hold.id, false); // Sélectionne la prise qu'on drag
                         } else {
-                           onSelectPlacedHold(hold.id, e.nativeEvent.ctrlKey || e.nativeEvent.metaKey);
+                           onSelectPlacedHold(hold.id, isMultiSelect);
                         }
                       }
                     }}

@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -17,6 +18,8 @@ interface HoldModelProps {
   isDragging?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
+  onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
+  onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
 }
 
@@ -36,6 +39,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   isDragging = false,
   onClick,
   onPointerDown,
+  onPointerOver,
+  onPointerOut,
   onContextMenu
 }) => {
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
@@ -94,6 +99,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
       position={position} rotation={rotation} 
       scale={[scale[0] * baseScale, scale[1] * baseScale, scale[2] * baseScale]}
       onPointerDown={preview ? undefined : onPointerDown}
+      onPointerOver={preview ? undefined : onPointerOver}
+      onPointerOut={preview ? undefined : onPointerOut}
       onClick={preview ? undefined : onClick}
       onContextMenu={preview ? undefined : onContextMenu}
     >
