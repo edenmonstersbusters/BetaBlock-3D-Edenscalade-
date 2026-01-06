@@ -1,3 +1,4 @@
+
 import React, { useState, Suspense, useMemo, useEffect, useRef } from 'react';
 import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
@@ -132,6 +133,7 @@ export const Scene: React.FC<SceneProps> = ({
   const [hoveredHoldId, setHoveredHoldId] = useState<string | null>(null);
   
   const orbitRef = useRef<any>(null);
+  const pointerDownScreenPos = useRef<{x: number, y: number} | null>(null);
 
   // Strategy: Disable orbit controls when hovering a selected hold to prioritize interaction
   const isHoveringSelected = hoveredHoldId && selectedPlacedHoldIds.includes(hoveredHoldId);
@@ -151,7 +153,6 @@ export const Scene: React.FC<SceneProps> = ({
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
     // Note: Actual dragging logic is now handled by DragController
-    // This handler only manages hover updates and ghost placement
     if (draggingId) return;
 
     const coords = calculateLocalCoords(e.point, segmentId, config);
@@ -165,7 +166,6 @@ export const Scene: React.FC<SceneProps> = ({
       return;
     }
     
-    e.stopPropagation();
     setGhostPos(e.point.clone());
     const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
     const quaternion = new THREE.Quaternion();
@@ -176,11 +176,35 @@ export const Scene: React.FC<SceneProps> = ({
     setGhostRot(new THREE.Euler().setFromQuaternion(quaternion));
   };
 
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (draggingId) return;
+    // Record for left (0) and right (2) clicks
+    if (e.button === 0 || e.button === 2) {
+      pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const handlePointerUp = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
+    if (!pointerDownScreenPos.current) return;
     if (draggingId) return;
     if (mode !== 'SET') return;
     if (e.button !== 0) return;
+
+    // Calcul du delta de mouvement
+    const dx = e.clientX - pointerDownScreenPos.current.x;
+    const dy = e.clientY - pointerDownScreenPos.current.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
     
+    // On ne réinitialise pas encore pointerDownScreenPos car le menu contextuel (right click)
+    // peut se déclencher juste après si c'est le bouton droit.
+
+    // Seuil de 5 pixels : si plus, c'est un mouvement de caméra (Orbit)
+    if (dist > 5) {
+      pointerDownScreenPos.current = null;
+      return;
+    }
+
+    // Validation de l'action de pose ou de désélection (Bouton Gauche)
     if (selectedPlacedHoldIds.length > 0) {
       e.stopPropagation();
       onSelectPlacedHold(null);
@@ -189,11 +213,21 @@ export const Scene: React.FC<SceneProps> = ({
       const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
       onPlaceHold(e.point.clone(), normal, segmentId);
     }
+    pointerDownScreenPos.current = null;
   };
 
   const handleWallContextMenu = (e: ThreeEvent<MouseEvent>, segmentId: string) => {
-    e.stopPropagation();
     e.nativeEvent.preventDefault();
+    if (!pointerDownScreenPos.current) return;
+
+    const dx = e.clientX - pointerDownScreenPos.current.x;
+    const dy = e.clientY - pointerDownScreenPos.current.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    pointerDownScreenPos.current = null;
+
+    if (dist > 5) return; // C'était un mouvement de caméra (Pan)
+
+    e.stopPropagation();
     const coords = calculateLocalCoords(e.point, segmentId, config);
     onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, coords?.x, coords?.y);
   };
@@ -223,6 +257,7 @@ export const Scene: React.FC<SceneProps> = ({
         enabled={orbitEnabled} 
       />
       
+      {/* Fix: Replaced handleHoldDrag and handleHoldDragEnd with onHoldDrag and onHoldDragEnd props */}
       <DragController 
         draggingId={draggingId}
         config={config}
@@ -242,6 +277,7 @@ export const Scene: React.FC<SceneProps> = ({
           interactive={mode === 'SET'}
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
           onContextMenu={handleWallContextMenu}
         />
         
@@ -267,20 +303,16 @@ export const Scene: React.FC<SceneProps> = ({
                       }
                     }}
                     onPointerDown={(e) => {
+                      // Record position for right-click delta check
+                      pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
+
                       if (e.button === 0) {
-                        console.log('Hold PointerDown detected:', hold.id);
                         e.stopPropagation();
-                        
-                        // Immediate lock
+                        // Verrouillage immédiat pour éviter tout conflit avec Orbit
                         if (orbitRef.current) orbitRef.current.enabled = false;
 
                         const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-
-                        // FIX: Remove !selectedHoldDef constraint. 
-                        // If user clicks an existing hold, we assume they want to interact with it,
-                        // regardless of whether they have a ghost hold selected in the library.
                         if (mode === 'SET' && !isMultiSelect) {
-                           console.log('Initiating drag for:', hold.id);
                            onSelectPlacedHold(hold.id, false);
                            setDraggingId(hold.id);
                         } else {
@@ -289,8 +321,17 @@ export const Scene: React.FC<SceneProps> = ({
                       }
                     }}
                     onContextMenu={(e) => {
-                      e.stopPropagation();
                       e.nativeEvent.preventDefault();
+                      if (!pointerDownScreenPos.current) return;
+                      
+                      const dx = e.clientX - pointerDownScreenPos.current.x;
+                      const dy = e.clientY - pointerDownScreenPos.current.y;
+                      const dist = Math.sqrt(dx * dx + dy * dy);
+                      pointerDownScreenPos.current = null;
+
+                      if (dist > 5) return; // Ignore menu if we panned
+
+                      e.stopPropagation();
                       onContextMenu('HOLD', hold.id, e.nativeEvent.clientX, e.nativeEvent.clientY);
                     }}
                 />

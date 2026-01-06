@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
@@ -18,12 +17,13 @@ interface WallPanelProps {
   interactive?: boolean;
   onPointerMove?: (e: ThreeEvent<PointerEvent>, segmentId: string) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>, segmentId: string) => void;
+  onPointerUp?: (e: ThreeEvent<PointerEvent>, segmentId: string) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>, segmentId: string) => void;
 }
 
 const WallPanel: React.FC<WallPanelProps> = ({ 
   segment, width, thickness, panelSize, baseY, baseZ, cumulativeDist, texture, 
-  interactive, onPointerMove, onPointerDown, onContextMenu 
+  interactive, onPointerMove, onPointerDown, onPointerUp, onContextMenu 
 }) => {
   const rad = (segment.angle * Math.PI) / 180;
   const topY = segment.height * Math.cos(rad);
@@ -76,6 +76,7 @@ const WallPanel: React.FC<WallPanelProps> = ({
       receiveShadow
       onPointerMove={interactive ? (e) => onPointerMove?.(e, segment.id) : undefined}
       onPointerDown={interactive ? (e) => onPointerDown?.(e, segment.id) : undefined}
+      onPointerUp={interactive ? (e) => onPointerUp?.(e, segment.id) : undefined}
       onContextMenu={interactive ? (e) => onContextMenu?.(e, segment.id) : undefined}
     >
       <meshStandardMaterial map={texture} color="#ffffff" roughness={0.8} metalness={0.0} />
@@ -87,11 +88,12 @@ interface WallMeshProps {
   config: WallConfig;
   onPointerMove?: (e: ThreeEvent<PointerEvent>, segmentId: string) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>, segmentId: string) => void;
+  onPointerUp?: (e: ThreeEvent<PointerEvent>, segmentId: string) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>, segmentId: string) => void;
   interactive?: boolean;
 }
 
-export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPointerDown, onContextMenu, interactive }) => {
+export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPointerDown, onPointerUp, onContextMenu, interactive }) => {
   const thickness = 0.25; 
   const panelSize = 1.25; 
 
@@ -174,6 +176,7 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
           interactive={interactive}
           onPointerMove={onPointerMove}
           onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
           onContextMenu={onContextMenu}
         />
       ))}
