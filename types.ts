@@ -1,45 +1,40 @@
-
+import 'react';
 
 /**
  * Global JSX namespace augmentation for Three.js elements.
  * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
  * We augment React.JSX to merge Three.js elements with standard HTML elements without overwriting them.
- * Explicitly defining common elements ensures compatibility even if ThreeElements inference fails.
  */
-declare global {
-  namespace React {
-    namespace JSX {
-      // Fix: Removed 'extends ThreeElements' to ensure standard HTML types are merged correctly
-      interface IntrinsicElements {
-        mesh: any;
-        group: any;
-        meshStandardMaterial: any;
-        ambientLight: any;
-        directionalLight: any;
-        hemisphereLight: any;
-        pointLight: any;
-        spotLight: any;
-        primitive: any;
-        color: any;
-        // Allow any other element (e.g. standard HTML elements like div, span) to avoid overwriting them
-        [elemName: string]: any;
-      }
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      mesh: any;
+      group: any;
+      meshStandardMaterial: any;
+      ambientLight: any;
+      directionalLight: any;
+      hemisphereLight: any;
+      pointLight: any;
+      spotLight: any;
+      primitive: any;
+      color: any;
     }
   }
+}
+
+declare global {
   namespace JSX {
-    // Fix: Removed 'extends ThreeElements' to avoid overwriting standard JSX intrinsic elements
     interface IntrinsicElements {
-        mesh: any;
-        group: any;
-        meshStandardMaterial: any;
-        ambientLight: any;
-        directionalLight: any;
-        hemisphereLight: any;
-        pointLight: any;
-        spotLight: any;
-        primitive: any;
-        color: any;
-        // Index signature removed to avoid "Duplicate index signature" error
+      mesh: any;
+      group: any;
+      meshStandardMaterial: any;
+      ambientLight: any;
+      directionalLight: any;
+      hemisphereLight: any;
+      pointLight: any;
+      spotLight: any;
+      primitive: any;
+      color: any;
     }
   }
 }
@@ -48,6 +43,7 @@ export interface WallMetadata {
   name: string;
   timestamp: string;
   appVersion: string;
+  thumbnail?: string;
 }
 
 export interface WallSegment {

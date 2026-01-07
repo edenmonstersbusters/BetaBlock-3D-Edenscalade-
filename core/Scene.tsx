@@ -1,81 +1,15 @@
 
 import React, { useState, Suspense, useEffect, useRef } from 'react';
-import { Canvas, ThreeEvent, useThree } from '@react-three/fiber';
+import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
+import { DragController } from './DragController';
+import { ScreenshotHandler } from './ScreenshotHandler';
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
 import { calculateLocalCoords } from '../utils/geometry';
 import '../types'; 
-
-// Internal component to handle global drag logic via manual raycasting
-const DragController: React.FC<{
-  draggingId: string | null;
-  config: WallConfig;
-  onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
-  onDragEnd: () => void;
-  setDraggingId: (id: string | null) => void;
-  orbitRef: React.MutableRefObject<any>;
-}> = ({ draggingId, config, onHoldDrag, onDragEnd, setDraggingId, orbitRef }) => {
-  const { camera, scene, gl } = useThree();
-
-  useEffect(() => {
-    if (!draggingId) return;
-    console.log('[DragController] Activated for hold:', draggingId);
-
-    const onPointerMove = (e: PointerEvent) => {
-       const rect = gl.domElement.getBoundingClientRect();
-       // Normalized device coordinates
-       const mouse = new THREE.Vector2(
-         ((e.clientX - rect.left) / rect.width) * 2 - 1,
-         -((e.clientY - rect.top) / rect.height) * 2 + 1
-       );
-
-       const raycaster = new THREE.Raycaster();
-       raycaster.setFromCamera(mouse, camera);
-       
-       // Intersect recursively with the scene
-       const intersects = raycaster.intersectObjects(scene.children, true);
-       // Find the wall panel
-       const wallHit = intersects.find(hit => hit.object.name === 'climbing-wall-panel');
-
-       if (wallHit && onHoldDrag) {
-          const segmentId = wallHit.object.userData.segmentId;
-          const coords = calculateLocalCoords(wallHit.point, segmentId, config);
-          
-          if (coords) {
-             const segment = config.segments.find(s => s.id === segmentId);
-             if (segment) {
-                const clampedY = Math.max(0, Math.min(segment.height, coords.y));
-                const clampedX = Math.max(-config.width/2, Math.min(config.width/2, coords.x));
-                onHoldDrag(draggingId, clampedX, clampedY, segmentId);
-             }
-          }
-       }
-    };
-
-    const onPointerUp = () => {
-       console.log('[DragController] Global Pointer Up/Cancel detected');
-       setDraggingId(null);
-       if (orbitRef.current) orbitRef.current.enabled = true;
-       onDragEnd();
-    };
-
-    // Attach to window to catch events even if they leave the canvas or element is captured
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
-
-    return () => {
-       window.removeEventListener('pointermove', onPointerMove);
-       window.removeEventListener('pointerup', onPointerUp);
-       window.removeEventListener('pointercancel', onPointerUp);
-    };
-  }, [draggingId, camera, scene, gl, config, onHoldDrag, onDragEnd, setDraggingId, orbitRef]);
-
-  return null;
-};
 
 interface SceneProps {
   config: WallConfig;
@@ -90,6 +24,7 @@ interface SceneProps {
   onWallPointerUpdate?: (info: { x: number, y: number, segmentId: string } | null) => void;
   onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
   onHoldDragEnd?: () => void;
+  screenshotRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -104,7 +39,8 @@ export const Scene: React.FC<SceneProps> = ({
   onContextMenu,
   onWallPointerUpdate,
   onHoldDrag,
-  onHoldDragEnd
+  onHoldDragEnd,
+  screenshotRef
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
@@ -118,7 +54,6 @@ export const Scene: React.FC<SceneProps> = ({
   const isHoveringSelected = hoveredHoldId && selectedPlacedHoldIds.includes(hoveredHoldId);
   const orbitEnabled = !draggingId && !isHoveringSelected;
 
-  // Cursor management
   useEffect(() => {
     if (draggingId) {
       document.body.style.cursor = 'grabbing';
@@ -131,7 +66,6 @@ export const Scene: React.FC<SceneProps> = ({
   }, [draggingId, isHoveringSelected]);
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
-    // Note: Actual dragging logic is now handled by DragController
     if (draggingId) return;
 
     const coords = calculateLocalCoords(e.point, segmentId, config);
@@ -157,7 +91,6 @@ export const Scene: React.FC<SceneProps> = ({
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (draggingId) return;
-    // Record for left (0) and right (2) clicks
     if (e.button === 0 || e.button === 2) {
       pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
     }
@@ -169,18 +102,15 @@ export const Scene: React.FC<SceneProps> = ({
     if (mode !== 'SET') return;
     if (e.button !== 0) return;
 
-    // Calcul du delta de mouvement
     const dx = e.clientX - pointerDownScreenPos.current.x;
     const dy = e.clientY - pointerDownScreenPos.current.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // Seuil de 5 pixels : si plus, c'est un mouvement de caméra (Orbit)
     if (dist > 5) {
       pointerDownScreenPos.current = null;
       return;
     }
 
-    // Validation de l'action de pose ou de désélection (Bouton Gauche)
     if (selectedPlacedHoldIds.length > 0) {
       e.stopPropagation();
       onSelectPlacedHold(null);
@@ -201,7 +131,7 @@ export const Scene: React.FC<SceneProps> = ({
     const dist = Math.sqrt(dx * dx + dy * dy);
     pointerDownScreenPos.current = null;
 
-    if (dist > 5) return; // C'était un mouvement de caméra (Pan)
+    if (dist > 5) return;
 
     e.stopPropagation();
     const coords = calculateLocalCoords(e.point, segmentId, config);
@@ -211,6 +141,8 @@ export const Scene: React.FC<SceneProps> = ({
   return (
     <Canvas 
       shadows 
+      // preserveDrawingBuffer is essential for toDataURL() to work
+      gl={{ preserveDrawingBuffer: true }}
       camera={{ position: [8, 5, 12], fov: 40 }}
       onPointerLeave={() => {
         onWallPointerUpdate?.(null);
@@ -224,6 +156,8 @@ export const Scene: React.FC<SceneProps> = ({
     >
       <color attach="background" args={['#0a0a0a']} />
       
+      {screenshotRef && <ScreenshotHandler onScreenshotRef={screenshotRef} />}
+
       <OrbitControls 
         ref={orbitRef}
         makeDefault 
@@ -278,12 +212,10 @@ export const Scene: React.FC<SceneProps> = ({
                       }
                     }}
                     onPointerDown={(e) => {
-                      // Record position for right-click delta check
                       pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
 
                       if (e.button === 0) {
                         e.stopPropagation();
-                        // Verrouillage immédiat pour éviter tout conflit avec Orbit
                         if (orbitRef.current) orbitRef.current.enabled = false;
 
                         const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
@@ -298,14 +230,11 @@ export const Scene: React.FC<SceneProps> = ({
                     onContextMenu={(e) => {
                       e.nativeEvent.preventDefault();
                       if (!pointerDownScreenPos.current) return;
-                      
                       const dx = e.clientX - pointerDownScreenPos.current.x;
                       const dy = e.clientY - pointerDownScreenPos.current.y;
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       pointerDownScreenPos.current = null;
-
-                      if (dist > 5) return; // Ignore menu if we panned
-
+                      if (dist > 5) return;
                       e.stopPropagation();
                       onContextMenu('HOLD', hold.id, e.nativeEvent.clientX, e.nativeEvent.clientY);
                     }}

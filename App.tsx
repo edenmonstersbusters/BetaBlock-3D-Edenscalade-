@@ -1,24 +1,34 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import * as THREE from 'three';
-// Imports depuis la nouvelle structure modulaire
+
+// Core imports
 import { Scene } from './core/Scene';
+import { api } from './core/api'; 
+import { validateBetaBlockJson } from './utils/validation';
+import { resolveHoldWorldData, calculateLocalCoords } from './utils/geometry';
+
+// Custom Hooks
+import { useHistory } from './hooks/useHistory';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+
+// Feature Components
 import { EditorPanel } from './features/builder/EditorPanel';
 import { RouteEditorPanel } from './features/builder/RouteEditorPanel';
-import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment, BetaBlockFile } from './types';
-import { resolveHoldWorldData, calculateLocalCoords } from './utils/geometry';
-import { validateBetaBlockJson } from './utils/validation';
-import { AlertTriangle, Info, Trash2, RotateCw, RotateCcw, MoveUp, MoveDown, Palette, ChevronRight, Undo2, Redo2, Copy, ClipboardPaste, ArrowLeft } from 'lucide-react';
+import { GalleryPage } from './features/gallery/GalleryPage';
 
-// Importation des types pour s'assurer que les extensions JSX globales de Three.js sont chargées
+// UI Components
+import { LoadingOverlay } from './components/ui/LoadingOverlay';
+import { GlobalModal, ModalConfig } from './components/ui/GlobalModal';
+import { ContextMenu, ContextMenuData } from './components/ui/ContextMenu';
+import { Undo2, Redo2 } from 'lucide-react';
+
+// Types
+import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment, BetaBlockFile } from './types';
 import './types';
 
 const APP_VERSION = "1.1";
-
-const PALETTE = [
-    '#990000', '#004400', '#002266', '#aa4400', '#ccaa00',
-    '#440066', '#882244', '#444444', '#f8f8f8', '#111111'
-];
 
 const INITIAL_CONFIG: WallConfig = {
   width: 4.5,
@@ -35,10 +45,17 @@ const STORAGE_KEYS = {
 };
 
 function App() {
-  const [mode, setMode] = useState<AppMode>('BUILD');
-  const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
-  const globalFileInputRef = useRef<HTMLInputElement>(null);
-  const lastWallPointer = useRef<{ x: number, y: number, segmentId: string } | null>(null);
+  // --- ROUTING ---
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isGallery = location.pathname === '/';
+  const mode: AppMode = location.pathname.startsWith('/setter') ? 'SET' : 'BUILD';
+
+  // --- STATE ---
+  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+  const [cloudId, setCloudId] = useState<string | null>(null);
+  const screenshotRef = useRef<(() => string | null) | null>(null);
   
   const [config, setConfig] = useState<WallConfig>(() => {
     try {
@@ -54,75 +71,84 @@ function App() {
     } catch { return []; }
   });
 
-  const [past, setPast] = useState<{config: WallConfig, holds: PlacedHold[]}[]>([]);
-  const [future, setFuture] = useState<{config: WallConfig, holds: PlacedHold[]}[]>([]);
-
-  const recordAction = useCallback(() => {
-    setPast(prev => [...prev, { config: JSON.parse(JSON.stringify(config)), holds: JSON.parse(JSON.stringify(holds)) }]);
-    setFuture([]);
-  }, [config, holds]);
-
-  const undo = useCallback(() => {
-    if (past.length === 0) return;
-    const previous = past[past.length - 1];
-    setFuture(prev => [{ config: JSON.parse(JSON.stringify(config)), holds: JSON.parse(JSON.stringify(holds)) }, ...prev]);
-    setConfig(previous.config);
-    setHolds(previous.holds);
-    setPast(prev => prev.slice(0, -1));
-  }, [past, config, holds]);
-
-  const redo = useCallback(() => {
-    if (future.length === 0) return;
-    const next = future[0];
-    setPast(prev => [...prev, { config: JSON.parse(JSON.stringify(config)), holds: JSON.parse(JSON.stringify(holds)) }]);
-    setConfig(next.config);
-    setHolds(next.holds);
-    setFuture(prev => prev.slice(1));
-  }, [future, config, holds]);
-
-  const exportWallToJson = useCallback(() => {
-    const data: BetaBlockFile = {
-      version: APP_VERSION,
-      metadata: {
-        name: `Mur Beta ${new Date().toLocaleDateString()}`,
-        timestamp: new Date().toISOString(),
-        appVersion: APP_VERSION
-      },
-      config: config,
-      holds: holds
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mon-mur-beta-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, [config, holds]);
-
-  const importWallFromJson = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const json = JSON.parse(e.target?.result as string);
-        const validated = validateBetaBlockJson(json);
-        if (!validated) throw new Error("Fichier corrompu ou format incompatible.");
-        recordAction();
-        setConfig(validated.config);
-        setHolds(validated.holds);
-        setModal({ title: "Succès", message: "Le mur a été chargé avec succès.", isAlert: true });
-      } catch (err: any) {
-        setModal({ title: "Erreur de chargement", message: err.message || "Impossible de lire le fichier.", isAlert: true });
-      }
-    };
-    reader.readAsText(file);
-  }, [recordAction]);
-
+  const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
   const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
   const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
+  
+  // UI States
+  const [modal, setModal] = useState<ModalConfig | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
+  const [isSavingCloud, setIsSavingCloud] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+
+  const globalFileInputRef = useRef<HTMLInputElement>(null);
+  const lastWallPointer = useRef<{ x: number, y: number, segmentId: string } | null>(null);
+
+  // --- HISTORY HOOK ---
+  const { past, future, recordAction, undo, redo, canUndo, canRedo } = useHistory<{config: WallConfig, holds: PlacedHold[]}>({ config, holds });
+
+  // Wrapper pour l'historique qui sauvegarde l'état courant
+  const saveToHistory = useCallback(() => {
+    recordAction({ config, holds });
+  }, [recordAction, config, holds]);
+
+  // Fonction pour appliquer un état depuis l'historique
+  const applyHistoryState = useCallback((state: {config: WallConfig, holds: PlacedHold[]}) => {
+    setConfig(state.config);
+    setHolds(state.holds);
+  }, []);
+
+  const performUndo = useCallback(() => undo({ config, holds }, applyHistoryState), [undo, config, holds, applyHistoryState]);
+  const performRedo = useCallback(() => redo({ config, holds }, applyHistoryState), [redo, config, holds, applyHistoryState]);
+
+  // --- EFFECTS ---
+  useEffect(() => {
+    if (isGallery) return;
+    const wallId = searchParams.get('id');
+    if (wallId && wallId !== cloudId) {
+      const loadFromCloud = async () => {
+        setIsLoadingCloud(true);
+        const { data, error } = await api.getWall(wallId);
+        if (data) {
+          setConfig(data.config);
+          setHolds(data.holds);
+          setCloudId(wallId);
+          setModal({ title: "Mur Chargé", message: "La configuration a été récupérée depuis le cloud.", isAlert: false });
+        } else {
+          setModal({ title: "Erreur", message: `Impossible de charger le mur : ${error}`, isAlert: true });
+        }
+        setIsLoadingCloud(false);
+      };
+      loadFromCloud();
+    }
+  }, [searchParams, isGallery, cloudId]); 
+
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config)); }, [config]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.HOLDS, JSON.stringify(holds)); }, [holds]);
+
+  const validIds = useMemo(() => new Set(config.segments.map(s => s.id)), [config.segments]);
+  useEffect(() => {
+    const filtered = holds.filter(h => validIds.has(h.segmentId));
+    if (filtered.length !== holds.length) setHolds(filtered);
+  }, [validIds]);
+
+  // --- LOGIC: HOLDS & SELECTION ---
+  const selectAllHolds = useCallback(() => {
+    setSelectedPlacedHoldIds(holds.map(h => h.id));
+  }, [holds]);
+
+  const handleSelectHold = (id: string | null, multi: boolean = false) => {
+    if (id === null) {
+        setSelectedPlacedHoldIds([]);
+        return;
+    }
+    if (multi) {
+        setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    } else {
+        setSelectedPlacedHoldIds([id]);
+    }
+  };
 
   const copySelectedHolds = useCallback(() => {
     if (selectedPlacedHoldIds.length === 0) return;
@@ -132,200 +158,53 @@ function App() {
 
   const pasteHolds = useCallback((targetPos?: { x: number, y: number, segmentId: string }) => {
     if (clipboard.length === 0) return;
-    recordAction();
-
+    saveToHistory();
     let newHolds: PlacedHold[] = [];
-    
     if (targetPos) {
       const anchor = clipboard[0];
       const dx = targetPos.x - anchor.x;
       const dy = targetPos.y - anchor.y;
-
       newHolds = clipboard.map(h => {
         const seg = config.segments.find(s => s.id === targetPos.segmentId);
         const maxHeight = seg?.height || 10;
-        return {
-          ...h,
-          id: crypto.randomUUID(),
-          segmentId: targetPos.segmentId,
-          x: h.x + dx,
-          y: Math.min(maxHeight, Math.max(0, h.y + dy))
-        };
+        return { ...h, id: crypto.randomUUID(), segmentId: targetPos.segmentId, x: h.x + dx, y: Math.min(maxHeight, Math.max(0, h.y + dy)) };
       });
     } else {
       newHolds = clipboard.map(h => ({
-        ...h,
-        id: crypto.randomUUID(),
-        x: h.x + 0.1,
-        y: Math.min(h.y + 0.1, config.segments.find(s => s.id === h.segmentId)?.height || h.y)
+        ...h, id: crypto.randomUUID(), x: h.x + 0.1, y: Math.min(h.y + 0.1, config.segments.find(s => s.id === h.segmentId)?.height || h.y)
       }));
     }
-
     setHolds(prev => [...prev, ...newHolds]);
     setSelectedPlacedHoldIds(newHolds.map(h => h.id));
-  }, [clipboard, recordAction, config.segments]);
-
-  const selectAllHolds = useCallback(() => {
-    setSelectedPlacedHoldIds(holds.map(h => h.id));
-  }, [holds]);
-
-  const [modal, setModal] = useState<{
-    title: string; message: string; onConfirm?: () => void; confirmText?: string; isAlert?: boolean;
-  } | null>(null);
+  }, [clipboard, saveToHistory, config.segments]);
 
   const removeHoldsAction = useCallback((ids: string[]) => {
+    if (ids.length === 0) return; // Sécurité ajoutée
     const isMultiple = ids.length > 1;
     setModal({
       title: "Suppression", 
       message: isMultiple ? `Voulez-vous vraiment supprimer ces ${ids.length} prises ?` : "Voulez-vous vraiment supprimer cette prise ?", 
       confirmText: "Supprimer",
       onConfirm: () => {
-        recordAction();
+        saveToHistory();
         const idSet = new Set(ids);
         setHolds(prev => prev.filter(h => !idSet.has(h.id)));
         setSelectedPlacedHoldIds(prev => prev.filter(id => !idSet.has(id)));
       }
     });
-  }, [recordAction]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Éviter de supprimer si l'utilisateur est dans un champ texte (ex: nom du mur)
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const isCtrl = e.ctrlKey || e.metaKey;
-      const key = e.key;
-      const lowerKey = key.toLowerCase();
-
-      if (isCtrl) {
-        // Liste des touches avec Ctrl que nous voulons intercepter
-        const handledCtrlKeys = ['z', 'y', 'a', 'c', 'v', 's', 'o'];
-        if (handledCtrlKeys.includes(lowerKey)) {
-          e.preventDefault();
-          e.stopPropagation();
-          switch (lowerKey) {
-            case 'z': if (e.shiftKey) redo(); else undo(); break;
-            case 'y': redo(); break;
-            case 'a': selectAllHolds(); break;
-            case 'c': copySelectedHolds(); break;
-            case 'v': pasteHolds(lastWallPointer.current || undefined); break;
-            case 's': exportWallToJson(); break;
-            case 'o': globalFileInputRef.current?.click(); break;
-          }
-        }
-      } else {
-        // Liste des touches sans Ctrl (Suppression)
-        if ((key === 'Delete' || key === 'Backspace') && selectedPlacedHoldIds.length > 0) {
-          e.preventDefault();
-          e.stopPropagation();
-          removeHoldsAction(selectedPlacedHoldIds);
-        }
-      }
-    };
-    
-    // Utilisation de capture: true pour être certain d'intercepter avant les raccourcis système
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [undo, redo, selectAllHolds, copySelectedHolds, pasteHolds, exportWallToJson, selectedPlacedHoldIds, removeHoldsAction]);
-
-  const [contextMenu, setContextMenu] = useState<{
-    type: 'HOLD' | 'SEGMENT'; id: string; x: number; y: number; wallX?: number; wallY?: number; subMenu?: 'COLOR';
-  } | null>(null);
-
-  useEffect(() => {
-    const validIds = new Set(config.segments.map(s => s.id));
-    const filtered = holds.filter(h => validIds.has(h.segmentId));
-    if (filtered.length !== holds.length) setHolds(filtered);
-  }, [config.segments]);
-
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config)); }, [config]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.HOLDS, JSON.stringify(holds)); }, [holds]);
-
-  const renderableHolds = useMemo(() => {
-    return holds.map(h => {
-      // Utilisation de la fonction utilitaire importée
-      const world = resolveHoldWorldData(h, config);
-      if (!world) return null;
-      return { ...h, ...world };
-    }).filter(h => h !== null) as (PlacedHold & { position: [number, number, number], rotation: [number, number, number] })[];
-  }, [holds, config]);
+  }, [saveToHistory]);
 
   const handlePlaceHold = (position: THREE.Vector3, normal: THREE.Vector3, segmentId: string) => {
     if (!selectedHold || selectedPlacedHoldIds.length > 0) return;
-    const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
-    if (segmentIndex === -1) return;
-    recordAction(); 
-    
-    // Utilisation de la fonction utilitaire pour les coordonnées locales
+    saveToHistory(); 
     const coords = calculateLocalCoords(position, segmentId, config);
     if (!coords) return;
-
     const newHold: PlacedHold = {
       id: crypto.randomUUID(), modelId: selectedHold.id, filename: selectedHold.filename,
       modelBaseScale: selectedHold.baseScale, segmentId: segmentId,
       x: coords.x, y: coords.y, spin: holdSettings.rotation, scale: [holdSettings.scale, holdSettings.scale, holdSettings.scale], color: holdSettings.color
     };
     setHolds([...holds, newHold]);
-  };
-
-  const handleHoldDrag = (id: string, x: number, y: number, segmentId: string) => {
-    setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId } : h));
-  };
-
-  const handleHoldDragEnd = () => {
-    recordAction();
-  };
-
-  const handleReplaceHold = (ids: string[], holdDef: HoldDefinition) => {
-    recordAction();
-    const idSet = new Set(ids);
-    setHolds(prev => prev.map(h => idSet.has(h.id) ? { 
-      ...h, modelId: holdDef.id, filename: holdDef.filename, modelBaseScale: holdDef.baseScale 
-    } : h));
-  };
-
-  const removeAllHoldsAction = () => {
-    if (holds.length === 0) return;
-    setModal({
-      title: "Tout supprimer", 
-      message: `Voulez-vous vraiment supprimer les ${holds.length} prises du mur ? Cette action est irréversible.`, 
-      confirmText: "Tout supprimer",
-      onConfirm: () => {
-        recordAction();
-        setHolds([]);
-        setSelectedPlacedHoldIds([]);
-      }
-    });
-  };
-
-  const changeAllHoldsColorAction = (newColor: string) => {
-    if (holds.length === 0) return;
-    setModal({
-      title: "Confirmation du changement",
-      message: `Appliquer la couleur choisie à l'intégralité des ${holds.length} prises ?`,
-      confirmText: "Confirmer",
-      isAlert: false,
-      onConfirm: () => {
-        recordAction();
-        setHolds(holds.map(h => ({ ...h, color: newColor })));
-      }
-    });
-  };
-
-  const removeSegmentAction = (id: string) => {
-    const segmentHolds = holds.filter(h => h.segmentId === id);
-    const message = segmentHolds.length > 0 
-      ? `Ce pan contient ${segmentHolds.length} prise(s). Elles seront supprimées. Confirmer la suppression ?`
-      : "Voulez-vous vraiment supprimer ce pan de mur ?";
-    setModal({
-      title: "Supprimer le pan",
-      message,
-      confirmText: "Supprimer",
-      onConfirm: () => {
-        recordAction();
-        setConfig(prev => ({ ...prev, segments: prev.segments.filter((s) => s.id !== id) }));
-      }
-    });
   };
 
   const updateSegmentQuickly = (id: string, updates: Partial<WallSegment>) => {
@@ -340,24 +219,113 @@ function App() {
         return;
       }
     }
-    recordAction();
-    setConfig(prev => ({
-      ...prev,
-      segments: prev.segments.map(s => s.id === id ? { ...s, height: Math.max(0.5, newHeight), angle: Math.min(85, Math.max(-15, newAngle)) } : s)
-    }));
+    saveToHistory();
+    setConfig(prev => ({ ...prev, segments: prev.segments.map(s => s.id === id ? { ...s, height: Math.max(0.5, newHeight), angle: Math.min(85, Math.max(-15, newAngle)) } : s) }));
   };
 
-  const handleSelectHold = (id: string | null, multi: boolean = false) => {
-    if (id === null) {
-      setSelectedPlacedHoldIds([]);
-      return;
-    }
-    if (multi) {
-      setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    } else {
-      setSelectedPlacedHoldIds([id]);
-    }
+  const removeSegmentAction = (id: string) => {
+    const segmentHolds = holds.filter(h => h.segmentId === id);
+    setModal({
+      title: "Supprimer le pan",
+      message: segmentHolds.length > 0 ? `Ce pan contient ${segmentHolds.length} prise(s). Elles seront supprimées.` : "Voulez-vous vraiment supprimer ce pan ?",
+      confirmText: "Supprimer",
+      onConfirm: () => {
+        saveToHistory();
+        setConfig(prev => ({ ...prev, segments: prev.segments.filter((s) => s.id !== id) }));
+      }
+    });
   };
+
+  // --- PERSISTENCE ---
+  const handleNewWall = useCallback(() => {
+    setModal({
+      title: "Nouveau Mur",
+      message: "Voulez-vous créer un nouveau mur vierge ? Tout travail non sauvegardé sera perdu.",
+      confirmText: "Créer",
+      onConfirm: () => {
+        saveToHistory();
+        // Reset to strict initial config to ensure clean slate
+        const resetConfig = JSON.parse(JSON.stringify(INITIAL_CONFIG));
+        setConfig(resetConfig);
+        setHolds([]);
+        setCloudId(null);
+        setSelectedPlacedHoldIds([]);
+      }
+    });
+  }, [saveToHistory]);
+
+  const downloadJson = useCallback(() => {
+    const data: BetaBlockFile = {
+      version: APP_VERSION,
+      metadata: { name: `Mur Beta ${new Date().toLocaleDateString()}`, timestamp: new Date().toISOString(), appVersion: APP_VERSION },
+      config: config, holds: holds
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `mon-mur-beta-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+    setModal(null);
+  }, [config, holds]);
+
+  const saveToCloud = useCallback(async () => {
+    setIsSavingCloud(true);
+    let thumbnail: string | undefined = undefined;
+    if (screenshotRef.current) { const shot = screenshotRef.current(); if (shot) thumbnail = shot; }
+    const data: BetaBlockFile = {
+      version: APP_VERSION,
+      metadata: { name: `Mur Cloud ${new Date().toLocaleDateString()}`, timestamp: new Date().toISOString(), appVersion: APP_VERSION, thumbnail },
+      config: config, holds: holds
+    };
+    const { id, error } = await api.saveWall(data);
+    setIsSavingCloud(false);
+    if (id) {
+      setGeneratedLink(`${window.location.origin}${window.location.pathname}#/builder?id=${id}`);
+      setCloudId(id);
+    } else {
+      setGeneratedLink(null);
+      alert(`Erreur de sauvegarde : ${error}`);
+    }
+  }, [config, holds]);
+
+  const openSaveDialog = useCallback(() => {
+    setGeneratedLink(null);
+    setModal({ title: "Options de Sauvegarde", message: "Choisissez comment vous souhaitez sauvegarder votre mur.", isSaveDialog: true });
+  }, []);
+
+  const importWallFromJson = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        const validated = validateBetaBlockJson(json);
+        if (!validated) throw new Error("Fichier corrompu ou format incompatible.");
+        saveToHistory();
+        setConfig(validated.config);
+        setHolds(validated.holds);
+        setModal({ title: "Succès", message: "Le mur a été chargé avec succès.", isAlert: true });
+      } catch (err: any) {
+        setModal({ title: "Erreur de chargement", message: err.message || "Impossible de lire le fichier.", isAlert: true });
+      }
+    };
+    reader.readAsText(file);
+  }, [saveToHistory]);
+
+  // --- SHORTCUTS HOOK ---
+  useKeyboardShortcuts({
+    undo: performUndo,
+    redo: performRedo,
+    selectAll: selectAllHolds,
+    copy: copySelectedHolds,
+    paste: () => pasteHolds(lastWallPointer.current || undefined),
+    save: openSaveDialog,
+    open: () => globalFileInputRef.current?.click(),
+    deleteAction: () => {
+      if (selectedPlacedHoldIds.length > 0) {
+        removeHoldsAction(selectedPlacedHoldIds);
+      }
+    }
+  }, [performUndo, performRedo, selectAllHolds, copySelectedHolds, pasteHolds, openSaveDialog, selectedPlacedHoldIds, removeHoldsAction]);
 
   useEffect(() => {
     const handleGlobalClick = () => setContextMenu(null);
@@ -365,42 +333,49 @@ function App() {
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
+  // --- RENDER ---
+  const renderableHolds = useMemo(() => holds.map(h => {
+      const world = resolveHoldWorldData(h, config);
+      if (!world) return null;
+      return { ...h, ...world };
+    }).filter(h => h !== null) as (PlacedHold & { position: [number, number, number], rotation: [number, number, number] })[]
+  , [holds, config]);
+
+  if (isGallery) return <GalleryPage />;
+
   return (
     <div className="flex h-screen w-screen bg-black overflow-hidden font-sans">
-      <input 
-        type="file" ref={globalFileInputRef} className="hidden" accept=".json"
-        onChange={(e) => { const file = e.target.files?.[0]; if (file) importWallFromJson(file); e.target.value = ''; }}
-      />
+      <input type="file" ref={globalFileInputRef} className="hidden" accept=".json" onChange={(e) => { const file = e.target.files?.[0]; if (file) importWallFromJson(file); e.target.value = ''; }} />
+
+      <LoadingOverlay isVisible={isLoadingCloud} />
 
       {mode === 'BUILD' ? (
         <EditorPanel 
             config={config} holds={holds} onUpdate={setConfig} 
-            onNext={() => setMode('SET')} showModal={(c) => setModal(c)}
-            onActionStart={recordAction}
-            onExport={exportWallToJson}
-            onImport={importWallFromJson}
+            onNext={() => navigate('/setter')} showModal={(c) => setModal(c)}
+            onActionStart={saveToHistory} onExport={openSaveDialog} onImport={importWallFromJson}
+            onNew={handleNewWall}
         />
       ) : (
         <RouteEditorPanel 
-            onBack={() => setMode('BUILD')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
+            onBack={() => navigate('/builder')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
             holdSettings={holdSettings} onUpdateSettings={(s) => setHoldSettings(prev => ({ ...prev, ...s }))}
-            placedHolds={holds} onRemoveHold={(id) => removeHoldsAction([id])} onRemoveAllHolds={removeAllHoldsAction} 
-            onChangeAllHoldsColor={changeAllHoldsColorAction} selectedPlacedHoldIds={selectedPlacedHoldIds}
-            onUpdatePlacedHold={(ids, u) => {
-              const idSet = new Set(ids);
-              setHolds(holds.map(h => idSet.has(h.id) ? { ...h, ...u } : h));
-            }}
+            placedHolds={holds} onRemoveHold={(id) => removeHoldsAction([id])} 
+            onRemoveAllHolds={() => { if (holds.length === 0) return; setModal({ title: "Tout supprimer", message: "Vider le mur ?", confirmText: "Tout supprimer", onConfirm: () => { saveToHistory(); setHolds([]); setSelectedPlacedHoldIds([]); }}); }} 
+            onChangeAllHoldsColor={(c) => { if (holds.length === 0) return; setModal({ title: "Confirmation", message: "Changer la couleur de toutes les prises ?", isAlert: false, onConfirm: () => { saveToHistory(); setHolds(holds.map(h => ({ ...h, color: c }))); }}); }} 
+            selectedPlacedHoldIds={selectedPlacedHoldIds}
+            onUpdatePlacedHold={(ids, u) => { const idSet = new Set(ids); setHolds(holds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); }}
             onSelectPlacedHold={handleSelectHold} onDeselect={() => setSelectedPlacedHoldIds([])}
-            onActionStart={recordAction} onReplaceHold={handleReplaceHold}
+            onActionStart={saveToHistory} onReplaceHold={(ids, def) => { saveToHistory(); const idSet = new Set(ids); setHolds(prev => prev.map(h => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename, modelBaseScale: def.baseScale } : h)); }}
             onRemoveMultiple={() => removeHoldsAction(selectedPlacedHoldIds)}
-            onExport={exportWallToJson}
-            onImport={importWallFromJson}
+            onExport={openSaveDialog} onImport={importWallFromJson}
+            onNew={handleNewWall}
         />
       )}
 
       <div className="fixed bottom-6 right-6 z-[100] flex gap-2">
-          <button disabled={past.length === 0} onClick={undo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md" title="Annuler (Ctrl+Z)"><Undo2 size={20} /></button>
-          <button disabled={future.length === 0} onClick={redo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md" title="Rétablir (Ctrl+Y)"><Redo2 size={20} /></button>
+          <button disabled={!canUndo} onClick={performUndo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md" title="Annuler (Ctrl+Z)"><Undo2 size={20} /></button>
+          <button disabled={!canRedo} onClick={performRedo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xl backdrop-blur-md" title="Rétablir (Ctrl+Y)"><Redo2 size={20} /></button>
       </div>
 
       <div className="flex-1 relative h-full">
@@ -410,100 +385,25 @@ function App() {
             onSelectPlacedHold={handleSelectHold}
             onContextMenu={(type, id, x, y, wx, wy) => setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
             onWallPointerUpdate={(info) => { lastWallPointer.current = info; }}
-            onHoldDrag={handleHoldDrag}
-            onHoldDragEnd={handleHoldDragEnd}
+            onHoldDrag={(id, x, y, segId) => setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId: segId } : h))}
+            onHoldDragEnd={saveToHistory} screenshotRef={screenshotRef}
         />
       </div>
 
-      {contextMenu && (
-        <div className="fixed z-[150] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-150" style={{ top: Math.min(contextMenu.y, window.innerHeight - 300), left: Math.min(contextMenu.x, window.innerWidth - 240) }} onClick={(e) => e.stopPropagation()}>
-          {contextMenu.type === 'HOLD' ? (
-            <>
-              {contextMenu.subMenu === 'COLOR' ? (
-                  <div className="p-3">
-                      <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                          <span className="text-xs font-bold text-gray-400 uppercase">Choisir une couleur</span>
-                          <button onClick={() => setContextMenu({ ...contextMenu, subMenu: undefined })} className="text-gray-500 hover:text-white"><ArrowLeft size={16}/></button>
-                      </div>
-                      <div className="grid grid-cols-5 gap-2">
-                          {PALETTE.map(c => (
-                              <button
-                                  key={c}
-                                  onClick={() => {
-                                      const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                                      recordAction();
-                                      const idSet = new Set(targetIds);
-                                      setHolds(holds.map(item => idSet.has(item.id) ? { ...item, color: c } : item));
-                                      setContextMenu(null);
-                                  }}
-                                  className="w-8 h-8 rounded-full border border-white/20 hover:scale-110 hover:border-white transition-all shadow-sm"
-                                  style={{ backgroundColor: c }}
-                              />
-                          ))}
-                      </div>
-                  </div>
-              ) : (
-                  <>
-                    <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
-                    <button onClick={() => { copySelectedHolds(); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Copy size={16} className="text-blue-400" /> Copier <span className="ml-auto text-[10px] text-gray-500">Ctrl+C</span></button>
-                    
-                    <button onClick={() => { 
-                        const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                        recordAction();
-                        const idSet = new Set(targetIds);
-                        setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin + 90) % 360 } : item)); 
-                    }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
-                    
-                    <button onClick={() => { 
-                        const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                        recordAction();
-                        const idSet = new Set(targetIds);
-                        setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin - 90) % 360 } : item)); 
-                    }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCcw size={16} className="text-red-400" /> Rotation -90°</button>
+      <ContextMenu 
+        data={contextMenu} onClose={() => setContextMenu(null)} onUpdateData={setContextMenu}
+        onCopyHold={copySelectedHolds} hasClipboard={clipboard.length > 0}
+        onPasteHold={pasteHolds} onDelete={(id) => { if (contextMenu?.type === 'HOLD') removeHoldsAction([id]); else removeSegmentAction(id); }}
+        onRotateHold={(id, delta) => { const targetIds = selectedPlacedHoldIds.includes(id) ? selectedPlacedHoldIds : [id]; saveToHistory(); const idSet = new Set(targetIds); setHolds(holds.map(item => idSet.has(item.id) ? { ...item, spin: (item.spin + delta) % 360 } : item)); }}
+        onColorHold={(id, color) => { const targetIds = selectedPlacedHoldIds.includes(id) ? selectedPlacedHoldIds : [id]; saveToHistory(); const idSet = new Set(targetIds); setHolds(holds.map(item => idSet.has(item.id) ? { ...item, color: color } : item)); }}
+        onSegmentUpdate={updateSegmentQuickly}
+      />
 
-                    <button onClick={() => setContextMenu({ ...contextMenu, subMenu: 'COLOR' })} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Modifier couleur</button>
-                    
-                    <div className="h-px bg-white/5 my-1" />
-                    <button onClick={() => { 
-                        const targetIds = selectedPlacedHoldIds.includes(contextMenu.id) ? selectedPlacedHoldIds : [contextMenu.id];
-                        removeHoldsAction(targetIds); 
-                        setContextMenu(null); 
-                    }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
-                  </>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Pan</div>
-              {clipboard.length > 0 && (
-                <button onClick={() => { 
-                  if (contextMenu.wallX !== undefined && contextMenu.wallY !== undefined) {
-                    pasteHolds({ x: contextMenu.wallX, y: contextMenu.wallY, segmentId: contextMenu.id });
-                  } else {
-                    pasteHolds();
-                  }
-                  setContextMenu(null); 
-                }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-500/10 text-sm text-emerald-400 font-bold"><ClipboardPaste size={16} /> Coller ici <span className="ml-auto text-[10px] text-gray-500">Ctrl+V</span></button>
-              )}
-              <button onClick={() => updateSegmentQuickly(contextMenu.id, { angle: 10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-orange-400"/> Dévers +10°</span><ChevronRight size={14} className="text-gray-600"/></button>
-              <button onClick={() => updateSegmentQuickly(contextMenu.id, { angle: -10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-blue-400"/> Dévers -10°</span><ChevronRight size={14} className="text-gray-600"/></button>
-              <button onClick={() => updateSegmentQuickly(contextMenu.id, { height: 0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveUp size={16} className="text-emerald-400"/> Hauteur +0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
-              <button onClick={() => updateSegmentQuickly(contextMenu.id, { height: -0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveDown size={16} className="text-red-400"/> Hauteur -0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
-              <div className="h-px bg-white/5 my-1" />
-              <button onClick={() => { removeSegmentAction(contextMenu.id); setContextMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer le pan</button>
-            </>
-          )}
-        </div>
-      )}
-
-      {modal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-white/10 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6"><div className="flex items-center gap-3 mb-4"><div className={`p-2 rounded-lg ${modal.isAlert ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>{modal.isAlert ? <Info size={24} /> : <AlertTriangle size={24} />}</div><h2 className="text-xl font-bold text-white">{modal.title}</h2></div><p className="text-gray-400 text-sm leading-relaxed">{modal.message}</p></div>
-            <div className="p-4 bg-gray-950/50 flex flex-row-reverse gap-3"><button onClick={() => { if (modal.onConfirm) modal.onConfirm(); setModal(null); }} className={`px-6 py-2 rounded-xl font-bold transition-all ${modal.isAlert ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>{modal.confirmText || "OK"}</button>{!modal.isAlert && <button onClick={() => setModal(null)} className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-all border border-white/5">Annuler</button>}</div>
-          </div>
-        </div>
-      )}
+      <GlobalModal 
+        config={modal} onClose={() => setModal(null)} 
+        isSavingCloud={isSavingCloud} generatedLink={generatedLink} 
+        onSaveCloud={saveToCloud} onDownload={downloadJson} 
+      />
     </div>
   );
 }
