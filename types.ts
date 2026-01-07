@@ -72,3 +72,23 @@ export interface BetaBlockFile {
   config: WallConfig;
   holds: PlacedHold[];
 }
+
+// --- SOCIAL TYPES ---
+
+export interface Comment {
+  id: string;
+  wall_id: string;
+  user_id: string;
+  author_name: string; // Stocké pour simplifier l'affichage sans jointure complexe
+  parent_id: string | null;
+  text: string;
+  created_at: string;
+  likes_count?: number; // Count agrégé
+  user_has_liked?: boolean; // État pour l'utilisateur courant
+  replies?: Comment[]; // Structure d'arbre pour l'UI
+}
+
+export interface SocialCounts {
+  likes: number;
+  comments: number;
+}

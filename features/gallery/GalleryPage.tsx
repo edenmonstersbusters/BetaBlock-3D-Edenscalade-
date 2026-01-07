@@ -1,49 +1,94 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { Plus, Loader2, Search, Database, LogIn, User, LogOut } from 'lucide-react';
+import { Plus, Loader2, Search, Database, LogIn, User, LogOut, X } from 'lucide-react';
 
 export const GalleryPage: React.FC = () => {
   const navigate = useNavigate();
   const [walls, setWalls] = useState<{ id: string; name: string; created_at: string; data?: any }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
+  // Timer pour le debouncing
+  const debounceTimerRef = useRef<number | null>(null);
+
   // Auth State
   const [user, setUser] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  const loadDefaultWalls = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error } = await api.getWallsList();
+    if (error) {
+      setError(error);
+    } else {
+      setWalls(data || []);
+    }
+    setLoading(false);
+  }, []);
+
+  const performSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      loadDefaultWalls();
+      return;
+    }
+
+    setIsSearching(true);
+    setError(null);
+    const { data, error } = await api.searchWalls(query.trim());
+    if (error) {
+      setError(error);
+    } else {
+      setWalls(data || []);
+    }
+    setIsSearching(false);
+  }, [loadDefaultWalls]);
+
+  // Effet pour gérer le debouncing de la recherche
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
+    }
+
+    if (!searchQuery.trim()) {
+      // Si on efface tout, on recharge immédiatement la liste par défaut
+      loadDefaultWalls();
+      return;
+    }
+
+    // Sinon, on attend que l'utilisateur finisse de taper
+    debounceTimerRef.current = window.setTimeout(() => {
+      performSearch(searchQuery);
+    }, 400);
+
+    return () => {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    };
+  }, [searchQuery, loadDefaultWalls, performSearch]);
 
   useEffect(() => {
     // Check user
     auth.getUser().then(setUser);
     const { data: { subscription } } = auth.onAuthStateChange(setUser);
 
-    // Load walls
-    const loadWalls = async () => {
-      const { data, error } = await api.getWallsList();
-      if (error) {
-        setError(error);
-      } else {
-        setWalls(data || []);
-      }
-      setLoading(false);
-    };
-    loadWalls();
+    // Chargement initial
+    loadDefaultWalls();
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadDefaultWalls]);
 
   const handleCreateNew = () => {
     navigate('/builder');
   };
 
   const handleOpenWall = (id: string) => {
-    // Si c'est l'auteur, on ouvre en mode édition (futur), sinon viewer. 
-    // Pour l'instant par défaut Viewer pour tout le monde si on clique depuis la galerie.
     navigate(`/view/${id}`);
   };
 
@@ -107,19 +152,39 @@ export const GalleryPage: React.FC = () => {
 
       {/* LISTING SECTION */}
       <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
             <div className="flex items-center gap-3 text-sm font-bold text-gray-400 uppercase tracking-widest">
                 <Database size={16} className="text-blue-500" />
-                <span>Découvrir ({walls.length})</span>
+                <span>
+                    {searchQuery.trim() ? `Résultats de recherche (${walls.length})` : `Dernières créations (${walls.length})`}
+                </span>
+                {(loading || isSearching) && <Loader2 size={16} className="animate-spin text-blue-500" />}
             </div>
-            {/* Fake Search Bar for aesthetics */}
-            <div className="hidden md:flex items-center bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-400 w-64">
-                <Search size={14} className="mr-2" />
-                <span>Rechercher...</span>
+            
+            {/* Recherche Interactive Globale */}
+            <div className="relative group w-full md:w-80">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 group-focus-within:text-blue-500 transition-colors">
+                    {isSearching ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                </div>
+                <input 
+                    type="text" 
+                    placeholder="Recherche globale (nom, auteur...)" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl py-3 pl-10 pr-10 text-sm text-gray-200 placeholder-gray-600 outline-none transition-all shadow-xl"
+                />
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition-colors"
+                    >
+                        <X size={16} />
+                    </button>
+                )}
             </div>
         </div>
 
-        {loading ? (
+        {loading && !isSearching ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                 <Loader2 size={48} className="animate-spin mb-4 text-blue-500" />
                 <span className="text-sm font-mono animate-pulse">Chargement de la matrice...</span>
@@ -128,27 +193,34 @@ export const GalleryPage: React.FC = () => {
             <div className="p-8 border border-red-900/50 bg-red-900/10 rounded-2xl text-center">
                 <h3 className="text-red-400 font-bold text-lg mb-2">Erreur de connexion</h3>
                 <p className="text-gray-400 text-sm mb-4">{error}</p>
-                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-300 rounded-lg text-sm transition-colors">Réessayer</button>
+                <button onClick={() => loadDefaultWalls()} className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-300 rounded-lg text-sm transition-colors">Réessayer</button>
             </div>
         ) : walls.length === 0 ? (
-            <div className="text-center py-20 bg-gray-900/30 rounded-3xl border border-white/5 border-dashed">
+            <div className="text-center py-20 bg-gray-900/30 rounded-3xl border border-white/5 border-dashed animate-in fade-in duration-500">
                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Database className="text-gray-600" />
+                    <Search className="text-gray-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-300 mb-2">C'est bien vide ici...</h3>
-                <p className="text-gray-500 mb-6">Soyez le premier à publier un mur sur le Hub !</p>
-                <button onClick={handleCreateNew} className="text-blue-400 hover:text-white underline underline-offset-4 decoration-blue-500/30 hover:decoration-blue-500">Commencer maintenant</button>
+                <h3 className="text-xl font-bold text-gray-300 mb-2">Aucun mur trouvé dans la base</h3>
+                <p className="text-gray-500 mb-6">La recherche s'est effectuée sur l'ensemble de la base de données.</p>
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery('')}
+                        className="text-blue-400 hover:text-white underline underline-offset-4 decoration-blue-500/30 hover:decoration-blue-500"
+                    >
+                        Réinitialiser la recherche
+                    </button>
+                )}
             </div>
         ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-300 ${isSearching ? 'opacity-50' : 'opacity-100'}`}>
                 {walls.map((wall, idx) => (
-                    <div key={wall.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 50}ms` }}>
+                    <div key={wall.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 30}ms` }}>
                         <WallCard 
                             id={wall.id} 
                             name={wall.name || "Mur Sans Nom"} 
                             createdAt={wall.created_at} 
                             thumbnail={wall.data?.metadata?.thumbnail} 
-                            authorName={wall.data?.metadata?.authorName} // Injection du nom de l'auteur
+                            authorName={wall.data?.metadata?.authorName}
                             onClick={() => handleOpenWall(wall.id)}
                         />
                     </div>
