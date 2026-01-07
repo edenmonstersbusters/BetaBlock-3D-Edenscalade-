@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AlertTriangle, Info, Loader2, Cloud, Download, Check, Save, Copy } from 'lucide-react';
+import { AlertTriangle, Info, Loader2, Cloud, Download, Check, Save, Copy, Edit3 } from 'lucide-react';
 
 export interface ModalConfig {
   title: string;
@@ -20,10 +20,12 @@ interface GlobalModalProps {
   generatedLink?: string | null;
   onSaveCloud?: () => void;
   onDownload?: () => void;
+  wallName?: string;
+  onWallNameChange?: (name: string) => void;
 }
 
 export const GlobalModal: React.FC<GlobalModalProps> = ({ 
-  config, onClose, isSavingCloud, generatedLink, onSaveCloud, onDownload 
+  config, onClose, isSavingCloud, generatedLink, onSaveCloud, onDownload, wallName, onWallNameChange 
 }) => {
   if (!config) return null;
 
@@ -40,17 +42,32 @@ export const GlobalModal: React.FC<GlobalModalProps> = ({
              
              {!generatedLink ? (
                <div className="space-y-4">
+                 {/* Input Nom du Mur */}
+                 <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase ml-1">Nom du mur</label>
+                    <div className="relative">
+                        <Edit3 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                        <input 
+                            type="text" 
+                            value={wallName} 
+                            onChange={(e) => onWallNameChange?.(e.target.value)}
+                            className="w-full bg-black/50 border border-gray-700 rounded-xl py-3 pl-10 pr-4 text-white text-sm focus:border-blue-500 outline-none transition-colors font-bold"
+                            placeholder="Mon Super Mur"
+                        />
+                    </div>
+                 </div>
+
                  <button 
                    onClick={onSaveCloud} 
-                   disabled={isSavingCloud}
-                   className="w-full p-4 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/50 rounded-xl flex items-center gap-4 transition-all group"
+                   disabled={isSavingCloud || !wallName?.trim()}
+                   className="w-full p-4 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/50 rounded-xl flex items-center gap-4 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                  >
                     <div className="p-3 bg-blue-500 text-white rounded-lg shadow-lg group-hover:scale-110 transition-transform">
                       {isSavingCloud ? <Loader2 size={24} className="animate-spin"/> : <Cloud size={24} />}
                     </div>
                     <div className="text-left">
-                      <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">Sauvegarde Cloud (Recommandé)</h3>
-                      <p className="text-xs text-gray-400">Génère un lien unique pour partager votre mur.</p>
+                      <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">Sauvegarde Cloud</h3>
+                      <p className="text-xs text-gray-400">Publier sur le Hub communautaire.</p>
                     </div>
                  </button>
 
@@ -63,7 +80,7 @@ export const GlobalModal: React.FC<GlobalModalProps> = ({
                     </div>
                     <div className="text-left">
                       <h3 className="font-bold text-gray-300 group-hover:text-white transition-colors">Téléchargement Local</h3>
-                      <p className="text-xs text-gray-500">Télécharge un fichier .json sur votre appareil.</p>
+                      <p className="text-xs text-gray-500">Sauvegarder un fichier .json</p>
                     </div>
                  </button>
                </div>

@@ -1,9 +1,7 @@
-
 import React, { useEffect, useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
 import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Home, Palette, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { HoldDefinition, PlacedHold } from '../../types';
 import '../../types';
 import { HoldModel } from '../../core/HoldModel';
@@ -32,13 +30,14 @@ interface RouteEditorPanelProps {
   onExport: () => void;
   onImport: (file: File) => void;
   onNew: () => void;
+  onHome: () => void;
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
 const CATALOGUE_URL = `${BASE_URL}catalogue.json`;
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew
+  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew, onHome
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +45,6 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
   
-  const navigate = useNavigate();
-
   useEffect(() => {
     const fetchLibrary = async () => {
       try {
@@ -84,7 +81,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
        
        <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
         <div className="flex items-center space-x-3 overflow-hidden">
-          <button onClick={() => navigate('/')} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 transition-colors" title="Retour à la Galerie">
+          <button onClick={onHome} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 transition-colors" title="Retour à la Galerie">
              <Home size={20} />
           </button>
           <div className="h-6 w-px bg-gray-800" />

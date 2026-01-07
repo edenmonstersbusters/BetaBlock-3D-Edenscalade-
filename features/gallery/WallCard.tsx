@@ -1,16 +1,17 @@
 
 import React, { useMemo } from 'react';
-import { Clock, Box, PlayCircle } from 'lucide-react';
+import { Clock, Box, PlayCircle, User } from 'lucide-react';
 
 interface WallCardProps {
   id: string;
   name: string;
   createdAt: string;
   thumbnail?: string; // Base64 thumbnail string
+  authorName?: string; // Nom de l'auteur
   onClick: () => void;
 }
 
-export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbnail, onClick }) => {
+export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbnail, authorName, onClick }) => {
   // Génération d'un dégradé déterministe (fallback)
   const gradientStyle = useMemo(() => {
     const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -60,9 +61,16 @@ export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbna
       {/* Content Area */}
       <div className="p-4">
         <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-1">{name || "Mur Sans Nom"}</h3>
-        <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
-          <Clock size={12} />
-          <span>{dateStr}</span>
+        
+        <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+            <div className="flex items-center gap-1.5 font-medium text-gray-400">
+                <User size={12} />
+                <span className="truncate max-w-[100px]">{authorName || "Anonyme"}</span>
+            </div>
+            <div className="flex items-center gap-1 font-mono">
+                <Clock size={12} />
+                <span>{dateStr}</span>
+            </div>
         </div>
       </div>
 

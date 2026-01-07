@@ -1,27 +1,11 @@
+
 import 'react';
 
 /**
  * Global JSX namespace augmentation for Three.js elements.
  * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
- * We augment React.JSX to merge Three.js elements with standard HTML elements without overwriting them.
+ * We augment the global JSX namespace to merge Three.js elements with standard HTML elements without overwriting them.
  */
-declare module 'react' {
-  namespace JSX {
-    interface IntrinsicElements {
-      mesh: any;
-      group: any;
-      meshStandardMaterial: any;
-      ambientLight: any;
-      directionalLight: any;
-      hemisphereLight: any;
-      pointLight: any;
-      spotLight: any;
-      primitive: any;
-      color: any;
-    }
-  }
-}
-
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -44,6 +28,8 @@ export interface WallMetadata {
   timestamp: string;
   appVersion: string;
   thumbnail?: string;
+  authorId?: string; // ID Supabase de l'auteur
+  authorName?: string; // Nom d'affichage (futur)
 }
 
 export interface WallSegment {
@@ -78,7 +64,7 @@ export interface PlacedHold {
   color?: string;
 }
 
-export type AppMode = 'BUILD' | 'SET';
+export type AppMode = 'BUILD' | 'SET' | 'VIEW';
 
 export interface BetaBlockFile {
   version: string;

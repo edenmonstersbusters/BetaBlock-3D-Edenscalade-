@@ -1,4 +1,3 @@
-
 import React, { useState, Suspense, useEffect, useRef } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
@@ -24,7 +23,7 @@ interface SceneProps {
   onWallPointerUpdate?: (info: { x: number, y: number, segmentId: string } | null) => void;
   onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
   onHoldDragEnd?: () => void;
-  screenshotRef?: React.MutableRefObject<(() => string | null) | null>;
+  screenshotRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 

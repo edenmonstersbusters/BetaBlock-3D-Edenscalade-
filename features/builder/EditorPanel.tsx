@@ -1,8 +1,6 @@
-
 import React from 'react';
 import { WallConfig, WallSegment, PlacedHold } from '../../types';
 import { Plus, ArrowRight, Maximize, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { SegmentManager } from './components/SegmentManager';
 import { FileControls } from '../../components/ui/FileControls';
 
@@ -16,13 +14,10 @@ interface EditorPanelProps {
   onExport: () => void;
   onImport: (file: File) => void;
   onNew: () => void;
+  onHome: () => void;
 }
 
-export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdate, onNext, showModal, onActionStart, onExport, onImport, onNew }) => {
-  const navigate = useNavigate();
-
-  const handleHomeClick = () => navigate('/');
-
+export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdate, onNext, showModal, onActionStart, onExport, onImport, onNew, onHome }) => {
   const addSegment = () => {
     onActionStart();
     const newSegment: WallSegment = {
@@ -86,7 +81,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdat
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden">
       <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
         <div className="flex items-center gap-3">
-             <button onClick={handleHomeClick} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 transition-colors" title="Retour à la Galerie">
+             <button onClick={onHome} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 transition-colors" title="Retour à la Galerie">
                 <Home size={20} />
              </button>
              <div>

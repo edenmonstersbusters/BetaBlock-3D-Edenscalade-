@@ -2,17 +2,27 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../core/api';
+import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';
-import { Plus, Loader2, Search, Database } from 'lucide-react';
+import { AuthModal } from '../../components/auth/AuthModal';
+import { Plus, Loader2, Search, Database, LogIn, User, LogOut } from 'lucide-react';
 
 export const GalleryPage: React.FC = () => {
   const navigate = useNavigate();
-  // Typage mis à jour pour inclure data qui contient la miniature
   const [walls, setWalls] = useState<{ id: string; name: string; created_at: string; data?: any }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Auth State
+  const [user, setUser] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
+    // Check user
+    auth.getUser().then(setUser);
+    const { data: { subscription } } = auth.onAuthStateChange(setUser);
+
+    // Load walls
     const loadWalls = async () => {
       const { data, error } = await api.getWallsList();
       if (error) {
@@ -23,6 +33,8 @@ export const GalleryPage: React.FC = () => {
       setLoading(false);
     };
     loadWalls();
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleCreateNew = () => {
@@ -30,21 +42,57 @@ export const GalleryPage: React.FC = () => {
   };
 
   const handleOpenWall = (id: string) => {
-    navigate(`/builder?id=${id}`);
+    // Si c'est l'auteur, on ouvre en mode édition (futur), sinon viewer. 
+    // Pour l'instant par défaut Viewer pour tout le monde si on clique depuis la galerie.
+    navigate(`/view/${id}`);
+  };
+
+  const handleSignOut = async () => {
+      await auth.signOut();
   };
 
   return (
     <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar">
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
+      
+      {/* NAVBAR */}
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
+          <div className="text-xl font-black italic tracking-tighter text-white/20">BB3D</div>
+          <div>
+            {user ? (
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <User size={16} />
+                        <span className="hidden sm:inline font-bold text-blue-400">
+                            {user.user_metadata?.display_name || user.email}
+                        </span>
+                    </div>
+                    <button onClick={handleSignOut} className="p-2 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-400 rounded-lg transition-colors" title="Se déconnecter">
+                        <LogOut size={18} />
+                    </button>
+                </div>
+            ) : (
+                <button 
+                    onClick={() => setShowAuthModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-blue-600 border border-white/10 hover:border-blue-500 rounded-full text-sm font-bold transition-all backdrop-blur-md"
+                >
+                    <LogIn size={16} />
+                    <span>Connexion</span>
+                </button>
+            )}
+          </div>
+      </div>
+
       {/* HEADER HERO */}
-      <header className="relative py-20 px-6 border-b border-white/10 overflow-hidden">
+      <header className="relative py-24 px-6 border-b border-white/10 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-gray-950 to-gray-950 pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10 text-center">
             <h1 className="text-5xl md:text-7xl font-black tracking-tighter bg-gradient-to-br from-white via-gray-200 to-gray-600 bg-clip-text text-transparent mb-6 animate-in slide-in-from-bottom-4 duration-700">
                 BetaBlock <span className="text-blue-500">Hub</span>
             </h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-in slide-in-from-bottom-6 duration-700 delay-100">
-                Explorez, créez et partagez des murs d'escalade 3D. <br/>
-                Rejoignez la communauté des ouvreurs virtuels.
+                La plateforme communautaire des ouvreurs virtuels.<br/>
+                Explorez, remixez et partagez des créations en 3D.
             </p>
             
             <button 
@@ -62,7 +110,7 @@ export const GalleryPage: React.FC = () => {
         <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3 text-sm font-bold text-gray-400 uppercase tracking-widest">
                 <Database size={16} className="text-blue-500" />
-                <span>Murs Récents ({walls.length})</span>
+                <span>Découvrir ({walls.length})</span>
             </div>
             {/* Fake Search Bar for aesthetics */}
             <div className="hidden md:flex items-center bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-400 w-64">
@@ -99,7 +147,8 @@ export const GalleryPage: React.FC = () => {
                             id={wall.id} 
                             name={wall.name || "Mur Sans Nom"} 
                             createdAt={wall.created_at} 
-                            thumbnail={wall.data?.metadata?.thumbnail} // Extraction de la miniature depuis le JSON
+                            thumbnail={wall.data?.metadata?.thumbnail} 
+                            authorName={wall.data?.metadata?.authorName} // Injection du nom de l'auteur
                             onClick={() => handleOpenWall(wall.id)}
                         />
                     </div>
