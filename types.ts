@@ -4,21 +4,23 @@ import 'react';
 /**
  * Global JSX namespace augmentation for Three.js elements.
  * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
- * We augment the global JSX namespace to merge Three.js elements with standard HTML elements without overwriting them.
+ * We augment React.JSX to properly merge with standard React HTML elements.
  */
 declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      mesh: any;
-      group: any;
-      meshStandardMaterial: any;
-      ambientLight: any;
-      directionalLight: any;
-      hemisphereLight: any;
-      pointLight: any;
-      spotLight: any;
-      primitive: any;
-      color: any;
+  namespace React {
+    namespace JSX {
+      interface IntrinsicElements {
+        mesh: any;
+        group: any;
+        meshStandardMaterial: any;
+        ambientLight: any;
+        directionalLight: any;
+        hemisphereLight: any;
+        pointLight: any;
+        spotLight: any;
+        primitive: any;
+        color: any;
+      }
     }
   }
 }

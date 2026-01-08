@@ -8,6 +8,7 @@ import { auth } from '../../core/auth';
 import { AuthModal } from '../../components/auth/AuthModal';
 
 interface ViewerPanelProps {
+  wallId: string;
   metadata: WallMetadata;
   config: WallConfig;
   holds: PlacedHold[];
@@ -16,12 +17,10 @@ interface ViewerPanelProps {
   onShare: () => void;
 }
 
-export const ViewerPanel: React.FC<ViewerPanelProps> = ({ metadata, config, holds, onHome, onRemix, onShare }) => {
+export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, config, holds, onHome, onRemix, onShare }) => {
   const [socialStats, setSocialStats] = useState({ likes: 0, hasLiked: false });
   const [showComments, setShowComments] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-
-  const wallId = window.location.hash.split('/').pop() || '';
 
   const dateStr = new Date(metadata.timestamp).toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric'

@@ -102,6 +102,11 @@ function App() {
   const globalFileInputRef = useRef<HTMLInputElement>(null);
   const lastWallPointer = useRef<{ x: number, y: number, segmentId: string } | null>(null);
 
+  // Extract current wall ID for viewers/cloud loaders
+  const activeWallId = useMemo(() => {
+    return searchParams.get('id') || (isViewer ? location.pathname.split('/').pop() : null);
+  }, [searchParams, isViewer, location.pathname]);
+
   // --- HISTORY HOOK ---
   const { past, future, recordAction, undo, redo, canUndo, canRedo } = useHistory<{config: WallConfig, holds: PlacedHold[]}>({ config, holds });
 
@@ -134,18 +139,15 @@ function App() {
   useEffect(() => {
     if (isGallery) return;
 
-    // Handle Route ID Loading
-    const wallId = searchParams.get('id') || (isViewer ? location.pathname.split('/').pop() : null);
-
-    if (wallId && wallId !== cloudId) {
+    if (activeWallId && activeWallId !== cloudId) {
       const loadFromCloud = async () => {
         setIsLoadingCloud(true);
-        const { data, error } = await api.getWall(wallId);
+        const { data, error } = await api.getWall(activeWallId);
         if (data) {
           setConfig(data.config);
           setHolds(data.holds);
           setMetadata(data.metadata);
-          setCloudId(wallId);
+          setCloudId(activeWallId);
           // Don't show success modal for Viewer mode to keep it clean
           if (!isViewer) {
             setModal({ title: "Mur Chargé", message: "La configuration a été récupérée.", isAlert: false });
@@ -157,7 +159,7 @@ function App() {
       };
       loadFromCloud();
     }
-  }, [searchParams, isViewer, isGallery, location.pathname, cloudId]); 
+  }, [activeWallId, isViewer, isGallery, cloudId]); 
 
   // Persistence Locale
   useEffect(() => { 
@@ -221,8 +223,6 @@ function App() {
           setHolds(validated.holds);
           setMetadata({ 
               ...validated.metadata, 
-              // On garde l'auteur original s'il existe, sinon on reset
-              // Important : si on importe, on reset le cloudId pour éviter d'écraser l'original
           });
           setCloudId(null);
           setModal({ title: "Import réussi", message: "Le mur a été chargé avec succès.", isAlert: false });
@@ -285,7 +285,6 @@ function App() {
           ...metadata, 
           name: `${metadata.name} (Remix)`, 
           authorId: user.id,
-          // On change l'auteur pour le remixeur
           authorName: user.user_metadata?.display_name || user.email.split('@')[0],
           timestamp: new Date().toISOString()
         });
@@ -311,6 +310,31 @@ function App() {
     });
   }, [saveToHistory]);
 
+  const handleRemoveAllHolds = useCallback(() => {
+    setModal({
+      title: "Vider le mur ?",
+      message: "Voulez-vous vraiment supprimer TOUTES les prises du mur ? Cette action peut être annulée via l'historique.",
+      confirmText: "Supprimer tout",
+      onConfirm: () => {
+        saveToHistory();
+        setHolds([]);
+        setSelectedPlacedHoldIds([]);
+      }
+    });
+  }, [saveToHistory]);
+
+  const handleChangeAllHoldsColor = useCallback((color: string) => {
+    setModal({
+      title: "Appliquer la couleur ?",
+      message: "Voulez-vous appliquer cette couleur à TOUTES les prises présentes sur le mur ?",
+      confirmText: "Appliquer",
+      onConfirm: () => {
+        saveToHistory();
+        setHolds(prev => prev.map(h => ({ ...h, color })));
+      }
+    });
+  }, [saveToHistory]);
+
   const saveToCloud = useCallback(async () => {
     if (!user) {
       setShowAuthModal(true);
@@ -324,7 +348,6 @@ function App() {
         thumbnail = await screenshotRef.current() || undefined; 
     }
 
-    // Récupération du pseudo utilisateur
     const authorName = user.user_metadata?.display_name || user.email.split('@')[0];
 
     const updatedMetadata = { 
@@ -335,7 +358,6 @@ function App() {
         authorName: authorName 
     };
 
-    // Mise à jour de l'état local pour refléter la sauvegarde
     setMetadata(updatedMetadata);
 
     const data: BetaBlockFile = {
@@ -416,6 +438,7 @@ function App() {
       {/* PANELS */}
       {mode === 'VIEW' ? (
         <ViewerPanel 
+            wallId={cloudId || activeWallId || ''}
             metadata={metadata} config={config} holds={holds}
             onHome={handleSafeHome} onRemix={handleRemix}
             onShare={() => setModal({ title: "Partager", message: "Lien généré", isSaveDialog: true })}
@@ -433,8 +456,8 @@ function App() {
             onBack={() => navigate('/builder')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
             holdSettings={holdSettings} onUpdateSettings={(s) => setHoldSettings(prev => ({ ...prev, ...s }))}
             placedHolds={holds} onRemoveHold={(id) => removeHoldsAction([id])} 
-            onRemoveAllHolds={() => { saveToHistory(); setHolds([]); }} 
-            onChangeAllHoldsColor={(c) => { saveToHistory(); setHolds(holds.map(h => ({ ...h, color: c }))); }} 
+            onRemoveAllHolds={handleRemoveAllHolds} 
+            onChangeAllHoldsColor={handleChangeAllHoldsColor} 
             selectedPlacedHoldIds={selectedPlacedHoldIds}
             onUpdatePlacedHold={(ids, u) => { const idSet = new Set(ids); setHolds(holds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); }}
             onSelectPlacedHold={handleSelectHold} onDeselect={() => setSelectedPlacedHoldIds([])}
