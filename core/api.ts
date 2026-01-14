@@ -7,9 +7,8 @@ const handleNetworkError = (err: any) => {
   if (err.message === 'Failed to fetch') {
     return "Erreur Réseau : Impossible de joindre Supabase.";
   }
-  // Gestion spécifique du blocage RLS (Row Level Security)
   if (err.code === '42501' || err.message?.includes('new row violates row-level security')) {
-    return "Action interdite : vous ne pouvez pas liker votre propre contenu.";
+    return "Action interdite.";
   }
   return err.message || "Une erreur inconnue est survenue.";
 };
@@ -18,24 +17,92 @@ export const api = {
   async saveWall(data: BetaBlockFile): Promise<{ id: string | null; error: string | null }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Vous devez être connecté.");
+      
       const avatarUrl = user?.user_metadata?.avatar_url;
+      const isPublic = data.metadata.isPublic || false;
       
       const enrichedData = {
           ...data,
           metadata: {
               ...data.metadata,
+              authorId: user.id,
               authorAvatarUrl: avatarUrl
           }
       };
 
       const { data: result, error } = await supabase
         .from('walls')
-        .insert([{ name: data.metadata.name, data: enrichedData }])
+        .insert([{ 
+            name: data.metadata.name, 
+            data: enrichedData,
+            is_public: isPublic 
+        }])
         .select().single();
+
       if (error) throw error;
       return { id: result.id, error: null };
     } catch (err: any) {
       return { id: null, error: handleNetworkError(err) };
+    }
+  },
+
+  async updateWall(id: string, data: BetaBlockFile): Promise<{ error: string | null }> {
+    try {
+      const isPublic = data.metadata.isPublic || false;
+      const { error } = await supabase
+        .from('walls')
+        .update({ 
+            name: data.metadata.name, 
+            data: data,
+            is_public: isPublic
+        })
+        .eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (err: any) {
+      return { error: handleNetworkError(err) };
+    }
+  },
+
+  // Nouvelle fonction pour basculer la visibilité sans tout recharger
+  async toggleWallVisibility(id: string, isPublic: boolean): Promise<{ error: string | null }> {
+      try {
+          // 1. On récupère les données actuelles pour mettre à jour le JSON interne aussi
+          const { data: current, error: fetchError } = await supabase.from('walls').select('data').eq('id', id).single();
+          if (fetchError || !current) throw fetchError || new Error("Mur introuvable");
+
+          const updatedData = {
+              ...current.data,
+              metadata: {
+                  ...current.data.metadata,
+                  isPublic: isPublic
+              }
+          };
+
+          // 2. Mise à jour de la colonne SQL ET du champ JSON
+          const { error } = await supabase
+              .from('walls')
+              .update({ 
+                  is_public: isPublic,
+                  data: updatedData
+              })
+              .eq('id', id);
+
+          if (error) throw error;
+          return { error: null };
+      } catch (err: any) {
+          return { error: handleNetworkError(err) };
+      }
+  },
+
+  async deleteWall(id: string): Promise<{ error: string | null }> {
+    try {
+      const { error } = await supabase.from('walls').delete().eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (err: any) {
+      return { error: handleNetworkError(err) };
     }
   },
 
@@ -49,13 +116,37 @@ export const api = {
     }
   },
 
+  // Récupère uniquement les murs PUBLICS pour la galerie
   async getWallsList(userId?: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
-      let query = supabase.from('walls').select('id, name, created_at, data').order('created_at', { ascending: false });
+      let query = supabase
+        .from('walls')
+        .select('id, name, created_at, data')
+        .eq('is_public', true); // Filtre Hub
+
       if (userId) {
-          query = query.eq('data->metadata->>authorId', userId);
+        query = query.eq('data->metadata->>authorId', userId);
       }
-      const { data, error } = await query.limit(50);
+
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (err: any) {
+      return { data: null, error: handleNetworkError(err) };
+    }
+  },
+
+  // Récupère TOUS les murs d'un utilisateur (Projets)
+  async getUserProjects(userId: string): Promise<{ data: any[] | null; error: string | null }> {
+    try {
+      const { data, error } = await supabase
+        .from('walls')
+        .select('id, name, created_at, data, is_public')
+        .eq('data->metadata->>authorId', userId)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return { data, error: null };
     } catch (err: any) {
@@ -68,6 +159,7 @@ export const api = {
       const searchTerm = `%${query}%`;
       const { data, error } = await supabase
         .from('walls').select('id, name, created_at, data')
+        .eq('is_public', true)
         .or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`)
         .order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
@@ -84,9 +176,7 @@ export const api = {
         let email = user?.email;
         let createdAt = user?.created_at;
 
-        // Si ce n'est pas l'utilisateur courant, on cherche dans ses murs publics
         if (user?.id !== userId) {
-             // CHANGE: On trie par created_at DESC pour avoir le mur le plus récent (et donc l'avatar le plus à jour)
              const { data: wallData } = await supabase
                 .from('walls')
                 .select('data')
@@ -148,25 +238,15 @@ export const api = {
   async uploadAvatar(file: File): Promise<string | null> {
       try {
           const fileExt = file.name.split('.').pop();
-          // CHANGE: Utilisation de Date.now() pour éviter les problèmes de nommage (points, caractères spéciaux)
           const fileName = `avatar_${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
           const filePath = `${fileName}`;
-          
-          const { error: uploadError } = await supabase.storage
-              .from('avatars')
-              .upload(filePath, file);
-          
+          const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
           if (uploadError) throw uploadError; 
-          
           const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
           return data.publicUrl;
       } catch (e) {
           console.error("Avatar Upload Error", e);
-          return new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(file);
-          });
+          return null;
       }
   },
 
@@ -215,26 +295,14 @@ export const api = {
         }));
         return enriched;
     } catch (err) { 
-        console.error("Error getting comments", err);
         return []; 
     }
   },
 
   async postComment(wallId: string, userId: string, authorName: string, text: string, parentId: string | null, avatarUrl?: string): Promise<{ error: string | null }> {
       try {
-          // Note: Assurez-vous que la colonne 'author_avatar_url' existe dans votre table 'comments' sur Supabase.
-          const payload: any = { 
-              wall_id: wallId, 
-              user_id: userId, 
-              author_name: authorName, 
-              text: text, 
-              parent_id: parentId 
-          };
-          
-          if (avatarUrl) {
-              payload.author_avatar_url = avatarUrl;
-          }
-
+          const payload: any = { wall_id: wallId, user_id: userId, author_name: authorName, text: text, parent_id: parentId };
+          if (avatarUrl) payload.author_avatar_url = avatarUrl;
           const { error } = await supabase.from('comments').insert(payload);
           return { error: error ? error.message : null };
       } catch (err: any) { return { error: err.message }; }

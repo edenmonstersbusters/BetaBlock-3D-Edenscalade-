@@ -1,11 +1,6 @@
 
 import 'react';
 
-/**
- * Global JSX namespace augmentation for Three.js elements.
- * This ensures that elements like <mesh />, <group />, <ambientLight />, etc., are recognized by TypeScript.
- * We augment React.JSX to properly merge with standard React HTML elements.
- */
 declare global {
   namespace React {
     namespace JSX {
@@ -30,19 +25,26 @@ export interface WallMetadata {
   timestamp: string;
   appVersion: string;
   thumbnail?: string;
-  authorId?: string; // ID Supabase de l'auteur
-  authorName?: string; // Nom d'affichage (futur)
-  authorAvatarUrl?: string; // URL de l'avatar de l'auteur (ajouté pour l'affichage public)
+  authorId?: string;
+  authorName?: string;
+  authorAvatarUrl?: string;
+  isPublic?: boolean; // NOUVEAU : Gère la visibilité
+  
+  // Remix fields
+  parentId?: string;
+  parentName?: string;
+  parentAuthorName?: string;
+  remixMode?: 'structure' | 'holds' | null;
 }
 
 export interface WallSegment {
   id: string;
-  height: number; // Length of the segment in meters
-  angle: number; // Angle in degrees. 0 = vertical, positive = overhang, negative = slab
+  height: number;
+  angle: number;
 }
 
 export interface WallConfig {
-  width: number; // Global width in meters
+  width: number;
   segments: WallSegment[];
 }
 
@@ -76,18 +78,16 @@ export interface BetaBlockFile {
   holds: PlacedHold[];
 }
 
-// --- SOCIAL TYPES ---
-
 export interface UserProfile {
   id: string;
   display_name: string;
   email?: string;
   bio?: string;
   avatar_url?: string;
-  location?: string; // Ville / Pays
-  home_gym?: string; // Salle préférée
-  climbing_grade?: string; // Niveau max
-  climbing_style?: string; // Bloc, Voie, etc.
+  location?: string;
+  home_gym?: string;
+  climbing_grade?: string;
+  climbing_style?: string;
   created_at: string;
   stats?: {
     total_walls: number;
@@ -101,13 +101,13 @@ export interface Comment {
   wall_id: string;
   user_id: string;
   author_name: string;
-  author_avatar_url?: string; // Pour l'affichage
+  author_avatar_url?: string;
   parent_id: string | null;
   text: string;
   created_at: string;
-  likes_count?: number; // Count agrégé
-  user_has_liked?: boolean; // État pour l'utilisateur courant
-  replies?: Comment[]; // Structure d'arbre pour l'UI
+  likes_count?: number;
+  user_has_liked?: boolean;
+  replies?: Comment[];
 }
 
 export interface SocialCounts {

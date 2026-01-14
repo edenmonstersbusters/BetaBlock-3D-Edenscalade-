@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Home, Palette, X } from 'lucide-react';
-import { HoldDefinition, PlacedHold } from '../../types';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock } from 'lucide-react';
+import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import '../../types';
 import { HoldModel } from '../../core/HoldModel';
 import { FileControls } from '../../components/ui/FileControls';
@@ -14,6 +15,7 @@ interface RouteEditorPanelProps {
   onBack: () => void;
   selectedHold: HoldDefinition | null;
   onSelectHold: (hold: HoldDefinition) => void;
+  metadata: WallMetadata;
   holdSettings: { scale: number; rotation: number; color: string };
   onUpdateSettings: (settings: any) => void;
   placedHolds: PlacedHold[];
@@ -37,7 +39,7 @@ const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing
 const CATALOGUE_URL = `${BASE_URL}catalogue.json`;
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew, onHome
+  onBack, selectedHold, onSelectHold, metadata, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew, onHome
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
   
+  const isHoldsLocked = metadata.remixMode === 'structure';
+
   useEffect(() => {
     const fetchLibrary = async () => {
       try {
@@ -68,6 +72,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const selectedHoldsObjects = placedHolds.filter(h => selectedPlacedHoldIds.includes(h.id));
 
   const handleCatalogueItemClick = (hold: HoldDefinition) => {
+    if (isHoldsLocked) return;
     if (anyHoldSelected && isReplacingMode) {
       onReplaceHold(selectedPlacedHoldIds, hold);
       setIsReplacingMode(false);
@@ -81,31 +86,46 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
        
        <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
         <div className="flex items-center space-x-3 overflow-hidden">
-          <button onClick={onHome} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 transition-colors" title="Retour à la Galerie">
-             <Home size={20} />
-          </button>
-          <div className="h-6 w-px bg-gray-800" />
           <button onClick={onBack} className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white flex-shrink-0" title="Retour Configuration"><ArrowLeft size={20} /></button>
           <div className="overflow-hidden">
-            <h1 className="text-lg font-bold text-white truncate">Création de Voie</h1>
-            <p className="text-xs text-gray-500 truncate">Étape 2: Pose de prises</p>
+            <h1 className="text-lg font-bold text-white truncate">Ouverture</h1>
+            <p className="text-xs text-gray-500 truncate">Pose de prises</p>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {metadata.parentId && (
+            <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
+                    <GitFork size={12} />
+                    <span>REMIX {isHoldsLocked ? 'ARCHITECTE' : 'OUVREUR'}</span>
+                </div>
+                <p className="text-[11px] text-gray-400 leading-tight">
+                    Inspiré par <span className="text-white font-bold">{metadata.parentName}</span>.
+                </p>
+                {isHoldsLocked && (
+                    <div className="mt-2 flex items-center gap-2 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded">
+                        <Lock size={10} />
+                        PRISES VERROUILLÉES
+                    </div>
+                )}
+            </div>
+        )}
+
         {anyHoldSelected ? (
           <HoldInspector 
              selectedHolds={selectedHoldsObjects}
-             onUpdate={(u) => onUpdatePlacedHold(selectedPlacedHoldIds, u)}
+             onUpdate={(u) => { if(!isHoldsLocked) onUpdatePlacedHold(selectedPlacedHoldIds, u); }}
              onRemove={onRemoveMultiple}
              onDeselect={onDeselect}
-             onToggleReplaceMode={() => { setCatalogueExpanded(true); setIsReplacingMode(true); }}
+             onToggleReplaceMode={() => { if(!isHoldsLocked) { setCatalogueExpanded(true); setIsReplacingMode(true); } }}
              isReplacingMode={isReplacingMode}
              onActionStart={onActionStart}
+             isLocked={isHoldsLocked}
           />
         ) : (
-          <section className="space-y-4">
+          <section className={isHoldsLocked ? "opacity-50 pointer-events-none grayscale" : "space-y-4"}>
                <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Box size={14} /><span>Paramètres de Pose</span></div>
                <div className="bg-gray-800 p-4 rounded-xl space-y-5 border border-gray-700">
                   <ColorPalette 
@@ -124,8 +144,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
           </section>
         )}
 
-        {/* PRÉVISUALISATION ACTIVE : 3D TEMPS RÉEL (Si pas de sélection active) */}
-        {!anyHoldSelected && selectedHold && (
+        {!anyHoldSelected && selectedHold && !isHoldsLocked && (
           <section className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
             <div className="flex items-center space-x-2 text-[10px] font-black text-blue-400 uppercase tracking-widest px-1">
               <Eye size={12} />
@@ -154,65 +173,64 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                       <OrbitControls makeDefault enableZoom={false} enablePan={false} minPolarAngle={0} maxPolarAngle={Math.PI} />
                   </Canvas>
               </div>
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center z-10 pointer-events-none">
-                 <span className="text-[11px] font-black text-white uppercase tracking-tighter bg-blue-600/20 px-3 py-1 rounded-full border border-blue-500/30 backdrop-blur-md shadow-lg">{selectedHold.name}</span>
-              </div>
             </div>
           </section>
         )}
 
-        <HoldCatalogue 
-           library={library} 
-           loading={loading}
-           selectedHoldId={selectedHold?.id}
-           onSelectHold={handleCatalogueItemClick}
-           expanded={catalogueExpanded}
-           onToggleExpand={() => { setCatalogueExpanded(!catalogueExpanded); if(catalogueExpanded) setIsReplacingMode(false); }}
-           isReplacingMode={isReplacingMode}
-        />
+        <div className={isHoldsLocked ? "opacity-50 pointer-events-none grayscale" : ""}>
+            <HoldCatalogue 
+               library={library} 
+               loading={loading}
+               selectedHoldId={selectedHold?.id}
+               onSelectHold={handleCatalogueItemClick}
+               expanded={catalogueExpanded}
+               onToggleExpand={() => { if(!isHoldsLocked) { setCatalogueExpanded(!catalogueExpanded); if(catalogueExpanded) setIsReplacingMode(false); } }}
+               isReplacingMode={isReplacingMode}
+            />
+        </div>
 
-        {!anyHoldSelected && (
-          <section className="pt-4 border-t border-gray-800">
-               <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
-              <div className="max-h-64 overflow-y-auto space-y-1">
-                  {placedHolds.slice().reverse().map((h, i) => (
-                      <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded-lg border cursor-pointer transition-colors ${selectedPlacedHoldIds.includes(h.id) ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`} onClick={(e) => onSelectPlacedHold(h.id, e.ctrlKey || e.metaKey)}>
-                          <span className="text-gray-300 font-bold">Prise #{placedHolds.length - i}</span>
-                          <button onClick={(e) => { e.stopPropagation(); onRemoveHold(h.id); }} className="text-gray-500 hover:text-red-400"><Trash2 size={12}/></button>
-                      </div>
-                  ))}
-              </div>
-              {placedHolds.length > 0 && (
-                <div className="space-y-2 mt-4">
-                  {isPickingAllColor ? (
-                    <div className="bg-gray-800 p-4 rounded-xl border-2 border-blue-500 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">COULEUR GLOBALE</span>
-                        <button onClick={() => setIsPickingAllColor(false)} className="text-gray-500 hover:text-white p-1 hover:bg-white/10 rounded-full transition-colors"><X size={16}/></button>
-                      </div>
-                      <ColorPalette onSelect={(c) => { onChangeAllHoldsColor(c); setIsPickingAllColor(false); }} />
+        <section className="pt-4 border-t border-gray-800">
+             <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+                {placedHolds.slice().reverse().map((h, i) => (
+                    <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded-lg border transition-colors ${selectedPlacedHoldIds.includes(h.id) ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500 cursor-pointer'}`} onClick={(e) => onSelectPlacedHold(h.id, e.ctrlKey || e.metaKey)}>
+                        <span className="text-gray-300 font-bold">Prise #{placedHolds.length - i}</span>
+                        {!isHoldsLocked && (
+                            <button onClick={(e) => { e.stopPropagation(); onRemoveHold(h.id); }} className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
+                        )}
                     </div>
-                  ) : (
-                    <button 
-                      onClick={() => setIsPickingAllColor(true)}
-                      className="w-full py-2 px-4 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-600/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
-                    >
-                      <Palette size={14} />
-                      <span>Couleur globale</span>
-                    </button>
-                  )}
-                  
+                ))}
+            </div>
+            {placedHolds.length > 0 && !isHoldsLocked && (
+              <div className="space-y-2 mt-4">
+                {isPickingAllColor ? (
+                  <div className="bg-gray-800 p-4 rounded-xl border-2 border-blue-500 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">COULEUR GLOBALE</span>
+                      <button onClick={() => setIsPickingAllColor(false)} className="text-gray-500 hover:text-white p-1 hover:bg-white/10 rounded-full transition-colors"><X size={16}/></button>
+                    </div>
+                    <ColorPalette onSelect={(c) => { onChangeAllHoldsColor(c); setIsPickingAllColor(false); }} />
+                  </div>
+                ) : (
                   <button 
-                    onClick={onRemoveAllHolds}
-                    className="w-full py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                    onClick={() => setIsPickingAllColor(true)}
+                    className="w-full py-2 px-4 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-600/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
                   >
-                    <Trash2 size={14} />
-                    <span>Vider le mur</span>
+                    <Palette size={14} />
+                    <span>Couleur globale</span>
                   </button>
-                </div>
-              )}
-          </section>
-        )}
+                )}
+                
+                <button 
+                  onClick={onRemoveAllHolds}
+                  className="w-full py-2 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                >
+                  <Trash2 size={14} />
+                  <span>Vider le mur</span>
+                </button>
+              </div>
+            )}
+        </section>
 
         <FileControls onExport={onExport} onImport={onImport} onNew={onNew} />
       </div>

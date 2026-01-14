@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams, Routes, Route, Navigate } from 'react-router-dom';
 import * as THREE from 'three';
@@ -6,7 +7,6 @@ import * as THREE from 'three';
 import { Scene } from './core/Scene';
 import { api } from './core/api'; 
 import { auth } from './core/auth';
-import { validateBetaBlockJson } from './utils/validation';
 import { resolveHoldWorldData, calculateLocalCoords } from './utils/geometry';
 
 // Custom Hooks
@@ -19,13 +19,14 @@ import { RouteEditorPanel } from './features/builder/RouteEditorPanel';
 import { ViewerPanel } from './features/viewer/ViewerPanel';
 import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
+import { ProjectsPage } from './features/projects/ProjectsPage';
 
 // UI Components
 import { LoadingOverlay } from './components/ui/LoadingOverlay';
 import { GlobalModal, ModalConfig } from './components/ui/GlobalModal';
 import { ContextMenu, ContextMenuData } from './components/ui/ContextMenu';
 import { AuthModal } from './components/auth/AuthModal';
-import { Undo2, Redo2 } from 'lucide-react';
+import { Undo2, Redo2, Save, Globe, ArrowLeft } from 'lucide-react';
 
 // Types
 import { WallConfig, AppMode, HoldDefinition, PlacedHold, WallSegment, BetaBlockFile, WallMetadata } from './types';
@@ -47,7 +48,7 @@ const STORAGE_KEYS = {
   HOLDS: 'betablock_placed_holds',
 };
 
-// Composant Editeur principal (Builder + Setter + Scene)
+// Composant Editeur principal
 const WallEditor = ({ 
   mode, 
   user, 
@@ -56,7 +57,7 @@ const WallEditor = ({
   metadata, setMetadata,
   recordAction, undo, redo, canUndo, canRedo,
   onSaveCloud, isSavingCloud, generatedLink,
-  onHome, onNewWall, onRemoveAllHolds, onChangeAllHoldsColor,
+  onHome, onNewWall, onRemix, onRemoveAllHolds, onChangeAllHoldsColor,
   isLoadingCloud, cloudId, screenshotRef
 }: any) => {
   const navigate = useNavigate();
@@ -67,7 +68,6 @@ const WallEditor = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const globalFileInputRef = useRef<HTMLInputElement>(null);
-  const lastWallPointer = useRef<{ x: number, y: number, segmentId: string } | null>(null);
   const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
 
   const applyHistoryState = useCallback((state: any) => {
@@ -83,6 +83,7 @@ const WallEditor = ({
   }, [recordAction, config, holds, mode]);
 
   const handlePlaceHold = (position: THREE.Vector3, normal: THREE.Vector3, segmentId: string) => {
+    if (metadata.remixMode === 'structure') return;
     if (!selectedHold) return;
     const coords = calculateLocalCoords(position, segmentId, config);
     if (!coords) return;
@@ -108,14 +109,16 @@ const WallEditor = ({
 
   const removeHoldsAction = useCallback((ids: string[]) => {
     if (ids.length === 0 || mode === 'VIEW') return;
+    if (metadata.remixMode === 'structure') return;
     saveToHistory();
     const idSet = new Set(ids);
     setHolds((prev: any) => prev.filter((h: any) => !idSet.has(h.id)));
     setSelectedPlacedHoldIds(prev => prev.filter(id => !idSet.has(id)));
-  }, [saveToHistory, mode, setHolds]);
+  }, [saveToHistory, mode, setHolds, metadata.remixMode]);
 
   const updateSegmentQuickly = (id: string, updates: Partial<WallSegment>) => {
       if(mode === 'VIEW') return;
+      if (metadata.remixMode === 'holds') return;
       const seg = config.segments.find((s: any) => s.id === id);
       if (!seg) return;
       const newHeight = updates.height !== undefined ? seg.height + updates.height : seg.height;
@@ -124,14 +127,35 @@ const WallEditor = ({
       setConfig((prev: any) => ({ ...prev, segments: prev.segments.map((s: any) => s.id === id ? { ...s, height: Math.max(0.5, newHeight), angle: Math.min(85, Math.max(-15, newAngle)) } : s) }));
   };
 
+  const handleAction = (type: 'save' | 'publish') => {
+      if (!user) {
+          setShowAuthModal(true);
+          return;
+      }
+      // On met à jour l'intention dans les métadonnées juste avant l'envoi
+      setMetadata((prev: any) => ({ ...prev, isPublic: type === 'publish' }));
+      
+      setModal({ 
+          title: type === 'publish' ? "Publier dans le Hub" : "Enregistrer le projet", 
+          message: type === 'publish' ? "Votre mur sera visible par toute la communauté." : "Le projet sera sauvegardé dans votre espace privé.",
+          isSaveDialog: true 
+      });
+  };
+
   useKeyboardShortcuts({
     undo: performUndo, redo: performRedo, selectAll: () => setSelectedPlacedHoldIds(holds.map((h: any) => h.id)),
     copy: () => { if (selectedPlacedHoldIds.length > 0) setClipboard(JSON.parse(JSON.stringify(holds.filter((h: any) => selectedPlacedHoldIds.includes(h.id))))); },
-    paste: () => { if (clipboard.length > 0 && mode !== 'VIEW') { saveToHistory(); setHolds((prev: any) => [...prev, ...clipboard.map(h => ({ ...h, id: crypto.randomUUID(), x: h.x + 0.1, y: Math.min(h.y + 0.1, config.segments.find((s: any) => s.id === h.segmentId)?.height || h.y) }))]); } },
-    save: () => setModal({ title: "Sauvegarder", message: "Sauvegarder ?", isSaveDialog: true }),
+    paste: () => { 
+        if (metadata.remixMode === 'structure') return;
+        if (clipboard.length > 0 && mode !== 'VIEW') { 
+            saveToHistory(); 
+            setHolds((prev: any) => [...prev, ...clipboard.map(h => ({ ...h, id: crypto.randomUUID(), x: h.x + 0.1, y: Math.min(h.y + 0.1, config.segments.find((s: any) => s.id === h.segmentId)?.height || h.y) }))]); 
+        } 
+    },
+    save: () => handleAction('save'),
     open: () => globalFileInputRef.current?.click(),
     deleteAction: () => removeHoldsAction(selectedPlacedHoldIds)
-  }, [performUndo, performRedo, selectedPlacedHoldIds, removeHoldsAction, clipboard, mode, holds, config]);
+  }, [performUndo, performRedo, selectedPlacedHoldIds, removeHoldsAction, clipboard, mode, holds, config, metadata.remixMode, user]);
 
   const renderableHolds = useMemo(() => holds.map((h: any) => {
       const world = resolveHoldWorldData(h, config);
@@ -141,90 +165,154 @@ const WallEditor = ({
   , [holds, config]);
 
   return (
-    <div className="flex h-screen w-screen bg-black overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-screen bg-black overflow-hidden font-sans">
       <LoadingOverlay isVisible={isLoadingCloud} />
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       
-      {mode === 'VIEW' ? (
-        <ViewerPanel 
-            wallId={cloudId || ''}
-            metadata={metadata} config={config} holds={holds}
-            onHome={onHome} onRemix={() => navigate('/builder')}
-            onShare={() => setModal({ title: "Partager", message: "Lien généré", isSaveDialog: true })}
-        />
-      ) : mode === 'BUILD' ? (
-        <EditorPanel 
-            config={config} holds={holds} onUpdate={setConfig} 
-            onNext={() => navigate('/setter')} showModal={(c) => setModal(c)}
-            onActionStart={saveToHistory} onExport={() => setModal({ title: "Sauvegarder", message: "", isSaveDialog: true })}
-            onImport={() => globalFileInputRef.current?.click()} onNew={onNewWall}
-            onHome={onHome}
-        />
-      ) : (
-        <RouteEditorPanel 
-            onBack={() => navigate('/builder')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
-            holdSettings={holdSettings} onUpdateSettings={(s) => setHoldSettings(prev => ({ ...prev, ...s }))}
-            placedHolds={holds} onRemoveHold={(id) => removeHoldsAction([id])} 
-            onRemoveAllHolds={onRemoveAllHolds} 
-            onChangeAllHoldsColor={onChangeAllHoldsColor} 
-            selectedPlacedHoldIds={selectedPlacedHoldIds}
-            onUpdatePlacedHold={(ids, u) => { const idSet = new Set(ids); setHolds((hds: any) => hds.map((h: any) => idSet.has(h.id) ? { ...h, ...u } : h)); }}
-            onSelectPlacedHold={(id, multi) => {
-                 if (id === null) { setSelectedPlacedHoldIds([]); return; }
-                 if (multi) setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-                 else setSelectedPlacedHoldIds([id]);
-            }} 
-            onDeselect={() => setSelectedPlacedHoldIds([])}
-            onActionStart={saveToHistory} onReplaceHold={(ids, def) => { saveToHistory(); const idSet = new Set(ids); setHolds((prev: any) => prev.map((h: any) => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}
-            onRemoveMultiple={() => removeHoldsAction(selectedPlacedHoldIds)}
-            onExport={() => setModal({ title: "Sauvegarder", message: "", isSaveDialog: true })}
-            onImport={() => globalFileInputRef.current?.click()} onNew={onNewWall}
-            onHome={onHome}
-        />
-      )}
-
-      {/* UNDO/REDO */}
+      {/* HEADER ACTIONS HAUTE VISIBILITÉ - DESIGN ÉQUILIBRÉ */}
       {mode !== 'VIEW' && (
-        <div className="fixed bottom-6 right-6 z-[100] flex gap-2">
-            <button disabled={!canUndo} onClick={performUndo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 transition-all shadow-2xl backdrop-blur-md"><Undo2 size={20} /></button>
-            <button disabled={!canRedo} onClick={performRedo} className="p-3 bg-gray-900/90 border border-white/10 rounded-full text-white hover:bg-white/10 disabled:opacity-30 transition-all shadow-2xl backdrop-blur-md"><Redo2 size={20} /></button>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative">
+            
+            {/* GAUCHE: Navigation & Contexte App */}
+            <div className="flex items-center gap-4 justify-start">
+                <button onClick={onHome} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2">
+                    <ArrowLeft size={16} />
+                    <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline">BetaBlock</span>
+                </button>
+            </div>
+
+            {/* CENTRE: Titre du Projet (Max Width Control) */}
+            <div className="flex flex-col items-center justify-center min-w-0 px-4">
+                <h1 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-[400px] text-center" title={metadata.name}>
+                    {metadata.name || "Mur Sans Nom"}
+                </h1>
+                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
+                    {mode === 'BUILD' ? 'Mode Structure' : 'Mode Ouverture'}
+                </span>
+            </div>
+            
+            {/* DROITE: Actions */}
+            <div className="flex items-center gap-2 justify-end">
+                <button 
+                    onClick={() => handleAction('save')}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-xl text-xs font-bold transition-all border border-gray-700 hover:border-gray-600"
+                >
+                    <Save size={14} />
+                    <span className="hidden sm:inline">Sauvegarder</span>
+                </button>
+                <button 
+                    onClick={() => handleAction('publish')}
+                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-600/20"
+                >
+                    <Globe size={14} />
+                    <span>PUBLIER</span>
+                </button>
+            </div>
         </div>
       )}
 
-      <div className="flex-1 relative h-full">
-        <Scene 
-            config={config} mode={mode} holds={renderableHolds} 
-            onPlaceHold={handlePlaceHold} 
-            selectedHoldDef={selectedHold} holdSettings={holdSettings} selectedPlacedHoldIds={selectedPlacedHoldIds}
-            onSelectPlacedHold={(id, multi) => {
-                 if (id === null) { setSelectedPlacedHoldIds([]); return; }
-                 if (multi) setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-                 else setSelectedPlacedHoldIds([id]);
-            }}
-            onContextMenu={(type, id, x, y, wx, wy) => setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
-            onWallPointerUpdate={(info) => { lastWallPointer.current = info; }}
-            onHoldDrag={(id, x, y, segId) => setHolds((prev: any) => prev.map((h: any) => h.id === id ? { ...h, x, y, segmentId: segId } : h))}
-            onHoldDragEnd={saveToHistory} screenshotRef={screenshotRef}
-        />
+      <div className="flex flex-1 overflow-hidden">
+        {mode === 'VIEW' ? (
+            <ViewerPanel 
+                wallId={cloudId || ''}
+                metadata={metadata} config={config} holds={holds}
+                onHome={onHome} 
+                onRemix={onRemix}
+                onShare={() => handleAction('publish')}
+            />
+        ) : mode === 'BUILD' ? (
+            <EditorPanel 
+                config={config} holds={holds} onUpdate={setConfig} 
+                metadata={metadata}
+                onNext={() => navigate('/setter')} showModal={(c) => setModal(c)}
+                onActionStart={saveToHistory} onExport={() => handleAction('save')}
+                onImport={(f:any) => globalFileInputRef.current?.click()} onNew={onNewWall}
+                onHome={onHome}
+            />
+        ) : (
+            <RouteEditorPanel 
+                onBack={() => navigate('/builder')} selectedHold={selectedHold} onSelectHold={setSelectedHold}
+                metadata={metadata}
+                holdSettings={holdSettings} onUpdateSettings={(s:any) => setHoldSettings(prev => ({ ...prev, ...s }))}
+                placedHolds={holds} onRemoveHold={(id:any) => removeHoldsAction([id])} 
+                onRemoveAllHolds={onRemoveAllHolds} 
+                onChangeAllHoldsColor={onChangeAllHoldsColor} 
+                selectedPlacedHoldIds={selectedPlacedHoldIds}
+                onUpdatePlacedHold={(ids:any, u:any) => { 
+                    if (metadata.remixMode === 'structure') return;
+                    const idSet = new Set(ids); setHolds((hds: any) => hds.map((h: any) => idSet.has(h.id) ? { ...h, ...u } : h)); 
+                }}
+                onSelectPlacedHold={(id:any, multi:any) => {
+                    if (id === null) { setSelectedPlacedHoldIds([]); return; }
+                    if (multi) setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+                    else setSelectedPlacedHoldIds([id]);
+                }} 
+                onDeselect={() => setSelectedPlacedHoldIds([])}
+                onActionStart={saveToHistory} onReplaceHold={(ids:any, def:any) => { 
+                    if (metadata.remixMode === 'structure') return;
+                    saveToHistory(); const idSet = new Set(ids); setHolds((prev: any) => prev.map((h: any) => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); 
+                }}
+                onRemoveMultiple={() => removeHoldsAction(selectedPlacedHoldIds)}
+                onExport={() => handleAction('save')}
+                onImport={(f:any) => globalFileInputRef.current?.click()} onNew={onNewWall}
+                onHome={onHome}
+            />
+        )}
+
+        <div className="flex-1 relative h-full">
+            {/* UNDO/REDO flottants au centre bas */}
+            {mode !== 'VIEW' && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
+                    <button disabled={!canUndo} onClick={performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
+                    <button disabled={!canRedo} onClick={performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
+                </div>
+            )}
+
+            <Scene 
+                config={config} mode={mode} holds={renderableHolds} 
+                onPlaceHold={handlePlaceHold} 
+                selectedHoldDef={selectedHold} holdSettings={holdSettings} selectedPlacedHoldIds={selectedPlacedHoldIds}
+                onSelectPlacedHold={(id:any, multi:any) => {
+                    if (id === null) { setSelectedPlacedHoldIds([]); return; }
+                    if (multi) setSelectedPlacedHoldIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+                    else setSelectedPlacedHoldIds([id]);
+                }}
+                onContextMenu={(type:any, id:any, x:any, y:any, wx:any, wy:any) => setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
+                onHoldDrag={(id:any, x:any, y:any, segId:any) => {
+                    if (metadata.remixMode === 'structure') return;
+                    setHolds((prev: any) => prev.map((h: any) => h.id === id ? { ...h, x, y, segmentId: segId } : h))
+                }}
+                onHoldDragEnd={saveToHistory} screenshotRef={screenshotRef}
+            />
+        </div>
       </div>
 
       <ContextMenu 
         data={contextMenu} onClose={() => setContextMenu(null)} onUpdateData={setContextMenu}
         onCopyHold={() => { if (selectedPlacedHoldIds.length > 0) setClipboard(JSON.parse(JSON.stringify(holds.filter((h: any) => selectedPlacedHoldIds.includes(h.id))))); }} 
         hasClipboard={clipboard.length > 0}
-        onPasteHold={() => {}} onDelete={(id) => { if (contextMenu?.type === 'HOLD') removeHoldsAction([id]); }}
-        // Fix: Removed duplicate onRotateHold and onColorHold props
-        onRotateHold={(id, delta) => { saveToHistory(); setHolds((hds: any) => hds.map((h: any) => h.id === id ? { ...h, spin: (h.spin + delta) } : h)); }}
-        onColorHold={(id, c) => { saveToHistory(); setHolds((hds: any) => hds.map((h: any) => h.id === id ? { ...h, color: c } : h)); }}
+        onPasteHold={() => {}} onDelete={(id:any, type:any) => { 
+            if (type === 'HOLD' && metadata.remixMode === 'structure') return;
+            if (type === 'SEGMENT' && metadata.remixMode === 'holds') return;
+            removeHoldsAction([id]); 
+        }}
+        onRotateHold={(id:any, delta:any) => { 
+            if (metadata.remixMode === 'structure') return;
+            saveToHistory(); setHolds((hds: any) => hds.map((h: any) => h.id === id ? { ...h, spin: (h.spin + delta) } : h)); 
+        }}
+        onColorHold={(id:any, c:any) => { 
+            if (metadata.remixMode === 'structure') return;
+            saveToHistory(); setHolds((hds: any) => hds.map((h: any) => h.id === id ? { ...h, color: c } : h)); 
+        }}
         onSegmentUpdate={updateSegmentQuickly}
       />
 
       <GlobalModal 
         config={modal} onClose={() => setModal(null)} 
         isSavingCloud={isSavingCloud} generatedLink={generatedLink} 
-        onSaveCloud={onSaveCloud} onDownload={() => {/* DL Logic */}}
+        onSaveCloud={onSaveCloud} 
         wallName={metadata.name}
-        onWallNameChange={(name) => setMetadata((prev: any) => ({ ...prev, name }))}
+        onWallNameChange={(name:any) => setMetadata((prev: any) => ({ ...prev, name }))}
       />
     </div>
   );
@@ -243,34 +331,41 @@ function App() {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
   const [metadata, setMetadata] = useState<WallMetadata>({ 
-    name: 'Mon Mur', timestamp: new Date().toISOString(), appVersion: APP_VERSION 
+    name: 'Mon Mur', timestamp: new Date().toISOString(), appVersion: APP_VERSION, isPublic: false
   });
   
-  const [config, setConfig] = useState<WallConfig>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CONFIG);
-      return saved ? JSON.parse(saved) : INITIAL_CONFIG;
-    } catch { return INITIAL_CONFIG; }
-  });
-  
-  const [holds, setHolds] = useState<PlacedHold[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.HOLDS);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [config, setConfig] = useState<WallConfig>(() => INITIAL_CONFIG);
+  const [holds, setHolds] = useState<PlacedHold[]>(() => []);
 
-  const { past, future, recordAction, undo, redo, canUndo, canRedo } = useHistory<{config: WallConfig, holds: PlacedHold[]}>({ config, holds });
+  const { recordAction, undo, redo, canUndo, canRedo } = useHistory<{config: WallConfig, holds: PlacedHold[]}>({ config, holds });
 
-  // RESET FUNCTION
   const handleNewWall = useCallback(() => {
       setHolds([]);
       setConfig(INITIAL_CONFIG);
-      setMetadata({ name: 'Mon Mur', timestamp: new Date().toISOString(), appVersion: APP_VERSION });
+      setMetadata({ name: 'Mon Mur', timestamp: new Date().toISOString(), appVersion: APP_VERSION, isPublic: false });
       setCloudId(null);
       setGeneratedLink(null);
       navigate('/builder');
   }, [navigate]);
+
+  const handleRemix = useCallback((mode: 'structure' | 'holds') => {
+      const parentName = metadata.name;
+      const parentAuthor = metadata.authorName;
+      const parentId = cloudId;
+      setMetadata({
+          name: `${parentName} (Remix)`,
+          timestamp: new Date().toISOString(),
+          appVersion: APP_VERSION,
+          parentId: parentId || undefined,
+          parentName: parentName,
+          parentAuthorName: parentAuthor,
+          remixMode: mode,
+          isPublic: false
+      });
+      setCloudId(null);
+      setGeneratedLink(null);
+      navigate(mode === 'structure' ? '/builder' : '/setter');
+  }, [metadata, cloudId, navigate]);
 
   useEffect(() => {
     auth.getUser().then(setUser);
@@ -279,20 +374,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!location.pathname.startsWith('/view') && !location.pathname.startsWith('/setter') && !location.pathname.startsWith('/builder')) return;
-    
-    // Check if we need to reset state because we just left a viewer to go to builder
-    const isEnteringEmptyBuilder = location.pathname === '/builder' && !searchParams.get('id') && cloudId !== null;
-    if (isEnteringEmptyBuilder) {
-        handleNewWall();
-        return;
-    }
-
     const activeId = searchParams.get('id') || (location.pathname.startsWith('/view') ? location.pathname.split('/').pop() : null);
     if (activeId && activeId !== cloudId && activeId.length > 5) {
-      const loadFromCloud = async () => {
-        setIsLoadingCloud(true);
-        const { data, error } = await api.getWall(activeId);
+      setIsLoadingCloud(true);
+      api.getWall(activeId).then(({ data }) => {
         if (data) {
           setConfig(data.config);
           setHolds(data.holds);
@@ -300,73 +385,73 @@ function App() {
           setCloudId(activeId);
         }
         setIsLoadingCloud(false);
-      };
-      loadFromCloud();
+      });
     }
-  }, [location.pathname, searchParams, cloudId, handleNewWall]);
+  }, [location.pathname, searchParams, cloudId]);
 
   const saveToCloud = useCallback(async () => {
     if (!user) return;
     setIsSavingCloud(true);
     let thumbnail: string | undefined = undefined;
     if (screenshotRef.current) thumbnail = await screenshotRef.current() || undefined; 
-    const authorName = user.user_metadata?.display_name || user.email.split('@')[0];
-    const authorAvatarUrl = user.user_metadata?.avatar_url;
-    const updatedMetadata = { ...metadata, timestamp: new Date().toISOString(), thumbnail, authorId: user.id, authorName: authorName, authorAvatarUrl: authorAvatarUrl };
+    
+    const updatedMetadata = { 
+        ...metadata, 
+        timestamp: new Date().toISOString(), 
+        thumbnail, 
+        authorName: user.user_metadata?.display_name || user.email.split('@')[0] 
+    };
+    
     setMetadata(updatedMetadata);
-    const data: BetaBlockFile = { version: APP_VERSION, metadata: updatedMetadata, config: config, holds: holds };
-    const { id, error } = await api.saveWall(data);
+    const file: BetaBlockFile = { version: APP_VERSION, metadata: updatedMetadata, config, holds };
+    
+    const { id } = cloudId ? await api.updateWall(cloudId, file).then(() => ({ id: cloudId })) : await api.saveWall(file);
+    
     setIsSavingCloud(false);
     if (id) {
-      setGeneratedLink(`${window.location.origin}/#/view/${id}`);
+      if (updatedMetadata.isPublic) {
+          setGeneratedLink(`${window.location.origin}/#/view/${id}`);
+      } else {
+          setGeneratedLink(null);
+          alert("Projet sauvegardé dans vos projets privés.");
+      }
       setCloudId(id);
     }
-  }, [config, holds, metadata, user]);
+  }, [config, holds, metadata, user, cloudId]);
 
   return (
     <Routes>
       <Route path="/" element={<GalleryPage onResetState={handleNewWall} />} />
+      <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/profile/:userId" element={<ProfilePage />} />
       <Route path="/builder" element={
         <WallEditor 
-          mode="BUILD" user={user} 
-          config={config} setConfig={setConfig} 
-          holds={holds} setHolds={setHolds} 
-          metadata={metadata} setMetadata={setMetadata}
+          mode="BUILD" user={user} config={config} setConfig={setConfig} holds={holds} setHolds={setHolds} metadata={metadata} setMetadata={setMetadata}
           recordAction={recordAction} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo}
           onSaveCloud={saveToCloud} isSavingCloud={isSavingCloud} generatedLink={generatedLink}
-          onHome={() => navigate('/')} onNewWall={handleNewWall}
+          onHome={() => navigate('/')} onNewWall={handleNewWall} onRemix={handleRemix}
           onRemoveAllHolds={() => setHolds([])}
-          onChangeAllHoldsColor={(c: string) => setHolds(h => h.map(x => ({...x, color: c})))}
+          onChangeAllHoldsColor={(c:any) => setHolds(h => h.map(x => ({...x, color: c})))}
           isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
       <Route path="/setter" element={
         <WallEditor 
-          mode="SET" user={user} 
-          config={config} setConfig={setConfig} 
-          holds={holds} setHolds={setHolds} 
-          metadata={metadata} setMetadata={setMetadata}
+          mode="SET" user={user} config={config} setConfig={setConfig} holds={holds} setHolds={setHolds} metadata={metadata} setMetadata={setMetadata}
           recordAction={recordAction} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo}
           onSaveCloud={saveToCloud} isSavingCloud={isSavingCloud} generatedLink={generatedLink}
-          onHome={() => navigate('/')} onNewWall={handleNewWall}
+          onHome={() => navigate('/')} onNewWall={handleNewWall} onRemix={handleRemix}
           onRemoveAllHolds={() => setHolds([])}
-          onChangeAllHoldsColor={(c: string) => setHolds(h => h.map(x => ({...x, color: c})))}
+          onChangeAllHoldsColor={(c:any) => setHolds(h => h.map(x => ({...x, color: c})))}
           isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
       <Route path="/view/:wallId" element={
         <WallEditor 
-          mode="VIEW" user={user} 
-          config={config} setConfig={setConfig} 
-          holds={holds} setHolds={setHolds} 
-          metadata={metadata} setMetadata={setMetadata}
+          mode="VIEW" user={user} config={config} setConfig={setConfig} holds={holds} setHolds={setHolds} metadata={metadata} setMetadata={setMetadata}
           recordAction={recordAction} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo}
           onSaveCloud={saveToCloud} isSavingCloud={isSavingCloud} generatedLink={generatedLink}
-          onHome={() => navigate('/')} onNewWall={handleNewWall}
-          onRemoveAllHolds={() => {}}
-          onChangeAllHoldsColor={() => {}}
+          onHome={() => navigate('/')} onNewWall={handleNewWall} onRemix={handleRemix}
           isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
