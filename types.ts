@@ -32,6 +32,7 @@ export interface WallMetadata {
   thumbnail?: string;
   authorId?: string; // ID Supabase de l'auteur
   authorName?: string; // Nom d'affichage (futur)
+  authorAvatarUrl?: string; // URL de l'avatar de l'auteur (ajouté pour l'affichage public)
 }
 
 export interface WallSegment {
@@ -77,11 +78,30 @@ export interface BetaBlockFile {
 
 // --- SOCIAL TYPES ---
 
+export interface UserProfile {
+  id: string;
+  display_name: string;
+  email?: string;
+  bio?: string;
+  avatar_url?: string;
+  location?: string; // Ville / Pays
+  home_gym?: string; // Salle préférée
+  climbing_grade?: string; // Niveau max
+  climbing_style?: string; // Bloc, Voie, etc.
+  created_at: string;
+  stats?: {
+    total_walls: number;
+    total_likes: number;
+    beta_level: number;
+  };
+}
+
 export interface Comment {
   id: string;
   wall_id: string;
   user_id: string;
-  author_name: string; // Stocké pour simplifier l'affichage sans jointure complexe
+  author_name: string;
+  author_avatar_url?: string; // Pour l'affichage
   parent_id: string | null;
   text: string;
   created_at: string;

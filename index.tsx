@@ -3,7 +3,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
-// Import types at the very top of the entry point to ensure global JSX extensions are registered
 import './types';
 
 const rootElement = document.getElementById('root');
@@ -11,13 +10,26 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Derive initial entry from hash to support deep linking on initial load
-const hashPath = window.location.hash.replace(/^#/, '') || '/';
+// Try to retrieve the current hash to initialize the router correctly.
+// This allows shared links (e.g. /#/view/...) to work on initial load
+// even if we use MemoryRouter to prevent runtime location crashes.
+const getInitialRoute = () => {
+  try {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#')) {
+      return hash.substring(1);
+    }
+    return '/';
+  } catch (e) {
+    console.warn("Could not read location hash", e);
+    return '/';
+  }
+};
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <MemoryRouter initialEntries={[hashPath]}>
+    <MemoryRouter initialEntries={[getInitialRoute()]}>
       <App />
     </MemoryRouter>
   </React.StrictMode>

@@ -5,9 +5,14 @@ import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { Plus, Loader2, Search, Database, LogIn, User, LogOut, X } from 'lucide-react';
+import { UserAvatar } from '../../components/ui/UserAvatar';
+import { Plus, Loader2, Search, Database, LogIn, LogOut, X } from 'lucide-react';
 
-export const GalleryPage: React.FC = () => {
+interface GalleryPageProps {
+  onResetState?: () => void;
+}
+
+export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
   const navigate = useNavigate();
   const [walls, setWalls] = useState<{ id: string; name: string; created_at: string; data?: any }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,12 +63,10 @@ export const GalleryPage: React.FC = () => {
     }
 
     if (!searchQuery.trim()) {
-      // Si on efface tout, on recharge immédiatement la liste par défaut
       loadDefaultWalls();
       return;
     }
 
-    // Sinon, on attend que l'utilisateur finisse de taper
     debounceTimerRef.current = window.setTimeout(() => {
       performSearch(searchQuery);
     }, 400);
@@ -74,18 +77,18 @@ export const GalleryPage: React.FC = () => {
   }, [searchQuery, loadDefaultWalls, performSearch]);
 
   useEffect(() => {
-    // Check user
     auth.getUser().then(setUser);
     const { data: { subscription } } = auth.onAuthStateChange(setUser);
-
-    // Chargement initial
     loadDefaultWalls();
-
     return () => subscription.unsubscribe();
   }, [loadDefaultWalls]);
 
   const handleCreateNew = () => {
-    navigate('/builder');
+    if (onResetState) {
+        onResetState();
+    } else {
+        navigate('/builder');
+    }
   };
 
   const handleOpenWall = (id: string) => {
@@ -102,16 +105,25 @@ export const GalleryPage: React.FC = () => {
       
       {/* NAVBAR */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
-          <div className="text-xl font-black italic tracking-tighter text-white/20">BB3D</div>
+          <div className="flex items-center gap-2 group cursor-default">
+             <div className="text-xl font-black italic tracking-tighter text-white/40 group-hover:text-white/60 transition-colors">BetaBlock</div>
+          </div>
           <div>
             {user ? (
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <User size={16} />
-                        <span className="hidden sm:inline font-bold text-blue-400">
-                            {user.user_metadata?.display_name || user.email}
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => navigate('/profile')}
+                        className="flex items-center gap-2 p-1 pr-4 bg-gray-900/60 hover:bg-gray-800 border border-white/5 rounded-full transition-all group backdrop-blur-md"
+                    >
+                        <UserAvatar 
+                            url={user.user_metadata?.avatar_url}
+                            name={user.user_metadata?.display_name || user.email}
+                            size="sm"
+                        />
+                        <span className="hidden sm:inline-block font-bold text-gray-300 group-hover:text-white truncate max-w-[150px]">
+                            {user.user_metadata?.display_name || user.email?.split('@')[0]}
                         </span>
-                    </div>
+                    </button>
                     <button onClick={handleSignOut} className="p-2 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-400 rounded-lg transition-colors" title="Se déconnecter">
                         <LogOut size={18} />
                     </button>
@@ -221,6 +233,7 @@ export const GalleryPage: React.FC = () => {
                             createdAt={wall.created_at} 
                             thumbnail={wall.data?.metadata?.thumbnail} 
                             authorName={wall.data?.metadata?.authorName}
+                            authorAvatarUrl={wall.data?.metadata?.authorAvatarUrl}
                             onClick={() => handleOpenWall(wall.id)}
                         />
                     </div>

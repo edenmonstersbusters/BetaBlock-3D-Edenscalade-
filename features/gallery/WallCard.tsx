@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { Clock, Box, PlayCircle, User } from 'lucide-react';
+import { Clock, Box, PlayCircle } from 'lucide-react';
+import { UserAvatar } from '../../components/ui/UserAvatar';
 
 interface WallCardProps {
   id: string;
@@ -8,10 +9,11 @@ interface WallCardProps {
   createdAt: string;
   thumbnail?: string; // Base64 thumbnail string
   authorName?: string; // Nom de l'auteur
+  authorAvatarUrl?: string; // URL Avatar
   onClick: () => void;
 }
 
-export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbnail, authorName, onClick }) => {
+export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbnail, authorName, authorAvatarUrl, onClick }) => {
   // Génération d'un dégradé déterministe (fallback)
   const gradientStyle = useMemo(() => {
     const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -60,12 +62,16 @@ export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbna
 
       {/* Content Area */}
       <div className="p-4">
-        <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-1">{name || "Mur Sans Nom"}</h3>
+        <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-2">{name || "Mur Sans Nom"}</h3>
         
-        <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
-            <div className="flex items-center gap-1.5 font-medium text-gray-400">
-                <User size={12} />
-                <span className="truncate max-w-[100px]">{authorName || "Anonyme"}</span>
+        <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center gap-2 font-medium text-gray-300">
+                <UserAvatar 
+                    url={authorAvatarUrl} 
+                    name={authorName || "Anonyme"} 
+                    size="xs" 
+                />
+                <span className="truncate max-w-[100px] block">{authorName || "Anonyme"}</span>
             </div>
             <div className="flex items-center gap-1 font-mono">
                 <Clock size={12} />

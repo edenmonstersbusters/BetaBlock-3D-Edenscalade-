@@ -3,19 +3,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../../core/api';
 import { auth } from '../../../core/auth';
 import { Comment } from '../../../types';
-import { MessageCircle, Heart, Reply, Send, Loader2, User, CornerDownRight } from 'lucide-react';
-
-interface SocialFeedProps {
-  wallId: string;
-  onRequestAuth: () => void;
-}
+import { MessageCircle, Heart, Reply, Send, Loader2, CornerDownRight } from 'lucide-react';
+import { UserAvatar } from '../../../components/ui/UserAvatar';
+import { ActionWarning } from '../../../components/ui/ActionWarning';
 
 // Composant récursif pour un commentaire et ses réponses
 const CommentItem: React.FC<{ 
     comment: Comment; 
     depth: number; 
     onReply: (id: string, author: string) => void;
-    onLike: (id: string) => void;
+    onLike: (id: string, authorId: string, e: React.MouseEvent) => void;
 }> = ({ comment, depth, onReply, onLike }) => {
     
     // Limite de profondeur pour l'UI (pour éviter d'écraser le layout)
@@ -30,9 +27,11 @@ const CommentItem: React.FC<{
             
             <div className="flex gap-3">
                 <div className="flex-shrink-0 mt-1">
-                    <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-400">
-                        {comment.author_name.charAt(0).toUpperCase()}
-                    </div>
+                    <UserAvatar 
+                        name={comment.author_name} 
+                        url={comment.author_avatar_url}
+                        size="sm"
+                    />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between">
@@ -43,7 +42,7 @@ const CommentItem: React.FC<{
                     
                     <div className="flex items-center gap-4 mt-2">
                         <button 
-                            onClick={() => onLike(comment.id)}
+                            onClick={(e) => onLike(comment.id, comment.user_id, e)}
                             className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${comment.user_has_liked ? 'text-red-400' : 'text-gray-600 hover:text-gray-400'}`}
                         >
                             <Heart size={12} fill={comment.user_has_liked ? "currentColor" : "none"} />
@@ -79,6 +78,12 @@ const CommentItem: React.FC<{
     );
 };
 
+// Define SocialFeedProps interface
+interface SocialFeedProps {
+  wallId: string;
+  onRequestAuth: () => void;
+}
+
 export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,9 +91,9 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
 
   const fetchComments = async () => {
-    // On passe l'ID utilisateur pour savoir s'il a liké
     const user = await auth.getUser();
     setCurrentUser(user);
     const data = await api.getComments(wallId, user?.id);
@@ -100,12 +105,9 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
     fetchComments();
   }, [wallId]);
 
-  // Transformation de la liste plate en arbre
   const commentTree = useMemo(() => {
     const map = new Map<string, Comment>();
     const roots: Comment[] = [];
-
-    // Clone pour éviter la mutation de l'état direct
     const rawComments = JSON.parse(JSON.stringify(comments));
 
     rawComments.forEach((c: Comment) => {
@@ -121,7 +123,7 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
         }
     });
 
-    return roots.reverse(); // Les plus récents en premier (si trié par date) ou l'inverse selon préférence
+    return roots.reverse();
   }, [comments]);
 
   const handlePost = async () => {
@@ -133,8 +135,9 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
 
       setIsPosting(true);
       const authorName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || "Anonyme";
+      const avatarUrl = currentUser.user_metadata?.avatar_url;
       
-      await api.postComment(wallId, currentUser.id, authorName, inputText, replyTo?.id || null);
+      await api.postComment(wallId, currentUser.id, authorName, inputText, replyTo?.id || null, avatarUrl);
       
       setInputText('');
       setReplyTo(null);
@@ -142,11 +145,22 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
       setIsPosting(false);
   };
 
-  const handleLike = async (commentId: string) => {
+  const handleLike = async (commentId: string, authorId: string, e: React.MouseEvent) => {
       if (!currentUser) {
           onRequestAuth();
           return;
       }
+
+      // Bloquer si c'est l'auteur du commentaire
+      if (currentUser.id === authorId) {
+          setWarning({ 
+              x: e.clientX, 
+              y: e.clientY, 
+              message: "Vous ne pouvez pas liker votre commentaire !" 
+          });
+          return;
+      }
+
       // Optimistic update
       setComments(prev => prev.map(c => {
           if (c.id === commentId) {
@@ -161,13 +175,21 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
       }));
 
       await api.toggleCommentLike(commentId, currentUser.id);
-      // Re-fetch en background pour consistance
       const data = await api.getComments(wallId, currentUser.id);
       setComments(data);
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+        {warning && (
+            <ActionWarning 
+                x={warning.x} 
+                y={warning.y} 
+                message={warning.message} 
+                onClose={() => setWarning(null)} 
+            />
+        )}
+
         {/* Zone de saisie */}
         <div className="p-3 bg-gray-800/50 rounded-xl mb-4 border border-gray-700">
             {replyTo && (

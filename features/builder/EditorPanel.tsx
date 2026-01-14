@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { WallConfig, WallSegment, PlacedHold } from '../../types';
 import { Plus, ArrowRight, Maximize, Home } from 'lucide-react';
@@ -84,9 +85,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, onUpdat
              <button onClick={onHome} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 transition-colors" title="Retour à la Galerie">
                 <Home size={20} />
              </button>
-             <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">BetaBlock</h1>
-                <p className="text-[10px] text-gray-500">Configuration</p>
+             <div className="flex items-center gap-2">
+                <div>
+                   <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">BetaBlock</h1>
+                   <p className="text-[10px] text-gray-500">Configuration</p>
+                </div>
              </div>
         </div>
       </div>
