@@ -1,17 +1,7 @@
 
 import React from 'react';
 import { AlertTriangle, Info, Loader2, Cloud, Download, Check, Save, Copy, Edit3, LogOut, Share2, Mail, MessageSquare, Twitter, Facebook, X } from 'lucide-react';
-
-export interface ModalConfig {
-  title: string;
-  message: string;
-  onConfirm?: () => void;
-  confirmText?: string;
-  isAlert?: boolean;
-  isSaveDialog?: boolean;
-  isExitDialog?: boolean;
-  isShareViewerDialog?: boolean;
-}
+import { ModalConfig } from '../../types';
 
 interface GlobalModalProps {
   config: ModalConfig | null;

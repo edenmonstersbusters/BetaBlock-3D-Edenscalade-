@@ -114,3 +114,24 @@ export interface SocialCounts {
   likes: number;
   comments: number;
 }
+
+export interface ModalConfig {
+  title: string;
+  message: string;
+  onConfirm?: () => void;
+  confirmText?: string;
+  isAlert?: boolean;
+  isSaveDialog?: boolean;
+  isExitDialog?: boolean;
+  isShareViewerDialog?: boolean;
+}
+
+export interface ContextMenuData {
+  type: 'HOLD' | 'SEGMENT';
+  id: string;
+  x: number;
+  y: number;
+  wallX?: number;
+  wallY?: number;
+  subMenu?: 'COLOR';
+}

@@ -1,22 +1,13 @@
 
 import React from 'react';
 import { ArrowLeft, Copy, RotateCw, RotateCcw, Palette, Trash2, ClipboardPaste, ChevronRight, MoveUp, MoveDown } from 'lucide-react';
+import { ContextMenuData } from '../../types';
 
 // Palette de couleurs (répliquée ici pour l'affichage)
 const PALETTE = [
     '#990000', '#004400', '#002266', '#aa4400', '#ccaa00',
     '#440066', '#882244', '#444444', '#f8f8f8', '#111111'
 ];
-
-export interface ContextMenuData {
-  type: 'HOLD' | 'SEGMENT';
-  id: string;
-  x: number;
-  y: number;
-  wallX?: number;
-  wallY?: number;
-  subMenu?: 'COLOR';
-}
 
 interface ContextMenuProps {
   data: ContextMenuData | null;
