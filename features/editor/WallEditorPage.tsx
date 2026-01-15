@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -132,13 +131,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                   />
                 ) : (
                   <div 
-                    className="flex items-center gap-2 cursor-pointer group"
+                    className="relative flex items-center justify-center cursor-pointer group px-5"
                     onClick={() => state.setIsEditingName(true)}
                   >
                     <h1 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-[400px] text-center" title={metadata.name}>
                         {metadata.name || "Mur Sans Nom"}
                     </h1>
-                    <Edit2 size={12} className="text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Edit2 size={12} className="absolute -right-1 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 )}
                 <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
