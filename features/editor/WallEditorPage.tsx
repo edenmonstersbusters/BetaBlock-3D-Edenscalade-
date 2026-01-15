@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Core & Utils
@@ -20,7 +20,7 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay';
 import { GlobalModal } from '../../components/ui/GlobalModal';
 import { ContextMenu } from '../../components/ui/ContextMenu';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { Undo2, Redo2, Save, Globe, ArrowLeft } from 'lucide-react';
+import { Undo2, Redo2, Save, Globe, ArrowLeft, Edit2 } from 'lucide-react';
 
 // Types
 import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../../types';
@@ -92,6 +92,19 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  // Fermer le menu contextuel si on clique ailleurs
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (state.contextMenu) state.setContextMenu(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    window.addEventListener('contextmenu', handleGlobalClick);
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+      window.removeEventListener('contextmenu', handleGlobalClick);
+    };
+  }, [state.contextMenu]);
+
   return (
     <div className="flex flex-col h-screen w-screen bg-black overflow-hidden font-sans">
       <LoadingOverlay isVisible={isLoadingCloud} />
@@ -108,9 +121,26 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 </button>
             </div>
             <div className="flex flex-col items-center justify-center min-w-0 px-4">
-                <h1 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-[400px] text-center" title={metadata.name}>
-                    {metadata.name || "Mur Sans Nom"}
-                </h1>
+                {state.isEditingName ? (
+                  <input 
+                    autoFocus
+                    className="bg-gray-800 text-white text-sm font-bold border-b border-blue-500 outline-none px-2 py-1 text-center"
+                    value={metadata.name}
+                    onChange={(e) => setMetadata(prev => ({ ...prev, name: e.target.value }))}
+                    onBlur={() => state.setIsEditingName(false)}
+                    onKeyDown={(e) => e.key === 'Enter' && state.setIsEditingName(false)}
+                  />
+                ) : (
+                  <div 
+                    className="flex items-center gap-2 cursor-pointer group"
+                    onClick={() => state.setIsEditingName(true)}
+                  >
+                    <h1 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-[400px] text-center" title={metadata.name}>
+                        {metadata.name || "Mur Sans Nom"}
+                    </h1>
+                    <Edit2 size={12} className="text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
                 <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
                     {mode === 'BUILD' ? 'Mode Structure' : 'Mode Ouverture'}
                 </span>

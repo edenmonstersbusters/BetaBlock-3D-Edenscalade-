@@ -18,6 +18,8 @@ interface HoldModelProps {
   isDragging?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
+  // Fix: Add missing onPointerUp to support interaction logic in Scene.tsx
+  onPointerUp?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
@@ -39,6 +41,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   isDragging = false,
   onClick,
   onPointerDown,
+  // Fix: Destructure onPointerUp from props
+  onPointerUp,
   onPointerOver,
   onPointerOut,
   onContextMenu
@@ -99,6 +103,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
       position={position} rotation={rotation} 
       scale={[scale[0] * baseScale, scale[1] * baseScale, scale[2] * baseScale]}
       onPointerDown={preview ? undefined : onPointerDown}
+      // Fix: Add onPointerUp event handler to the Three.js group
+      onPointerUp={preview ? undefined : onPointerUp}
       onPointerOver={preview ? undefined : onPointerOver}
       onPointerOut={preview ? undefined : onPointerOut}
       onClick={preview ? undefined : onClick}

@@ -37,6 +37,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         className="fixed z-[150] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-150" 
         style={{ top: Math.min(data.y, window.innerHeight - 300), left: Math.min(data.x, window.innerWidth - 240) }} 
         onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
     >
         {data.type === 'HOLD' ? (
         <>
@@ -44,13 +45,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 <div className="p-3">
                     <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
                         <span className="text-xs font-bold text-gray-400 uppercase">Choisir une couleur</span>
-                        <button onClick={() => onUpdateData({ ...data, subMenu: undefined })} className="text-gray-500 hover:text-white"><ArrowLeft size={16}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateData({ ...data, subMenu: undefined }); }} className="text-gray-500 hover:text-white"><ArrowLeft size={16}/></button>
                     </div>
                     <div className="grid grid-cols-5 gap-2">
                         {PALETTE.map(c => (
                             <button
                                 key={c}
-                                onClick={() => { onColorHold(data.id, c); onClose(); }}
+                                onClick={(e) => { e.stopPropagation(); onColorHold(data.id, c); onClose(); }}
                                 className="w-8 h-8 rounded-full border border-white/20 hover:scale-110 hover:border-white transition-all shadow-sm"
                                 style={{ backgroundColor: c }}
                             />
@@ -60,16 +61,16 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             ) : (
                 <>
                     <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Prise</div>
-                    <button onClick={() => { onCopyHold(); onClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Copy size={16} className="text-blue-400" /> Copier <span className="ml-auto text-[10px] text-gray-500">Ctrl+C</span></button>
+                    <button onClick={(e) => { e.stopPropagation(); onCopyHold(); onClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Copy size={16} className="text-blue-400" /> Copier <span className="ml-auto text-[10px] text-gray-500">Ctrl+C</span></button>
                     
-                    <button onClick={() => { onRotateHold(data.id, 90); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
+                    <button onClick={(e) => { e.stopPropagation(); onRotateHold(data.id, 90); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCw size={16} className="text-emerald-400" /> Rotation +90°</button>
                     
-                    <button onClick={() => { onRotateHold(data.id, -90); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCcw size={16} className="text-red-400" /> Rotation -90°</button>
+                    <button onClick={(e) => { e.stopPropagation(); onRotateHold(data.id, -90); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><RotateCcw size={16} className="text-red-400" /> Rotation -90°</button>
 
-                    <button onClick={() => onUpdateData({ ...data, subMenu: 'COLOR' })} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Modifier couleur</button>
+                    <button onClick={(e) => { e.stopPropagation(); onUpdateData({ ...data, subMenu: 'COLOR' }); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><Palette size={16} className="text-orange-400" /> Modifier couleur</button>
                     
                     <div className="h-px bg-white/5 my-1" />
-                    <button onClick={() => { onDelete(data.id, 'HOLD'); onClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(data.id, 'HOLD'); onClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer</button>
                 </>
             )}
         </>
@@ -77,7 +78,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         <>
             <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">Actions Pan</div>
             {hasClipboard && (
-                <button onClick={() => { 
+                <button onClick={(e) => { 
+                    e.stopPropagation();
                     if (data.wallX !== undefined && data.wallY !== undefined) {
                         onPasteHold({ x: data.wallX, y: data.wallY, segmentId: data.id });
                     } else {
@@ -86,12 +88,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                     onClose(); 
                 }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-500/10 text-sm text-emerald-400 font-bold"><ClipboardPaste size={16} /> Coller ici <span className="ml-auto text-[10px] text-gray-500">Ctrl+V</span></button>
             )}
-            <button onClick={() => onSegmentUpdate(data.id, { angle: 10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-orange-400"/> Dévers +10°</span><ChevronRight size={14} className="text-gray-600"/></button>
-            <button onClick={() => onSegmentUpdate(data.id, { angle: -10 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-blue-400"/> Dévers -10°</span><ChevronRight size={14} className="text-gray-600"/></button>
-            <button onClick={() => onSegmentUpdate(data.id, { height: 0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveUp size={16} className="text-emerald-400"/> Hauteur +0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
-            <button onClick={() => onSegmentUpdate(data.id, { height: -0.5 })} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveDown size={16} className="text-red-400"/> Hauteur -0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
+            <button onClick={(e) => { e.stopPropagation(); onSegmentUpdate(data.id, { angle: 10 }); }} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-orange-400"/> Dévers +10°</span><ChevronRight size={14} className="text-gray-600"/></button>
+            <button onClick={(e) => { e.stopPropagation(); onSegmentUpdate(data.id, { angle: -10 }); }} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><RotateCw size={16} className="text-blue-400"/> Dévers -10°</span><ChevronRight size={14} className="text-gray-600"/></button>
+            <button onClick={(e) => { e.stopPropagation(); onSegmentUpdate(data.id, { height: 0.5 }); }} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveUp size={16} className="text-emerald-400"/> Hauteur +0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
+            <button onClick={(e) => { e.stopPropagation(); onSegmentUpdate(data.id, { height: -0.5 }); }} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200"><span className="flex items-center gap-3"><MoveDown size={16} className="text-red-400"/> Hauteur -0.5m</span><ChevronRight size={14} className="text-gray-600"/></button>
             <div className="h-px bg-white/5 my-1" />
-            <button onClick={() => { onDelete(data.id, 'SEGMENT'); onClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer le pan</button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(data.id, 'SEGMENT'); onClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/20 text-sm text-red-400"><Trash2 size={16} /> Supprimer le pan</button>
         </>
         )}
     </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, Suspense, useEffect, useRef } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
@@ -90,63 +91,63 @@ export const Scene: React.FC<SceneProps> = ({
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (draggingId) return;
-    if (e.button === 0 || e.button === 2) {
-      pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
-    }
+    pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
   };
 
   const handlePointerUp = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
     if (!pointerDownScreenPos.current) return;
-    if (draggingId) return;
-    if (mode !== 'SET') return;
-    if (e.button !== 0) return;
-
+    
     const dx = e.clientX - pointerDownScreenPos.current.x;
     const dy = e.clientY - pointerDownScreenPos.current.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
+    // Si on a bougé (drag), on ne fait rien
     if (dist > 5) {
       pointerDownScreenPos.current = null;
       return;
     }
 
-    if (selectedPlacedHoldIds.length > 0) {
+    // Gestion CLIC DROIT (Menu contextuel sur le mur)
+    if (e.button === 2) {
       e.stopPropagation();
-      onSelectPlacedHold(null);
-    } else if (selectedHoldDef) {
-      e.stopPropagation();
-      const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
-      onPlaceHold(e.point.clone(), normal, segmentId);
+      const coords = calculateLocalCoords(e.point, segmentId, config);
+      onContextMenu('SEGMENT', segmentId, e.clientX, e.clientY, coords?.x, coords?.y);
+      pointerDownScreenPos.current = null;
+      return;
+    }
+
+    // Gestion CLIC GAUCHE (Placement ou désélection)
+    if (e.button === 0) {
+      if (draggingId) return;
+      if (mode !== 'SET') return;
+
+      if (selectedPlacedHoldIds.length > 0) {
+        e.stopPropagation();
+        onSelectPlacedHold(null);
+      } else if (selectedHoldDef) {
+        e.stopPropagation();
+        const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
+        onPlaceHold(e.point.clone(), normal, segmentId);
+      }
     }
     pointerDownScreenPos.current = null;
   };
 
-  const handleWallContextMenu = (e: ThreeEvent<MouseEvent>, segmentId: string) => {
-    e.nativeEvent.preventDefault();
-    if (!pointerDownScreenPos.current) return;
-
-    const dx = e.clientX - pointerDownScreenPos.current.x;
-    const dy = e.clientY - pointerDownScreenPos.current.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    pointerDownScreenPos.current = null;
-
-    if (dist > 5) return;
-
-    e.stopPropagation();
-    const coords = calculateLocalCoords(e.point, segmentId, config);
-    onContextMenu('SEGMENT', segmentId, e.nativeEvent.clientX, e.nativeEvent.clientY, coords?.x, coords?.y);
+  // On désactive le menu par défaut du navigateur
+  const preventDefaultContextMenu = (e: any) => {
+    e.preventDefault();
   };
 
   return (
     <Canvas 
       shadows 
-      // preserveDrawingBuffer is essential for toDataURL() to work
       gl={{ preserveDrawingBuffer: true }}
       camera={{ position: [8, 5, 12], fov: 40 }}
       onPointerLeave={() => {
         onWallPointerUpdate?.(null);
         setHoveredHoldId(null);
       }}
+      onContextMenu={preventDefaultContextMenu}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -186,7 +187,6 @@ export const Scene: React.FC<SceneProps> = ({
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
-          onContextMenu={handleWallContextMenu}
         />
         
         <Suspense fallback={null}>
@@ -212,11 +212,9 @@ export const Scene: React.FC<SceneProps> = ({
                     }}
                     onPointerDown={(e) => {
                       pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
-
                       if (e.button === 0) {
                         e.stopPropagation();
                         if (orbitRef.current) orbitRef.current.enabled = false;
-
                         const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
                         if (mode === 'SET' && !isMultiSelect) {
                            onSelectPlacedHold(hold.id, false);
@@ -226,16 +224,19 @@ export const Scene: React.FC<SceneProps> = ({
                         }
                       }
                     }}
-                    onContextMenu={(e) => {
-                      e.nativeEvent.preventDefault();
+                    onPointerUp={(e) => {
                       if (!pointerDownScreenPos.current) return;
                       const dx = e.clientX - pointerDownScreenPos.current.x;
                       const dy = e.clientY - pointerDownScreenPos.current.y;
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       pointerDownScreenPos.current = null;
+                      
                       if (dist > 5) return;
-                      e.stopPropagation();
-                      onContextMenu('HOLD', hold.id, e.nativeEvent.clientX, e.nativeEvent.clientY);
+                      
+                      if (e.button === 2) {
+                        e.stopPropagation();
+                        onContextMenu('HOLD', hold.id, e.clientX, e.clientY);
+                      }
                     }}
                 />
             ))}

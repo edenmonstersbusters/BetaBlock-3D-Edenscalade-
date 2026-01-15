@@ -13,6 +13,7 @@ export const useEditorState = () => {
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
+  const [isEditingName, setIsEditingName] = useState(false);
 
   // Helpers pour la sélection
   const handleSelectPlacedHold = (id: string | null, multi: boolean = false) => {
@@ -38,6 +39,7 @@ export const useEditorState = () => {
     contextMenu, setContextMenu,
     showAuthModal, setShowAuthModal,
     clipboard, setClipboard,
+    isEditingName, setIsEditingName,
 
     // Actions
     handleSelectPlacedHold
