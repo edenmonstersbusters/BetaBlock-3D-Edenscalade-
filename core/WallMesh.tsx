@@ -91,6 +91,9 @@ const WallPanel: React.FC<WallPanelProps> = ({
 
   const heightLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(heightLinePoints), [heightLinePoints]);
 
+  // Fix: Create memoized THREE.Line object to use with primitive tag
+  const heightLineObject = useMemo(() => new THREE.Line(heightLineGeometry), [heightLineGeometry]);
+
   return (
     <group position={[0, baseY, baseZ]}>
       <mesh 
@@ -108,9 +111,11 @@ const WallPanel: React.FC<WallPanelProps> = ({
       </mesh>
 
       {/* DIMENSIONS DE HAUTEUR DU PAN */}
-      <line geometry={heightLineGeometry}>
+      {/* Fix: Use primitive to mount THREE.Line and avoid conflict with SVG 'line' tag in JSX */}
+      <primitive object={heightLineObject}>
         <lineBasicMaterial attach="material" color="#ffffff" opacity={0.3} transparent />
-      </line>
+      </primitive>
+      
       {/* Arrêts de ligne */}
       <mesh position={[width / 2 + 0.1, 0, 0.01]}>
         <boxGeometry args={[0.05, 0.005, 0.005]} />
@@ -213,12 +218,17 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
   ], [config.width]);
   const widthLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(widthLinePoints), [widthLinePoints]);
 
+  // Fix: Create memoized THREE.Line object to use with primitive tag
+  const widthLineObject = useMemo(() => new THREE.Line(widthLineGeometry), [widthLineGeometry]);
+
   return (
     <group name="wall-group">
       {/* DIMENSION DE LARGEUR GLOBALE */}
-      <line geometry={widthLineGeometry}>
+      {/* Fix: Use primitive to mount THREE.Line and avoid conflict with SVG 'line' tag in JSX */}
+      <primitive object={widthLineObject}>
         <lineBasicMaterial attach="material" color="#3b82f6" opacity={0.6} transparent />
-      </line>
+      </primitive>
+      
       <DimensionLabel 
         label="Largeur"
         value={config.width} 

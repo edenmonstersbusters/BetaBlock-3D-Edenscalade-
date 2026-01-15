@@ -84,15 +84,52 @@ export const useEditorLogic = ({
     setHolds(prev => [...prev, newHold]);
   };
 
-  const removeHoldsAction = useCallback((ids: string[]) => {
+  const removeHoldsAction = useCallback((ids: string[], askConfirm: boolean = false) => {
     if (ids.length === 0 || mode === 'VIEW') return;
     if (metadata.remixMode === 'structure') return;
     
-    saveToHistory();
-    const idSet = new Set(ids);
-    setHolds(prev => prev.filter(h => !idSet.has(h.id)));
-    state.setSelectedPlacedHoldIds((prev: string[]) => prev.filter(id => !idSet.has(id)));
+    const executeDelete = () => {
+        saveToHistory();
+        const idSet = new Set(ids);
+        setHolds(prev => prev.filter(h => !idSet.has(h.id)));
+        state.setSelectedPlacedHoldIds((prev: string[]) => prev.filter(id => !idSet.has(id)));
+    };
+
+    if (askConfirm) {
+        state.setModal({
+            title: "Supprimer",
+            message: ids.length > 1 ? `Voulez-vous supprimer ces ${ids.length} prises ?` : "Voulez-vous supprimer cette prise ?",
+            confirmText: "Supprimer",
+            onConfirm: executeDelete
+        });
+    } else {
+        executeDelete();
+    }
   }, [saveToHistory, mode, setHolds, metadata.remixMode, state]);
+
+  const removeSegmentAction = useCallback((id: string) => {
+    if (mode === 'VIEW' || metadata.remixMode === 'holds') return;
+    
+    const segmentHolds = holds.filter(h => h.segmentId === id);
+    const message = segmentHolds.length > 0 
+      ? `Ce pan contient ${segmentHolds.length} prise(s). Elles seront définitivement supprimées. Confirmer la suppression ?`
+      : "Voulez-vous vraiment supprimer ce pan de mur ?";
+      
+    state.setModal({
+      title: "Supprimer le pan",
+      message,
+      confirmText: "Supprimer",
+      onConfirm: () => {
+        saveToHistory();
+        setConfig(prev => ({
+          ...prev,
+          segments: prev.segments.filter((s) => s.id !== id),
+        }));
+        // Supprimer aussi les prises sur ce segment
+        setHolds(prev => prev.filter(h => h.segmentId !== id));
+      }
+    });
+  }, [mode, metadata.remixMode, holds, state, saveToHistory, setConfig, setHolds]);
 
   const updateSegmentQuickly = (id: string, updates: Partial<WallSegment>) => {
       if(mode === 'VIEW') return;
@@ -184,6 +221,6 @@ export const useEditorLogic = ({
   return {
     globalFileInputRef,
     performUndo, performRedo, saveToHistory,
-    handlePlaceHold, removeHoldsAction, updateSegmentQuickly, handleAction
+    handlePlaceHold, removeHoldsAction, removeSegmentAction, updateSegmentQuickly, handleAction
   };
 };

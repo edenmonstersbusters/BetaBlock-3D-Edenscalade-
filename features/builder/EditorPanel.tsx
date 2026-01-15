@@ -17,9 +17,13 @@ interface EditorPanelProps {
   onImport: (file: File) => void;
   onNew: () => void;
   onHome: () => void;
+  onRemoveSegment: (id: string) => void;
 }
 
-export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, metadata, onUpdate, onNext, showModal, onActionStart, onExport, onImport, onNew, onHome }) => {
+export const EditorPanel: React.FC<EditorPanelProps> = ({ 
+    config, holds, metadata, onUpdate, onNext, showModal, onActionStart, 
+    onExport, onImport, onNew, onHome, onRemoveSegment 
+}) => {
   const isStructureLocked = metadata.remixMode === 'holds';
 
   const addSegment = () => {
@@ -33,27 +37,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, metadat
     onUpdate({
       ...config,
       segments: [...config.segments, newSegment],
-    });
-  };
-
-  const removeSegment = (id: string) => {
-    if (isStructureLocked) return;
-    const segmentHolds = holds.filter(h => h.segmentId === id);
-    const message = segmentHolds.length > 0 
-      ? `Ce pan contient ${segmentHolds.length} prise(s). Elles seront supprimées. Confirmer la suppression ?`
-      : "Voulez-vous vraiment supprimer ce pan de mur ?";
-      
-    showModal({
-      title: "Supprimer le pan",
-      message,
-      confirmText: "Supprimer",
-      onConfirm: () => {
-        onActionStart();
-        onUpdate({
-          ...config,
-          segments: config.segments.filter((s) => s.id !== id),
-        });
-      }
     });
   };
 
@@ -135,12 +118,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ config, holds, metadat
             <SegmentManager 
                 segments={config.segments}
                 onUpdateSegment={updateSegment}
-                onRemoveSegment={removeSegment}
+                onRemoveSegment={onRemoveSegment}
                 onActionStart={onActionStart}
             />
         </div>
 
-        {/* Note: FileControls could be kept for local import/export if needed, but primary actions are now in TopBar */}
         <FileControls onExport={onExport} onImport={onImport} onNew={onNew} />
       </div>
 

@@ -141,6 +141,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')}
                 onImport={() => logic.globalFileInputRef.current?.click()} onNew={onNewWall}
                 onHome={() => logic.handleAction('exit')}
+                onRemoveSegment={logic.removeSegmentAction}
             />
         ) : (
             <RouteEditorPanel 
@@ -148,7 +149,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold}
                 metadata={metadata}
                 holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
-                placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id])} 
+                placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} 
                 onRemoveAllHolds={onRemoveAllHolds || (() => {})} 
                 onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
                 selectedPlacedHoldIds={state.selectedPlacedHoldIds}
@@ -163,7 +164,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                     if (metadata.remixMode === 'structure') return;
                     logic.saveToHistory(); const idSet = new Set(ids); setHolds(prev => prev.map(h => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); 
                 }}
-                onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds)}
+                onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)}
                 onExport={() => logic.handleAction('save')}
                 onImport={() => logic.globalFileInputRef.current?.click()} onNew={onNewWall}
                 onHome={() => logic.handleAction('exit')}
@@ -205,16 +206,14 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         }} 
         hasClipboard={state.clipboard.length > 0}
         onPasteHold={(target) => {
-             // Si target est fourni (collage via menu contextuel sur un pan spécifique), on l'utilise
-             // Sinon, le hook useEditorLogic gère le collage standard au centre ou décalé
-             // Note: Ici on simplifie en appelant une fonction fictive car useEditorLogic gère le shortcut, 
-             // mais pour le menu contextuel il faudrait exposer handlePaste specifique.
-             // Pour l'instant on garde le comportement par défaut ou on améliorera ça.
+             // standard paste handled by logic shortcuts, context menu paste could be added if needed
         }} 
         onDelete={(id, type) => { 
-            if (type === 'HOLD' && metadata.remixMode === 'structure') return;
-            if (type === 'SEGMENT' && metadata.remixMode === 'holds') return;
-            logic.removeHoldsAction([id]); 
+            if (type === 'HOLD') {
+              logic.removeHoldsAction([id], true); 
+            } else {
+              logic.removeSegmentAction(id);
+            }
         }}
         onRotateHold={(id, delta) => { 
             if (metadata.remixMode === 'structure') return;
