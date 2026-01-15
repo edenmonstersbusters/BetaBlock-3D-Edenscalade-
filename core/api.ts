@@ -4,12 +4,20 @@ import { BetaBlockFile, Comment, UserProfile } from '../types';
 
 const handleNetworkError = (err: any) => {
   console.error("Supabase Request Error:", err);
+  
+  // Code d'erreur Postgres pour violation de contrainte de clé étrangère
+  if (err.code === '23503') {
+    return "Suppression impossible : ce mur possède des dépendances (likes/commentaires). Activez 'ON DELETE CASCADE' sur vos tables Supabase.";
+  }
+  
   if (err.message === 'Failed to fetch') {
     return "Erreur Réseau : Impossible de joindre Supabase.";
   }
+  
   if (err.code === '42501' || err.message?.includes('new row violates row-level security')) {
-    return "Action interdite.";
+    return "Action interdite : vous n'avez pas les droits de modification/suppression sur ce mur.";
   }
+  
   return err.message || "Une erreur inconnue est survenue.";
 };
 
@@ -65,10 +73,8 @@ export const api = {
     }
   },
 
-  // Nouvelle fonction pour basculer la visibilité sans tout recharger
   async toggleWallVisibility(id: string, isPublic: boolean): Promise<{ error: string | null }> {
       try {
-          // 1. On récupère les données actuelles pour mettre à jour le JSON interne aussi
           const { data: current, error: fetchError } = await supabase.from('walls').select('data').eq('id', id).single();
           if (fetchError || !current) throw fetchError || new Error("Mur introuvable");
 
@@ -80,7 +86,6 @@ export const api = {
               }
           };
 
-          // 2. Mise à jour de la colonne SQL ET du champ JSON
           const { error } = await supabase
               .from('walls')
               .update({ 
@@ -98,8 +103,20 @@ export const api = {
 
   async deleteWall(id: string): Promise<{ error: string | null }> {
     try {
-      const { error } = await supabase.from('walls').delete().eq('id', id);
+      // Utilisation de .select() pour s'assurer que Supabase renvoie la donnée supprimée.
+      // Si RLS bloque, data sera vide même si Supabase ne renvoie pas d'erreur explicite.
+      const { data, error } = await supabase
+        .from('walls')
+        .delete()
+        .eq('id', id)
+        .select();
+
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error("Le mur n'a pas été supprimé. Cela arrive souvent si vos politiques RLS (DELETE) ne sont pas configurées ou si vous n'êtes pas le propriétaire.");
+      }
+
       return { error: null };
     } catch (err: any) {
       return { error: handleNetworkError(err) };
@@ -116,13 +133,12 @@ export const api = {
     }
   },
 
-  // Récupère uniquement les murs PUBLICS pour la galerie
   async getWallsList(userId?: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       let query = supabase
         .from('walls')
         .select('id, name, created_at, data')
-        .eq('is_public', true); // Filtre Hub
+        .eq('is_public', true);
 
       if (userId) {
         query = query.eq('data->metadata->>authorId', userId);
@@ -139,7 +155,6 @@ export const api = {
     }
   },
 
-  // Récupère TOUS les murs d'un utilisateur (Projets)
   async getUserProjects(userId: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const { data, error } = await supabase
