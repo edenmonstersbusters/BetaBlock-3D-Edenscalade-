@@ -127,12 +127,31 @@ const WallEditor = ({
       setConfig((prev: any) => ({ ...prev, segments: prev.segments.map((s: any) => s.id === id ? { ...s, height: Math.max(0.5, newHeight), angle: Math.min(85, Math.max(-15, newAngle)) } : s) }));
   };
 
-  const handleAction = (type: 'save' | 'publish') => {
+  const handleAction = (type: 'save' | 'publish' | 'exit' | 'share') => {
+      if (type === 'exit') {
+        setModal({
+          title: "Quitter l'éditeur ?",
+          message: "Toute modification non sauvegardée sera perdue. Nous vous recommandons d'enregistrer votre projet avant de partir.",
+          isExitDialog: true,
+          onConfirm: onHome
+        });
+        return;
+      }
+
+      if (type === 'share') {
+        setModal({
+          title: "Partager ce mur",
+          message: "Lien unique et options de partage.",
+          isShareViewerDialog: true
+        });
+        return;
+      }
+
       if (!user) {
           setShowAuthModal(true);
           return;
       }
-      // On met à jour l'intention dans les métadonnées juste avant l'envoi
+      
       setMetadata((prev: any) => ({ ...prev, isPublic: type === 'publish' }));
       
       setModal({ 
@@ -164,24 +183,32 @@ const WallEditor = ({
     }).filter((h: any) => h !== null)
   , [holds, config]);
 
+  const handleDownloadLocal = () => {
+    const file: BetaBlockFile = { version: APP_VERSION, metadata, config, holds };
+    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${metadata.name || 'betablock-wall'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-black overflow-hidden font-sans">
       <LoadingOverlay isVisible={isLoadingCloud} />
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       
-      {/* HEADER ACTIONS HAUTE VISIBILITÉ - DESIGN ÉQUILIBRÉ */}
       {mode !== 'VIEW' && (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative">
             
-            {/* GAUCHE: Navigation & Contexte App */}
             <div className="flex items-center gap-4 justify-start">
-                <button onClick={onHome} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2">
+                <button onClick={() => handleAction('exit')} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2">
                     <ArrowLeft size={16} />
                     <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline">BetaBlock</span>
                 </button>
             </div>
 
-            {/* CENTRE: Titre du Projet (Max Width Control) */}
             <div className="flex flex-col items-center justify-center min-w-0 px-4">
                 <h1 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-[400px] text-center" title={metadata.name}>
                     {metadata.name || "Mur Sans Nom"}
@@ -191,7 +218,6 @@ const WallEditor = ({
                 </span>
             </div>
             
-            {/* DROITE: Actions */}
             <div className="flex items-center gap-2 justify-end">
                 <button 
                     onClick={() => handleAction('save')}
@@ -216,9 +242,9 @@ const WallEditor = ({
             <ViewerPanel 
                 wallId={cloudId || ''}
                 metadata={metadata} config={config} holds={holds}
-                onHome={onHome} 
+                onHome={() => handleAction('exit')} 
                 onRemix={onRemix}
-                onShare={() => handleAction('publish')}
+                onShare={() => handleAction('share')}
             />
         ) : mode === 'BUILD' ? (
             <EditorPanel 
@@ -227,7 +253,7 @@ const WallEditor = ({
                 onNext={() => navigate('/setter')} showModal={(c) => setModal(c)}
                 onActionStart={saveToHistory} onExport={() => handleAction('save')}
                 onImport={(f:any) => globalFileInputRef.current?.click()} onNew={onNewWall}
-                onHome={onHome}
+                onHome={() => handleAction('exit')}
             />
         ) : (
             <RouteEditorPanel 
@@ -255,12 +281,11 @@ const WallEditor = ({
                 onRemoveMultiple={() => removeHoldsAction(selectedPlacedHoldIds)}
                 onExport={() => handleAction('save')}
                 onImport={(f:any) => globalFileInputRef.current?.click()} onNew={onNewWall}
-                onHome={onHome}
+                onHome={() => handleAction('exit')}
             />
         )}
 
         <div className="flex-1 relative h-full">
-            {/* UNDO/REDO flottants au centre bas */}
             {mode !== 'VIEW' && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
                     <button disabled={!canUndo} onClick={performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
@@ -298,19 +323,20 @@ const WallEditor = ({
         }}
         onRotateHold={(id:any, delta:any) => { 
             if (metadata.remixMode === 'structure') return;
-            saveToHistory(); setHolds((hds: any) => hds.map((h: any) => h.id === id ? { ...h, spin: (h.spin + delta) } : h)); 
+            saveToHistory(); setHolds((hds: any) => hds.map((h: any) => id === h.id ? { ...h, spin: h.spin + delta } : h)); 
         }}
         onColorHold={(id:any, c:any) => { 
             if (metadata.remixMode === 'structure') return;
-            saveToHistory(); setHolds((hds: any) => hds.map((h: any) => h.id === id ? { ...h, color: c } : h)); 
+            saveToHistory(); setHolds((hds: any) => hds.map((h: any) => id === h.id ? { ...h, color: c } : h)); 
         }}
         onSegmentUpdate={updateSegmentQuickly}
       />
 
       <GlobalModal 
         config={modal} onClose={() => setModal(null)} 
-        isSavingCloud={isSavingCloud} generatedLink={generatedLink} 
+        isSavingCloud={isSavingCloud} generatedLink={generatedLink || `${window.location.origin}/#/view/${cloudId}`} 
         onSaveCloud={onSaveCloud} 
+        onDownload={handleDownloadLocal}
         wallName={metadata.name}
         onWallNameChange={(name:any) => setMetadata((prev: any) => ({ ...prev, name }))}
       />
@@ -318,54 +344,26 @@ const WallEditor = ({
   );
 };
 
-function App() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
+export default function App() {
+  const [mode, setMode] = useState<AppMode>('BUILD');
+  const [config, setConfig] = useState<WallConfig>(INITIAL_CONFIG);
+  const [holds, setHolds] = useState<PlacedHold[]>([]);
+  const [metadata, setMetadata] = useState<WallMetadata>({
+    name: "Nouveau Mur",
+    timestamp: new Date().toISOString(),
+    appVersion: APP_VERSION,
+    remixMode: null
+  });
+  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+  const [isSavingCloud, setIsSavingCloud] = useState(false);
+  const [cloudId, setCloudId] = useState<string | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   
-  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
-  const [cloudId, setCloudId] = useState<string | null>(null);
   const screenshotRef = useRef<(() => Promise<string | null>) | null>(null);
-  const [isSavingCloud, setIsSavingCloud] = useState(false);
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-
-  const [metadata, setMetadata] = useState<WallMetadata>({ 
-    name: 'Mon Mur', timestamp: new Date().toISOString(), appVersion: APP_VERSION, isPublic: false
-  });
-  
-  const [config, setConfig] = useState<WallConfig>(() => INITIAL_CONFIG);
-  const [holds, setHolds] = useState<PlacedHold[]>(() => []);
-
-  const { recordAction, undo, redo, canUndo, canRedo } = useHistory<{config: WallConfig, holds: PlacedHold[]}>({ config, holds });
-
-  const handleNewWall = useCallback(() => {
-      setHolds([]);
-      setConfig(INITIAL_CONFIG);
-      setMetadata({ name: 'Mon Mur', timestamp: new Date().toISOString(), appVersion: APP_VERSION, isPublic: false });
-      setCloudId(null);
-      setGeneratedLink(null);
-      navigate('/builder');
-  }, [navigate]);
-
-  const handleRemix = useCallback((mode: 'structure' | 'holds') => {
-      const parentName = metadata.name;
-      const parentAuthor = metadata.authorName;
-      const parentId = cloudId;
-      setMetadata({
-          name: `${parentName} (Remix)`,
-          timestamp: new Date().toISOString(),
-          appVersion: APP_VERSION,
-          parentId: parentId || undefined,
-          parentName: parentName,
-          parentAuthorName: parentAuthor,
-          remixMode: mode,
-          isPublic: false
-      });
-      setCloudId(null);
-      setGeneratedLink(null);
-      navigate(mode === 'structure' ? '/builder' : '/setter');
-  }, [metadata, cloudId, navigate]);
+  const history = useHistory({ config, holds });
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     auth.getUser().then(setUser);
@@ -374,84 +372,134 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const activeId = searchParams.get('id') || (location.pathname.startsWith('/view') ? location.pathname.split('/').pop() : null);
-    if (activeId && activeId !== cloudId && activeId.length > 5) {
-      setIsLoadingCloud(true);
-      api.getWall(activeId).then(({ data }) => {
-        if (data) {
-          setConfig(data.config);
-          setHolds(data.holds);
-          setMetadata(data.metadata);
-          setCloudId(activeId);
+    const path = location.pathname;
+    if (path.startsWith('/view/')) {
+        const id = path.split('/').pop();
+        if (id) {
+            setCloudId(id);
+            setIsLoadingCloud(true);
+            api.getWall(id).then(({ data, error }) => {
+                if (data) {
+                    setConfig(data.config);
+                    setHolds(data.holds);
+                    setMetadata(data.metadata);
+                    setMode('VIEW');
+                }
+                setIsLoadingCloud(false);
+            });
         }
-        setIsLoadingCloud(false);
-      });
+    } else if (path === '/builder') {
+        setMode('BUILD');
+    } else if (path === '/setter') {
+        setMode('SET');
     }
-  }, [location.pathname, searchParams, cloudId]);
+  }, [location.pathname]);
 
-  const saveToCloud = useCallback(async () => {
+  const handleSaveCloud = async () => {
     if (!user) return;
     setIsSavingCloud(true);
-    let thumbnail: string | undefined = undefined;
-    if (screenshotRef.current) thumbnail = await screenshotRef.current() || undefined; 
+    let screenshot = null;
+    if (screenshotRef.current) {
+        screenshot = await screenshotRef.current();
+    }
     
-    const updatedMetadata = { 
-        ...metadata, 
-        timestamp: new Date().toISOString(), 
-        thumbnail, 
-        authorName: user.user_metadata?.display_name || user.email.split('@')[0] 
+    const dataToSave: BetaBlockFile = {
+      version: APP_VERSION,
+      metadata: { 
+          ...metadata, 
+          timestamp: new Date().toISOString(),
+          thumbnail: screenshot || undefined,
+          authorName: user.user_metadata?.display_name || user.email?.split('@')[0]
+      },
+      config,
+      holds
     };
-    
-    setMetadata(updatedMetadata);
-    const file: BetaBlockFile = { version: APP_VERSION, metadata: updatedMetadata, config, holds };
-    
-    const { id } = cloudId ? await api.updateWall(cloudId, file).then(() => ({ id: cloudId })) : await api.saveWall(file);
+
+    let result;
+    if (cloudId) {
+        result = await api.updateWall(cloudId, dataToSave);
+    } else {
+        const saveRes = await api.saveWall(dataToSave);
+        result = { error: saveRes.error };
+        if (saveRes.id) setCloudId(saveRes.id);
+    }
     
     setIsSavingCloud(false);
-    if (id) {
-      if (updatedMetadata.isPublic) {
-          setGeneratedLink(`${window.location.origin}/#/view/${id}`);
-      } else {
-          setGeneratedLink(null);
-          alert("Projet sauvegardé dans vos projets privés.");
-      }
-      setCloudId(id);
+    if (!result.error) {
+        setGeneratedLink(`${window.location.origin}/#/view/${cloudId}`);
     }
-  }, [config, holds, metadata, user, cloudId]);
+  };
+
+  const handleRemix = (remixMode: 'structure' | 'holds') => {
+      const newMetadata: WallMetadata = {
+          ...metadata,
+          name: `Remix de ${metadata.name}`,
+          timestamp: new Date().toISOString(),
+          parentId: cloudId || undefined,
+          parentName: metadata.name,
+          parentAuthorName: metadata.authorName,
+          remixMode: remixMode
+      };
+      setMetadata(newMetadata);
+      setCloudId(null);
+      setGeneratedLink(null);
+      navigate(remixMode === 'holds' ? '/setter' : '/builder');
+  };
+
+  const resetToNew = () => {
+    setConfig(INITIAL_CONFIG);
+    setHolds([]);
+    setMetadata({
+        name: "Nouveau Mur",
+        timestamp: new Date().toISOString(),
+        appVersion: APP_VERSION,
+        remixMode: null
+    });
+    setCloudId(null);
+    setGeneratedLink(null);
+    navigate('/builder');
+  };
 
   return (
     <Routes>
-      <Route path="/" element={<GalleryPage onResetState={handleNewWall} />} />
-      <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/profile/:userId" element={<ProfilePage />} />
+      <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/builder" element={
         <WallEditor 
-          mode="BUILD" user={user} config={config} setConfig={setConfig} holds={holds} setHolds={setHolds} metadata={metadata} setMetadata={setMetadata}
-          recordAction={recordAction} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo}
-          onSaveCloud={saveToCloud} isSavingCloud={isSavingCloud} generatedLink={generatedLink}
-          onHome={() => navigate('/')} onNewWall={handleNewWall} onRemix={handleRemix}
-          onRemoveAllHolds={() => setHolds([])}
-          onChangeAllHoldsColor={(c:any) => setHolds(h => h.map(x => ({...x, color: c})))}
-          isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
+          mode="BUILD" user={user}
+          config={config} setConfig={setConfig} 
+          holds={holds} setHolds={setHolds} 
+          metadata={metadata} setMetadata={setMetadata}
+          {...history} onSaveCloud={handleSaveCloud} isSavingCloud={isSavingCloud} 
+          generatedLink={generatedLink} onHome={() => navigate('/')} 
+          onNewWall={resetToNew} isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
       <Route path="/setter" element={
         <WallEditor 
-          mode="SET" user={user} config={config} setConfig={setConfig} holds={holds} setHolds={setHolds} metadata={metadata} setMetadata={setMetadata}
-          recordAction={recordAction} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo}
-          onSaveCloud={saveToCloud} isSavingCloud={isSavingCloud} generatedLink={generatedLink}
-          onHome={() => navigate('/')} onNewWall={handleNewWall} onRemix={handleRemix}
-          onRemoveAllHolds={() => setHolds([])}
-          onChangeAllHoldsColor={(c:any) => setHolds(h => h.map(x => ({...x, color: c})))}
+          mode="SET" user={user}
+          config={config} setConfig={setConfig} 
+          holds={holds} setHolds={setHolds} 
+          metadata={metadata} setMetadata={setMetadata}
+          {...history} onSaveCloud={handleSaveCloud} isSavingCloud={isSavingCloud} 
+          generatedLink={generatedLink} onHome={() => navigate('/')} 
+          onNewWall={resetToNew}
+          onRemoveAllHolds={() => { history.recordAction({ config, holds }); setHolds([]); }}
+          onChangeAllHoldsColor={(color: string) => { history.recordAction({ config, holds }); setHolds(prev => prev.map(h => ({ ...h, color }))); }}
           isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
-      <Route path="/view/:wallId" element={
+      <Route path="/view/:id" element={
         <WallEditor 
-          mode="VIEW" user={user} config={config} setConfig={setConfig} holds={holds} setHolds={setHolds} metadata={metadata} setMetadata={setMetadata}
-          recordAction={recordAction} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo}
-          onSaveCloud={saveToCloud} isSavingCloud={isSavingCloud} generatedLink={generatedLink}
-          onHome={() => navigate('/')} onNewWall={handleNewWall} onRemix={handleRemix}
+          mode="VIEW" user={user}
+          config={config} setConfig={setConfig} 
+          holds={holds} setHolds={setHolds} 
+          metadata={metadata} setMetadata={setMetadata}
+          {...history} onSaveCloud={handleSaveCloud} isSavingCloud={isSavingCloud} 
+          generatedLink={generatedLink} onHome={() => navigate('/')} 
+          onNewWall={resetToNew} onRemix={handleRemix}
           isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
@@ -459,5 +507,3 @@ function App() {
     </Routes>
   );
 }
-
-export default App;
