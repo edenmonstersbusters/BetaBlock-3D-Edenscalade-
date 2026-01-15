@@ -7,7 +7,13 @@ declare global {
       interface IntrinsicElements {
         mesh: any;
         group: any;
+        // Fix: Add line to prevent conflict with SVG line element in Three.js context
+        line: any;
         meshStandardMaterial: any;
+        // Fix: Add missing material and geometry types used in WallMesh.tsx
+        lineBasicMaterial: any;
+        boxGeometry: any;
+        meshBasicMaterial: any;
         ambientLight: any;
         directionalLight: any;
         hemisphereLight: any;

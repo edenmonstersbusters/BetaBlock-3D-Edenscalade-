@@ -2,8 +2,25 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { WallConfig, WallSegment } from '../types';
 import '../types';
+
+interface DimensionLabelProps {
+  value: number;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  label: string;
+}
+
+const DimensionLabel: React.FC<DimensionLabelProps> = ({ value, position, label }) => (
+  <Html position={position} center distanceFactor={10}>
+    <div className="bg-gray-950/80 border border-white/20 px-2 py-0.5 rounded text-[10px] font-mono text-white whitespace-nowrap backdrop-blur-sm pointer-events-none select-none">
+      <span className="opacity-50 mr-1">{label}:</span>
+      <span className="font-bold">{value.toFixed(2)}m</span>
+    </div>
+  </Html>
+);
 
 interface WallPanelProps {
   segment: WallSegment;
@@ -66,21 +83,50 @@ const WallPanel: React.FC<WallPanelProps> = ({
     return geo;
   }, [width, thickness, panelSize, segment.height, topY, topZ, cumulativeDist]);
 
+  // Points pour la ligne de cotation de hauteur
+  const heightLinePoints = useMemo(() => [
+    new THREE.Vector3(width / 2 + 0.1, 0, 0.01),
+    new THREE.Vector3(width / 2 + 0.1, topY, topZ + 0.01)
+  ], [width, topY, topZ]);
+
+  const heightLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(heightLinePoints), [heightLinePoints]);
+
   return (
-    <mesh 
-      geometry={geometry}
-      position={[0, baseY, baseZ]}
-      name="climbing-wall-panel"
-      userData={{ segmentId: segment.id }}
-      castShadow 
-      receiveShadow
-      onPointerMove={interactive ? (e) => onPointerMove?.(e, segment.id) : undefined}
-      onPointerDown={interactive ? (e) => onPointerDown?.(e, segment.id) : undefined}
-      onPointerUp={interactive ? (e) => onPointerUp?.(e, segment.id) : undefined}
-      onContextMenu={interactive ? (e) => onContextMenu?.(e, segment.id) : undefined}
-    >
-      <meshStandardMaterial map={texture} color="#ffffff" roughness={0.8} metalness={0.0} />
-    </mesh>
+    <group position={[0, baseY, baseZ]}>
+      <mesh 
+        geometry={geometry}
+        name="climbing-wall-panel"
+        userData={{ segmentId: segment.id }}
+        castShadow 
+        receiveShadow
+        onPointerMove={interactive ? (e) => onPointerMove?.(e, segment.id) : undefined}
+        onPointerDown={interactive ? (e) => onPointerDown?.(e, segment.id) : undefined}
+        onPointerUp={interactive ? (e) => onPointerUp?.(e, segment.id) : undefined}
+        onContextMenu={interactive ? (e) => onContextMenu?.(e, segment.id) : undefined}
+      >
+        <meshStandardMaterial map={texture} color="#ffffff" roughness={0.8} metalness={0.0} />
+      </mesh>
+
+      {/* DIMENSIONS DE HAUTEUR DU PAN */}
+      <line geometry={heightLineGeometry}>
+        <lineBasicMaterial attach="material" color="#ffffff" opacity={0.3} transparent />
+      </line>
+      {/* Arrêts de ligne */}
+      <mesh position={[width / 2 + 0.1, 0, 0.01]}>
+        <boxGeometry args={[0.05, 0.005, 0.005]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.5} transparent />
+      </mesh>
+      <mesh position={[width / 2 + 0.1, topY, topZ + 0.01]}>
+        <boxGeometry args={[0.05, 0.005, 0.005]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.5} transparent />
+      </mesh>
+
+      <DimensionLabel 
+        label="H"
+        value={segment.height} 
+        position={[width / 2 + 0.4, topY / 2, topZ / 2 + 0.05]} 
+      />
+    </group>
   );
 };
 
@@ -160,8 +206,25 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     return result;
   }, [config.segments]);
 
+  // Ligne de cotation de largeur (bas du mur)
+  const widthLinePoints = useMemo(() => [
+    new THREE.Vector3(-config.width / 2, -0.05, 0.2),
+    new THREE.Vector3(config.width / 2, -0.05, 0.2)
+  ], [config.width]);
+  const widthLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(widthLinePoints), [widthLinePoints]);
+
   return (
     <group name="wall-group">
+      {/* DIMENSION DE LARGEUR GLOBALE */}
+      <line geometry={widthLineGeometry}>
+        <lineBasicMaterial attach="material" color="#3b82f6" opacity={0.6} transparent />
+      </line>
+      <DimensionLabel 
+        label="Largeur"
+        value={config.width} 
+        position={[0, -0.3, 0.2]} 
+      />
+
       {panels.map((p) => (
         <WallPanel 
           key={p.segment.id}
