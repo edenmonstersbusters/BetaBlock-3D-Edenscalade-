@@ -1,5 +1,5 @@
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, Dispatch, SetStateAction } from 'react';
 import * as THREE from 'three';
 import { calculateLocalCoords } from '../../../utils/geometry';
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';
@@ -8,11 +8,14 @@ import { WallConfig, PlacedHold, AppMode, WallSegment, WallMetadata } from '../.
 interface UseEditorLogicProps {
   mode: AppMode;
   config: WallConfig;
-  setConfig: React.Dispatch<React.SetStateAction<WallConfig>>;
+  // Fix: Use imported Dispatch and SetStateAction from react to avoid global namespace issues
+  setConfig: Dispatch<SetStateAction<WallConfig>>;
   holds: PlacedHold[];
-  setHolds: React.Dispatch<React.SetStateAction<PlacedHold[]>>;
+  // Fix: Use imported Dispatch and SetStateAction from react to avoid global namespace issues
+  setHolds: Dispatch<SetStateAction<PlacedHold[]>>;
   metadata: WallMetadata;
-  setMetadata: React.Dispatch<React.SetStateAction<WallMetadata>>;
+  // Fix: Use imported Dispatch and SetStateAction from react to avoid global namespace issues
+  setMetadata: Dispatch<SetStateAction<WallMetadata>>;
   user: any;
   
   // From History
