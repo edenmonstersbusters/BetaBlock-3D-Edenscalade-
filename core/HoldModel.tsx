@@ -33,54 +33,41 @@ const DimensionHelper: React.FC<{ size: THREE.Vector3; scale: number[]; baseScal
     // Calcul des dimensions réelles en mètres
     const realW = size.x * scale[0] * baseScale;
     const realH = size.y * scale[1] * baseScale;
-    const realD = size.z * scale[2] * baseScale;
-
-    // Demi-dimensions locales pour le placement des lignes (le groupe parent est déjà mis à l'échelle)
-    // On divise par scale[i] * baseScale car on est DANS le repère scalé pour le dessin, 
-    // MAIS on veut afficher les lignes autour de la boite "visuelle".
-    // Le clonedScene est unshifted à 0,0,0. Donc les bornes sont +/- size/2.
+    
+    // Demi-dimensions locales
     const hX = size.x / 2;
     const hY = size.y / 2;
-    const hZ = size.z / 2;
+
+    // Padding dynamique (20% de la taille max) pour éloigner les traits
+    const padding = Math.max(size.x, size.y) * 0.05; 
 
     const lineMaterial = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0.5, transparent: true });
 
     // Géométrie pour la largeur (en bas)
     const widthGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-hX, -hY - 0.05, 0), new THREE.Vector3(hX, -hY - 0.05, 0)
-    ]), [hX, hY]);
+        new THREE.Vector3(-hX, -hY - padding, 0), new THREE.Vector3(hX, -hY - padding, 0)
+    ]), [hX, hY, padding]);
 
     // Géométrie pour la hauteur (à droite)
     const heightGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(hX + 0.05, -hY, 0), new THREE.Vector3(hX + 0.05, hY, 0)
-    ]), [hX, hY]);
-    
-    // Géométrie pour la profondeur (sur le coté)
-    const depthGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(hX + 0.05, -hY, -hZ), new THREE.Vector3(hX + 0.05, -hY, hZ)
-    ]), [hX, hY, hZ]);
+        new THREE.Vector3(hX + padding, -hY, 0), new THREE.Vector3(hX + padding, hY, 0)
+    ]), [hX, hY, padding]);
 
     return (
         <group>
             {/* Lignes */}
             <primitive object={new THREE.Line(widthGeo, lineMaterial)} />
             <primitive object={new THREE.Line(heightGeo, lineMaterial)} />
-            <primitive object={new THREE.Line(depthGeo, lineMaterial)} />
 
             {/* Labels */}
-            <Html position={[0, -hY - 0.15, 0]} center zIndexRange={[50, 0]}>
+            <Html position={[0, -hY - padding - (padding * 0.5), 0]} center zIndexRange={[50, 0]}>
                 <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
                     L: {realW.toFixed(2)}m
                 </div>
             </Html>
-            <Html position={[hX + 0.15, 0, 0]} center zIndexRange={[50, 0]}>
+            <Html position={[hX + padding + (padding * 0.5), 0, 0]} center zIndexRange={[50, 0]}>
                 <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
                     H: {realH.toFixed(2)}m
-                </div>
-            </Html>
-            <Html position={[hX + 0.15, -hY - 0.05, 0]} center zIndexRange={[50, 0]}>
-                <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-emerald-400 font-mono whitespace-nowrap border border-emerald-500/30">
-                    P: {realD.toFixed(2)}m
                 </div>
             </Html>
         </group>
