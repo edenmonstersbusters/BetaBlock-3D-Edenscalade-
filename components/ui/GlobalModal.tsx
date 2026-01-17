@@ -10,7 +10,7 @@ interface GlobalModalProps {
   // Props spécifiques à la sauvegarde
   isSavingCloud?: boolean;
   generatedLink?: string | null;
-  onSaveCloud?: () => void;
+  onSaveCloud?: () => Promise<boolean>; // Retourne désormais un booléen pour valider le succès
   onDownload?: () => void;
   wallName?: string;
   onWallNameChange?: (name: string) => void;
@@ -56,7 +56,11 @@ export const GlobalModal: React.FC<GlobalModalProps> = ({
             <div className="space-y-3">
               <button 
                 onClick={async () => {
-                    if (onSaveCloud) await onSaveCloud();
+                    if (onSaveCloud) {
+                        const success = await onSaveCloud();
+                        // Si la sauvegarde échoue (ex: l'utilisateur n'est pas connecté), on n'appelle pas onConfirm
+                        if (!success) return; 
+                    }
                     if (config.onConfirm) config.onConfirm();
                     onClose();
                 }}

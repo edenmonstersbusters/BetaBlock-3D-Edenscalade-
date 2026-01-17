@@ -14,6 +14,9 @@ export const useEditorState = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
+  
+  // Suivi des modifications
+  const [isDirty, setIsDirty] = useState(false);
 
   // Helpers pour la sélection
   const handleSelectPlacedHold = (id: string | null, multi: boolean = false) => {
@@ -40,6 +43,7 @@ export const useEditorState = () => {
     showAuthModal, setShowAuthModal,
     clipboard, setClipboard,
     isEditingName, setIsEditingName,
+    isDirty, setIsDirty,
 
     // Actions
     handleSelectPlacedHold

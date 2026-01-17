@@ -81,13 +81,15 @@ export default function App() {
     }
   }, [location.pathname]);
 
-  const handleSaveCloud = async () => {
-    if (!user) return;
+  const handleSaveCloud = async (): Promise<boolean> => {
+    if (!user) return false;
     setIsSavingCloud(true);
     let screenshot = null;
-    if (screenshotRef.current) {
-        screenshot = await screenshotRef.current();
-    }
+    try {
+        if (screenshotRef.current) {
+            screenshot = await screenshotRef.current();
+        }
+    } catch(e) { console.error("Screenshot failed during save", e); }
     
     const dataToSave: BetaBlockFile = {
       version: APP_VERSION,
@@ -113,7 +115,9 @@ export default function App() {
     setIsSavingCloud(false);
     if (!result.error) {
         setGeneratedLink(`${window.location.origin}/#/view/${cloudId}`);
+        return true;
     }
+    return false;
   };
 
   const handleRemix = (remixMode: 'structure' | 'holds') => {

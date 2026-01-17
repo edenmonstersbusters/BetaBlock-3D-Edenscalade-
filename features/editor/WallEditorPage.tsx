@@ -38,7 +38,7 @@ interface WallEditorProps {
   redo: (current: any, apply: any) => void;
   canUndo: boolean;
   canRedo: boolean;
-  onSaveCloud: () => void;
+  onSaveCloud: () => Promise<boolean>; // Changé pour retourner un booléen
   isSavingCloud: boolean;
   generatedLink: string | null;
   onHome: () => void;
@@ -64,7 +64,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
   // 1. Initialisation de l'état UI
   const state = useEditorState();
 
-  // 2. Initialisation de la logique métier (liée à l'état et à l'historique)
+  // 2. Initialisation de la logique métier
   const logic = useEditorLogic({
     mode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
     undo, redo, recordAction,
@@ -72,7 +72,20 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     onHome, onNewWall
   });
 
-  // 3. Calculs de rendu
+  // 3. Wrapper pour la sauvegarde afin de gérer l'état isDirty et l'authentification
+  const wrappedSaveCloud = async () => {
+      if (!user) {
+          state.setShowAuthModal(true);
+          return false;
+      }
+      const success = await onSaveCloud();
+      if (success) {
+          state.setIsDirty(false);
+      }
+      return success;
+  };
+
+  // 4. Calculs de rendu
   const renderableHolds = useMemo(() => holds.map((h) => {
       const world = resolveHoldWorldData(h, config);
       if (!world) return null;
@@ -91,7 +104,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Fermer le menu contextuel si on clique ailleurs
   useEffect(() => {
     const handleGlobalClick = () => {
       if (state.contextMenu) state.setContextMenu(null);
@@ -110,7 +122,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       
       {state.showAuthModal && <AuthModal onClose={() => state.setShowAuthModal(false)} onSuccess={() => state.setShowAuthModal(false)} />}
       
-      {/* Top Bar (Cachée en mode Viewer) */}
+      {/* Top Bar */}
       {mode !== 'VIEW' && (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative">
             <div className="flex items-center gap-4 justify-start">
@@ -125,7 +137,10 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                     autoFocus
                     className="bg-gray-800 text-white text-sm font-bold border-b border-blue-500 outline-none px-2 py-1 text-center"
                     value={metadata.name}
-                    onChange={(e) => setMetadata(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => { 
+                        setMetadata(prev => ({ ...prev, name: e.target.value }));
+                        state.setIsDirty(true);
+                    }}
                     onBlur={() => state.setIsEditingName(false)}
                     onKeyDown={(e) => e.key === 'Enter' && state.setIsEditingName(false)}
                   />
@@ -144,6 +159,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 )}
                 <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
                     {mode === 'BUILD' ? 'Mode Structure' : 'Mode Ouverture'}
+                    {state.isDirty && <span className="ml-2 text-blue-400 font-black">•</span>}
                 </span>
             </div>
             <div className="flex items-center gap-2 justify-end">
@@ -158,7 +174,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Panneau Latéral Gauche */}
         {mode === 'VIEW' ? (
             <ViewerPanel 
                 wallId={cloudId || ''} metadata={metadata} config={config} holds={holds}
@@ -187,6 +202,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 onUpdatePlacedHold={(ids, u) => { 
                     if (metadata.remixMode === 'structure') return;
                     const idSet = new Set(ids); setHolds(hds => hds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); 
+                    state.setIsDirty(true);
                 }}
                 onSelectPlacedHold={state.handleSelectPlacedHold} 
                 onDeselect={() => state.setSelectedPlacedHoldIds([])}
@@ -202,7 +218,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
             />
         )}
 
-        {/* Zone Principale 3D */}
         <div className="flex-1 relative h-full">
             {mode !== 'VIEW' && (
                 <div className="fixed bottom-6 right-6 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
@@ -221,6 +236,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 onHoldDrag={(id, x, y, segId) => {
                     if (metadata.remixMode === 'structure') return;
                     setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId: segId } : h))
+                    state.setIsDirty(true);
                 }}
                 onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef}
             />
@@ -237,7 +253,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         }} 
         hasClipboard={state.clipboard.length > 0}
         onPasteHold={(target) => {
-             // standard paste handled by logic shortcuts, context menu paste could be added if needed
+             // standard paste handled by logic shortcuts
         }} 
         onDelete={(id, type) => { 
             if (type === 'HOLD') {
@@ -250,6 +266,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
             if (metadata.remixMode === 'structure') return;
             logic.saveToHistory(); setHolds(hds => hds.map(h => id === h.id ? { ...h, spin: h.spin + delta } : h)); 
         }}
+        // Fix: Remove duplicate onColorHold attribute
         onColorHold={(id, c) => { 
             if (metadata.remixMode === 'structure') return;
             logic.saveToHistory(); setHolds(hds => hds.map(h => id === h.id ? { ...h, color: c } : h)); 
@@ -260,10 +277,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       <GlobalModal 
         config={state.modal} onClose={() => state.setModal(null)} 
         isSavingCloud={isSavingCloud} generatedLink={generatedLink || `${window.location.origin}/#/view/${cloudId}`} 
-        onSaveCloud={onSaveCloud} 
+        onSaveCloud={wrappedSaveCloud} 
         onDownload={handleDownloadLocal}
         wallName={metadata.name}
-        onWallNameChange={(name) => setMetadata(prev => ({ ...prev, name }))}
+        onWallNameChange={(name) => {
+            setMetadata(prev => ({ ...prev, name }));
+            state.setIsDirty(true);
+        }}
       />
     </div>
   );

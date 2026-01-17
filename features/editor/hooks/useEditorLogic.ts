@@ -8,13 +8,10 @@ import { WallConfig, PlacedHold, AppMode, WallSegment, WallMetadata } from '../.
 interface UseEditorLogicProps {
   mode: AppMode;
   config: WallConfig;
-  // Fix: Use imported Dispatch and SetStateAction from react to avoid global namespace issues
   setConfig: Dispatch<SetStateAction<WallConfig>>;
   holds: PlacedHold[];
-  // Fix: Use imported Dispatch and SetStateAction from react to avoid global namespace issues
   setHolds: Dispatch<SetStateAction<PlacedHold[]>>;
   metadata: WallMetadata;
-  // Fix: Use imported Dispatch and SetStateAction from react to avoid global namespace issues
   setMetadata: Dispatch<SetStateAction<WallMetadata>>;
   user: any;
   
@@ -24,7 +21,7 @@ interface UseEditorLogicProps {
   recordAction: (state: any) => void;
 
   // From State Hook
-  state: any; // On passe tout l'état UI ici pour que la logique puisse le manipuler
+  state: any; 
   
   // Callbacks externes
   onHome: () => void;
@@ -43,14 +40,18 @@ export const useEditorLogic = ({
   const applyHistoryState = useCallback((hState: any) => {
     setConfig(hState.config);
     setHolds(hState.holds);
-  }, [setConfig, setHolds]);
+    state.setIsDirty(true);
+  }, [setConfig, setHolds, state]);
 
   const performUndo = useCallback(() => undo({ config, holds }, applyHistoryState), [undo, config, holds, applyHistoryState]);
   const performRedo = useCallback(() => redo({ config, holds }, applyHistoryState), [redo, config, holds, applyHistoryState]);
 
   const saveToHistory = useCallback(() => {
-    if (mode !== 'VIEW') recordAction({ config, holds });
-  }, [recordAction, config, holds, mode]);
+    if (mode !== 'VIEW') {
+        recordAction({ config, holds });
+        state.setIsDirty(true);
+    }
+  }, [recordAction, config, holds, mode, state]);
 
 
   // --- Logique Métier ---
@@ -128,7 +129,6 @@ export const useEditorLogic = ({
           ...prev,
           segments: prev.segments.filter((s) => s.id !== id),
         }));
-        // Supprimer aussi les prises sur ce segment
         setHolds(prev => prev.filter(h => h.segmentId !== id));
       }
     });
@@ -157,6 +157,13 @@ export const useEditorLogic = ({
 
   const handleAction = (type: 'save' | 'publish' | 'exit' | 'share') => {
       if (type === 'exit') {
+        // En mode VIEW ou si aucune modif, on sort direct
+        if (mode === 'VIEW' || !state.isDirty) {
+            onHome();
+            return;
+        }
+
+        // Sinon on demande confirmation
         state.setModal({
           title: "Quitter l'éditeur ?",
           message: "Toute modification non sauvegardée sera perdue.",
@@ -205,7 +212,6 @@ export const useEditorLogic = ({
         if (metadata.remixMode === 'structure') return;
         if (state.clipboard.length > 0 && mode !== 'VIEW') { 
             saveToHistory(); 
-            // Décalage léger pour voir les prises collées
             const toPaste = state.clipboard.map((h: PlacedHold) => ({ 
                 ...h, 
                 id: crypto.randomUUID(), 
