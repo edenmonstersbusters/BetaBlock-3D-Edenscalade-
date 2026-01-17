@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { WallConfig, PlacedHold, WallMetadata } from '../../types';
-import { Home, Share2, GitFork, Calendar, Ruler, Layers, Box, Heart, MessageSquare, ArrowUp, Activity } from 'lucide-react';
+import { Home, Share2, GitFork, Calendar, Ruler, Layers, Box, Heart, MessageSquare, ArrowUp, Activity, Edit3 } from 'lucide-react';
 import { SocialFeed } from './components/SocialFeed';
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
@@ -18,13 +18,15 @@ interface ViewerPanelProps {
   onHome: () => void;
   onRemix: (mode: 'structure' | 'holds') => void;
   onShare: () => void;
+  onEdit?: () => void;
 }
 
-export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, config, holds, onHome, onRemix, onShare }) => {
+export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, config, holds, onHome, onRemix, onShare, onEdit }) => {
   const [socialStats, setSocialStats] = useState({ likes: 0, hasLiked: false });
   const [showAuth, setShowAuth] = useState(false);
   const [showRemixModal, setShowRemixModal] = useState(false);
   const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   
   const [displayAvatarUrl, setDisplayAvatarUrl] = useState<string | undefined | null>(metadata.authorAvatarUrl);
 
@@ -42,11 +44,16 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
   }, 0);
 
   useEffect(() => {
-      if (!wallId) return;
       auth.getUser().then(user => {
+          // Vérification de propriété
+          if (user && metadata.authorId && user.id === metadata.authorId) {
+              setIsOwner(true);
+          }
+          
+          if (!wallId) return;
           api.getWallSocialStatus(wallId, user?.id).then(setSocialStats);
       });
-  }, [wallId]);
+  }, [wallId, metadata.authorId]);
 
   useEffect(() => {
       if (!metadata.authorAvatarUrl && metadata.authorId) {
@@ -222,6 +229,15 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
       {/* Actions Footer */}
       <div className="p-4 border-t border-gray-800 bg-gray-950 space-y-3">
+        {isOwner && (
+            <button 
+                onClick={onEdit} 
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center space-x-2 font-bold transition-all shadow-lg hover:shadow-blue-900/20 transform hover:-translate-y-0.5"
+            >
+                <Edit3 size={18} />
+                <span>Modifier mon mur</span>
+            </button>
+        )}
         <button 
             onClick={() => setShowRemixModal(true)} 
             className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg flex items-center justify-center space-x-2 font-bold transition-all shadow-lg hover:shadow-blue-900/20 transform hover:-translate-y-0.5"

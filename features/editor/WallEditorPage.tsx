@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -178,7 +179,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
             <ViewerPanel 
                 wallId={cloudId || ''} metadata={metadata} config={config} holds={holds}
                 onHome={() => logic.handleAction('exit')} 
-                onRemix={onRemix || (() => {})} onShare={() => logic.handleAction('share')}
+                onRemix={onRemix || (() => {})} 
+                onShare={() => logic.handleAction('share')}
+                onEdit={() => navigate(`/builder?id=${cloudId}`)}
             />
         ) : mode === 'BUILD' ? (
             <EditorPanel 
