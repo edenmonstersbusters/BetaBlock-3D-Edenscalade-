@@ -218,6 +218,12 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 onExport={() => logic.handleAction('save')}
                 onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
                 onHome={() => logic.handleAction('exit')}
+                isMeasuring={state.isMeasuring}
+                onToggleMeasure={() => {
+                     // Reset selection when entering/exiting measure mode
+                     state.setSelectedPlacedHoldIds([]);
+                     state.setIsMeasuring(prev => !prev);
+                }}
             />
         )}
 

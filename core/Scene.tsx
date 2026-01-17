@@ -1,5 +1,5 @@
 
-import React, { useState, Suspense, useEffect, useRef } from 'react';
+import React, { useState, Suspense, useEffect, useRef, useMemo } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -7,8 +7,9 @@ import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
 import { DragController } from './DragController';
 import { ScreenshotHandler } from './ScreenshotHandler';
+import { MeasurementLine } from './MeasurementLine'; // IMPORT NOUVEAU
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
-import { calculateLocalCoords } from '../utils/geometry';
+import { calculateLocalCoords, resolveHoldWorldData } from '../utils/geometry';
 import '../types'; 
 
 interface SceneProps {
@@ -53,6 +54,25 @@ export const Scene: React.FC<SceneProps> = ({
   // Strategy: Disable orbit controls when hovering a selected hold to prioritize interaction
   const isHoveringSelected = hoveredHoldId && selectedPlacedHoldIds.includes(hoveredHoldId);
   const orbitEnabled = !draggingId && !isHoveringSelected;
+
+  // --- LOGIQUE DE MESURE ---
+  // Calculer les positions 3D des prises sélectionnées pour afficher la ligne
+  const measurementData = useMemo(() => {
+    if (selectedPlacedHoldIds.length !== 2) return null;
+    
+    // On doit retrouver les objets holds complets (avec données brutes pour recalculer ou utiliser props)
+    // Ici 'holds' contient déjà la position calculée "position: [x,y,z]" passée par WallEditorPage
+    const h1 = holds.find(h => h.id === selectedPlacedHoldIds[0]);
+    const h2 = holds.find(h => h.id === selectedPlacedHoldIds[1]);
+
+    if (h1 && h2) {
+        return {
+            start: new THREE.Vector3(...h1.position),
+            end: new THREE.Vector3(...h2.position)
+        };
+    }
+    return null;
+  }, [selectedPlacedHoldIds, holds]);
 
   useEffect(() => {
     if (draggingId) {
@@ -122,6 +142,9 @@ export const Scene: React.FC<SceneProps> = ({
       if (mode !== 'SET') return;
 
       if (selectedPlacedHoldIds.length > 0) {
+        // Si on clique dans le vide mais qu'on a une sélection, 
+        // on ne désélectionne QUE si on n'est pas en mode mesure (optionnel, mais standard)
+        // Ici : comportement standard = désélection.
         e.stopPropagation();
         onSelectPlacedHold(null);
       } else if (selectedHoldDef) {
@@ -189,6 +212,11 @@ export const Scene: React.FC<SceneProps> = ({
           onPointerUp={handlePointerUp}
         />
         
+        {/* Ligne de mesure dynamique */}
+        {measurementData && (
+            <MeasurementLine start={measurementData.start} end={measurementData.end} />
+        )}
+
         <Suspense fallback={null}>
             {holds.map((hold) => (
                 <HoldModel 
@@ -215,12 +243,16 @@ export const Scene: React.FC<SceneProps> = ({
                       if (e.button === 0) {
                         e.stopPropagation();
                         if (orbitRef.current) orbitRef.current.enabled = false;
+                        // On passe l'état "isMeasuring" implicitement via le handler du parent
+                        // mais ici on doit juste gérer le click
                         const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-                        if (mode === 'SET' && !isMultiSelect) {
-                           onSelectPlacedHold(hold.id, false);
-                           setDraggingId(hold.id);
-                        } else {
-                           onSelectPlacedHold(hold.id, isMultiSelect);
+                        // Important : Si on veut mesurer, on peut soit utiliser CTRL, soit le mode dédié du parent.
+                        // Le parent gère la logique "isMeasuring" dans onSelectPlacedHold.
+                        onSelectPlacedHold(hold.id, isMultiSelect);
+                        
+                        // Si pas en mode mesure et pas multi, on drag
+                        if (!isMultiSelect && selectedPlacedHoldIds.length <= 1) { // logic approx
+                             setDraggingId(hold.id);
                         }
                       }
                     }}

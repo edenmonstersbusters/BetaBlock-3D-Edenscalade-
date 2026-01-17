@@ -1,8 +1,8 @@
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock, Ruler, CheckCircle } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import '../../types';
 import { HoldModel } from '../../core/HoldModel';
@@ -10,6 +10,7 @@ import { FileControls } from '../../components/ui/FileControls';
 import { ColorPalette } from '../../components/ui/ColorPalette';
 import { HoldCatalogue } from './components/HoldCatalogue';
 import { HoldInspector } from './components/HoldInspector';
+import { resolveHoldWorldData } from '../../utils/geometry'; // Pour calculer distance
 
 interface RouteEditorPanelProps {
   onBack: () => void;
@@ -33,13 +34,23 @@ interface RouteEditorPanelProps {
   onImport: (file: File) => void;
   onNew: () => void;
   onHome: () => void;
+  isMeasuring: boolean;
+  onToggleMeasure: () => void;
+  // Note: On pourrait passer 'config' ici pour recalculer la distance précisément côté UI si besoin, 
+  // mais on peut le faire plus simplement si le parent passe la distance ou si on affiche juste l'état.
+  // Pour l'instant, faisons simple : le panel affiche juste l'état "Mesure" si actif.
+  // UPDATE : J'ai besoin de 'config' pour calculer la distance réelle ici aussi pour l'afficher dans le panel.
+  // Mais je ne l'ai pas dans les props actuelles. 
+  // Solution : On affiche la distance uniquement dans la scène 3D pour l'instant (MeasurementLine), 
+  // et dans le panel on met juste les instructions.
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
 const CATALOGUE_URL = `${BASE_URL}catalogue.json`;
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
-  onBack, selectedHold, onSelectHold, metadata, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew, onHome
+  onBack, selectedHold, onSelectHold, metadata, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew, onHome,
+  isMeasuring, onToggleMeasure
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +105,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         {metadata.parentId && (
             <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
                 <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
@@ -112,6 +123,44 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                 )}
             </div>
         )}
+
+        {/* BARRE D'OUTILS ET MESURE */}
+        <section className="space-y-4">
+            <div className="flex items-center justify-between">
+                 <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider">
+                    <Box size={14} /><span>Outils</span>
+                 </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+                 <button 
+                    onClick={onToggleMeasure}
+                    className={`flex items-center justify-center gap-2 py-3 rounded-lg text-xs font-bold transition-all border ${isMeasuring ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'}`}
+                 >
+                    <Ruler size={16} />
+                    <span>{isMeasuring ? 'Mesure Active' : 'Mesurer Écart'}</span>
+                 </button>
+            </div>
+            
+            {/* Instruction si mode mesure actif */}
+            {isMeasuring && selectedPlacedHoldIds.length < 2 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg animate-in fade-in">
+                    <p className="text-xs text-yellow-200 text-center">
+                        Sélectionnez <span className="font-bold">2 prises</span> pour afficher la distance.
+                    </p>
+                </div>
+            )}
+
+            {/* Affichage Distance dans le panel si 2 prises sélectionnées */}
+            {selectedPlacedHoldIds.length === 2 && (
+                <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center justify-between animate-in slide-in-from-right">
+                    <span className="text-xs text-gray-400 font-bold uppercase">Distance</span>
+                    {/* Note: La valeur exacte est affichée en 3D, ici on met un indicateur visuel */}
+                    <span className="text-sm font-black text-yellow-400 flex items-center gap-2">
+                        <Eye size={14} /> Voir sur le mur
+                    </span>
+                </div>
+            )}
+        </section>
 
         {anyHoldSelected ? (
           <HoldInspector 
@@ -144,9 +193,12 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
           </section>
         )}
 
+        {/* ... (Code existant catalogue) ... */}
+        
         {!anyHoldSelected && selectedHold && !isHoldsLocked && (
           <section className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
-            <div className="flex items-center space-x-2 text-[10px] font-black text-blue-400 uppercase tracking-widest px-1">
+             {/* ... (Code existant Preview 3D) ... */}
+             <div className="flex items-center space-x-2 text-[10px] font-black text-blue-400 uppercase tracking-widest px-1">
               <Eye size={12} />
               <span>Rendu 3D Temps Réel</span>
             </div>
@@ -189,6 +241,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
             />
         </div>
 
+        {/* ... (Code existant Liste Prises & FileControls) ... */}
         <section className="pt-4 border-t border-gray-800">
              <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({placedHolds.length})</span></div>
             <div className="max-h-64 overflow-y-auto space-y-1">

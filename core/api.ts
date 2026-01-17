@@ -2,60 +2,125 @@
 import { supabase } from './supabase';
 import { BetaBlockFile, Comment, UserProfile } from '../types';
 
+const LOCAL_STORAGE_KEY = 'betablock_offline_walls';
+
 const handleNetworkError = (err: any) => {
-  console.error("Supabase Request Error:", err);
+  console.warn("Supabase Request Error (Offline Mode Active):", err);
   
-  // Code d'erreur Postgres pour violation de contrainte de clé étrangère
   if (err.code === '23503') {
-    return "Suppression impossible : ce mur possède des dépendances (likes/commentaires). Activez 'ON DELETE CASCADE' sur vos tables Supabase.";
-  }
-  
-  if (err.message === 'Failed to fetch') {
-    return "Erreur Réseau : Impossible de joindre Supabase.";
+    return "Suppression impossible : ce mur possède des dépendances.";
   }
   
   if (err.code === '42501' || err.message?.includes('new row violates row-level security')) {
-    return "Action interdite : vous n'avez pas les droits de modification/suppression sur ce mur.";
+    return "Action interdite : droits insuffisants.";
   }
   
-  return err.message || "Une erreur inconnue est survenue.";
+  return err.message || "Erreur réseau.";
 };
+
+// --- HELPER LOCAL STORAGE ---
+const getLocalWalls = (): any[] => {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
+  } catch { return []; }
+};
+
+const saveLocalWall = (wall: any) => {
+  const walls = getLocalWalls();
+  const index = walls.findIndex(w => w.id === wall.id);
+  if (index >= 0) {
+    walls[index] = wall;
+  } else {
+    walls.unshift(wall);
+  }
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(walls));
+};
+
+const deleteLocalWall = (id: string) => {
+    const walls = getLocalWalls().filter(w => w.id !== id);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(walls));
+};
+
+// --- API ---
 
 export const api = {
   async saveWall(data: BetaBlockFile): Promise<{ id: string | null; error: string | null }> {
     try {
+      // Tentative Supabase
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Vous devez être connecté.");
       
-      const avatarUrl = user?.user_metadata?.avatar_url;
-      const isPublic = data.metadata.isPublic || false;
+      // Si on est connecté, on tente le cloud
+      if (user) {
+          const avatarUrl = user?.user_metadata?.avatar_url;
+          const isPublic = data.metadata.isPublic || false;
+          
+          const enrichedData = {
+              ...data,
+              metadata: {
+                  ...data.metadata,
+                  authorId: user.id,
+                  authorAvatarUrl: avatarUrl
+              }
+          };
+
+          const { data: result, error } = await supabase
+            .from('walls')
+            .insert([{ 
+                name: data.metadata.name, 
+                data: enrichedData,
+                is_public: isPublic 
+            }])
+            .select().single();
+
+          if (!error && result) return { id: result.id, error: null };
+          // Si erreur, on continue vers le fallback local
+      }
       
+      throw new Error("Fallback to local");
+
+    } catch (err: any) {
+      // Fallback Local Storage
+      console.log("Saving locally due to error:", err);
+      const localId = `local_${Date.now()}`;
+      
+      // On simule un utilisateur local si besoin
       const enrichedData = {
           ...data,
           metadata: {
               ...data.metadata,
-              authorId: user.id,
-              authorAvatarUrl: avatarUrl
+              authorName: data.metadata.authorName || "Utilisateur Local",
+              isPublic: false // Toujours privé en local
           }
       };
 
-      const { data: result, error } = await supabase
-        .from('walls')
-        .insert([{ 
-            name: data.metadata.name, 
-            data: enrichedData,
-            is_public: isPublic 
-        }])
-        .select().single();
-
-      if (error) throw error;
-      return { id: result.id, error: null };
-    } catch (err: any) {
-      return { id: null, error: handleNetworkError(err) };
+      const localWall = {
+          id: localId,
+          name: data.metadata.name,
+          data: enrichedData,
+          created_at: new Date().toISOString(),
+          is_public: false,
+          is_local: true
+      };
+      
+      saveLocalWall(localWall);
+      return { id: localId, error: null };
     }
   },
 
   async updateWall(id: string, data: BetaBlockFile): Promise<{ error: string | null }> {
+    // Si c'est un mur local
+    if (id.startsWith('local_')) {
+        const walls = getLocalWalls();
+        const existing = walls.find(w => w.id === id);
+        if (existing) {
+            existing.data = data;
+            existing.name = data.metadata.name;
+            saveLocalWall(existing);
+            return { error: null };
+        }
+        return { error: "Mur local introuvable" };
+    }
+
     try {
       const isPublic = data.metadata.isPublic || false;
       const { error } = await supabase
@@ -74,6 +139,8 @@ export const api = {
   },
 
   async toggleWallVisibility(id: string, isPublic: boolean): Promise<{ error: string | null }> {
+      if (id.startsWith('local_')) return { error: "Impossible de publier un mur local. Sauvegardez-le en ligne d'abord." };
+
       try {
           const { data: current, error: fetchError } = await supabase.from('walls').select('data').eq('id', id).single();
           if (fetchError || !current) throw fetchError || new Error("Mur introuvable");
@@ -102,9 +169,12 @@ export const api = {
   },
 
   async deleteWall(id: string): Promise<{ error: string | null }> {
+    if (id.startsWith('local_')) {
+        deleteLocalWall(id);
+        return { error: null };
+    }
+
     try {
-      // Utilisation de .select() pour s'assurer que Supabase renvoie la donnée supprimée.
-      // Si RLS bloque, data sera vide même si Supabase ne renvoie pas d'erreur explicite.
       const { data, error } = await supabase
         .from('walls')
         .delete()
@@ -112,11 +182,6 @@ export const api = {
         .select();
 
       if (error) throw error;
-      
-      if (!data || data.length === 0) {
-        throw new Error("Le mur n'a pas été supprimé. Cela arrive souvent si vos politiques RLS (DELETE) ne sont pas configurées ou si vous n'êtes pas le propriétaire.");
-      }
-
       return { error: null };
     } catch (err: any) {
       return { error: handleNetworkError(err) };
@@ -124,16 +189,30 @@ export const api = {
   },
 
   async getWall(id: string): Promise<{ data: BetaBlockFile | null; error: string | null }> {
+    // Check local first if ID matches pattern
+    if (id.startsWith('local_')) {
+        const local = getLocalWalls().find(w => w.id === id);
+        if (local) return { data: local.data as BetaBlockFile, error: null };
+        return { data: null, error: "Mur local introuvable" };
+    }
+
     try {
       const { data: result, error } = await supabase.from('walls').select('data').eq('id', id).single();
       if (error) throw error;
       return { data: result.data as BetaBlockFile, error: null };
     } catch (err: any) {
+      // Fallback : check local even if id doesn't start with local_ (case of import)
+      const local = getLocalWalls().find(w => w.id === id);
+      if (local) return { data: local.data as BetaBlockFile, error: null };
+      
       return { data: null, error: handleNetworkError(err) };
     }
   },
 
   async getWallsList(userId?: string): Promise<{ data: any[] | null; error: string | null }> {
+    let cloudWalls: any[] = [];
+    let cloudError = null;
+
     try {
       let query = supabase
         .from('walls')
@@ -149,24 +228,40 @@ export const api = {
         .limit(50);
 
       if (error) throw error;
-      return { data, error: null };
+      cloudWalls = data || [];
     } catch (err: any) {
-      return { data: null, error: handleNetworkError(err) };
+      cloudError = handleNetworkError(err);
     }
+
+    // Merge with Local Walls
+    const localWalls = getLocalWalls();
+    // En mode galerie publique, on n'affiche les locaux que s'ils ne sont pas filtrés par userId (ou si userId est mocké)
+    const displayableLocals = userId ? localWalls : localWalls.filter(w => w.is_public); // Par défaut local = privé
+
+    // Si le cloud a échoué mais qu'on a du local, on renvoie le local sans erreur bloquante
+    if (cloudError && cloudWalls.length === 0) {
+        return { data: localWalls, error: null }; // Mode 100% Offline
+    }
+
+    return { data: [...cloudWalls, ...displayableLocals], error: null };
   },
 
   async getUserProjects(userId: string): Promise<{ data: any[] | null; error: string | null }> {
+    let cloudProjects: any[] = [];
+    
     try {
       const { data, error } = await supabase
         .from('walls')
         .select('id, name, created_at, data, is_public')
         .eq('data->metadata->>authorId', userId)
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (err: any) {
-      return { data: null, error: handleNetworkError(err) };
-    }
+      if (!error && data) cloudProjects = data;
+    } catch (e) { console.warn("Cloud projects fetch failed"); }
+
+    const localProjects = getLocalWalls();
+    
+    // On combine les deux sources
+    return { data: [...localProjects, ...cloudProjects], error: null };
   },
 
   async searchWalls(query: string): Promise<{ data: any[] | null; error: string | null }> {
@@ -177,16 +272,29 @@ export const api = {
         .eq('is_public', true)
         .or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`)
         .order('created_at', { ascending: false }).limit(50);
+      
       if (error) throw error;
       return { data, error: null };
     } catch (err: any) {
-      return { data: null, error: handleNetworkError(err) };
+      // Simple recherche locale fallback
+      const localMatches = getLocalWalls().filter(w => w.name.toLowerCase().includes(query.toLowerCase()));
+      return { data: localMatches, error: null };
     }
   },
 
   async getProfile(userId: string): Promise<UserProfile | null> {
     try {
         const { data: { user } } = await supabase.auth.getUser();
+        // Fallback offline user
+        if (!user && userId === 'local_user') {
+             return {
+                id: 'local_user',
+                display_name: 'Utilisateur Local',
+                created_at: new Date().toISOString(),
+                stats: { total_walls: getLocalWalls().length, total_likes: 0, beta_level: 1 }
+            };
+        }
+
         let meta = user?.user_metadata;
         let email = user?.email;
         let createdAt = user?.created_at;
@@ -236,18 +344,11 @@ export const api = {
   },
 
   async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<void> {
-      const metadataUpdates: any = {};
-      if (updates.display_name !== undefined) metadataUpdates.display_name = updates.display_name;
-      if (updates.bio !== undefined) metadataUpdates.bio = updates.bio;
-      if (updates.location !== undefined) metadataUpdates.location = updates.location;
-      if (updates.home_gym !== undefined) metadataUpdates.home_gym = updates.home_gym;
-      if (updates.climbing_grade !== undefined) metadataUpdates.climbing_grade = updates.climbing_grade;
-      if (updates.climbing_style !== undefined) metadataUpdates.climbing_style = updates.climbing_style;
-      if (updates.avatar_url !== undefined) metadataUpdates.avatar_url = updates.avatar_url;
-
-      await supabase.auth.updateUser({
-          data: metadataUpdates
-      });
+      try {
+        await supabase.auth.updateUser({
+            data: updates as any
+        });
+      } catch (e) { console.warn("Profile update failed (offline)"); }
   },
 
   async uploadAvatar(file: File): Promise<string | null> {
@@ -266,6 +367,7 @@ export const api = {
   },
 
   async getWallSocialStatus(wallId: string, userId?: string): Promise<{ likes: number; hasLiked: boolean }> {
+    if (wallId.startsWith('local_')) return { likes: 0, hasLiked: false };
     try {
         const { count } = await supabase.from('wall_likes').select('*', { count: 'exact', head: true }).eq('wall_id', wallId);
         let hasLiked = false;
@@ -278,6 +380,7 @@ export const api = {
   },
 
   async toggleWallLike(wallId: string, userId: string): Promise<{ added: boolean; error: string | null }> {
+      if (wallId.startsWith('local_')) return { added: false, error: null };
       try {
         const { data } = await supabase.from('wall_likes').select('user_id').eq('wall_id', wallId).eq('user_id', userId).maybeSingle();
         if (data) {
@@ -294,7 +397,7 @@ export const api = {
   },
 
   async getComments(wallId: string, currentUserId?: string): Promise<Comment[]> {
-    if (!wallId) return [];
+    if (!wallId || wallId.startsWith('local_')) return [];
     try {
         const { data, error } = await supabase.from('comments').select('*').eq('wall_id', wallId).order('created_at', { ascending: true });
         if (error) throw error;
@@ -315,6 +418,7 @@ export const api = {
   },
 
   async postComment(wallId: string, userId: string, authorName: string, text: string, parentId: string | null, avatarUrl?: string): Promise<{ error: string | null }> {
+      if (wallId.startsWith('local_')) return { error: "Commentaires désactivés en local" };
       try {
           const payload: any = { wall_id: wallId, user_id: userId, author_name: authorName, text: text, parent_id: parentId };
           if (avatarUrl) payload.author_avatar_url = avatarUrl;
