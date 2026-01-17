@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
 import '../types';
@@ -14,11 +14,11 @@ interface HoldModelProps {
   opacity?: number;
   color?: string;
   preview?: boolean;
+  showDimensions?: boolean; // NOUVEAU
   isSelected?: boolean;
   isDragging?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
-  // Fix: Add missing onPointerUp to support interaction logic in Scene.tsx
   onPointerUp?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
@@ -27,6 +27,65 @@ interface HoldModelProps {
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
 const DRACO_DECODER_URL = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
+
+// Composant interne pour afficher les dimensions
+const DimensionHelper: React.FC<{ size: THREE.Vector3; scale: number[]; baseScale: number }> = ({ size, scale, baseScale }) => {
+    // Calcul des dimensions réelles en mètres
+    const realW = size.x * scale[0] * baseScale;
+    const realH = size.y * scale[1] * baseScale;
+    const realD = size.z * scale[2] * baseScale;
+
+    // Demi-dimensions locales pour le placement des lignes (le groupe parent est déjà mis à l'échelle)
+    // On divise par scale[i] * baseScale car on est DANS le repère scalé pour le dessin, 
+    // MAIS on veut afficher les lignes autour de la boite "visuelle".
+    // Le clonedScene est unshifted à 0,0,0. Donc les bornes sont +/- size/2.
+    const hX = size.x / 2;
+    const hY = size.y / 2;
+    const hZ = size.z / 2;
+
+    const lineMaterial = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0.5, transparent: true });
+
+    // Géométrie pour la largeur (en bas)
+    const widthGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-hX, -hY - 0.05, 0), new THREE.Vector3(hX, -hY - 0.05, 0)
+    ]), [hX, hY]);
+
+    // Géométrie pour la hauteur (à droite)
+    const heightGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(hX + 0.05, -hY, 0), new THREE.Vector3(hX + 0.05, hY, 0)
+    ]), [hX, hY]);
+    
+    // Géométrie pour la profondeur (sur le coté)
+    const depthGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(hX + 0.05, -hY, -hZ), new THREE.Vector3(hX + 0.05, -hY, hZ)
+    ]), [hX, hY, hZ]);
+
+    return (
+        <group>
+            {/* Lignes */}
+            <primitive object={new THREE.Line(widthGeo, lineMaterial)} />
+            <primitive object={new THREE.Line(heightGeo, lineMaterial)} />
+            <primitive object={new THREE.Line(depthGeo, lineMaterial)} />
+
+            {/* Labels */}
+            <Html position={[0, -hY - 0.15, 0]} center zIndexRange={[50, 0]}>
+                <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
+                    L: {realW.toFixed(2)}m
+                </div>
+            </Html>
+            <Html position={[hX + 0.15, 0, 0]} center zIndexRange={[50, 0]}>
+                <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
+                    H: {realH.toFixed(2)}m
+                </div>
+            </Html>
+            <Html position={[hX + 0.15, -hY - 0.05, 0]} center zIndexRange={[50, 0]}>
+                <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-emerald-400 font-mono whitespace-nowrap border border-emerald-500/30">
+                    P: {realD.toFixed(2)}m
+                </div>
+            </Html>
+        </group>
+    );
+};
 
 export const HoldModel: React.FC<HoldModelProps> = ({ 
   modelFilename, 
@@ -37,11 +96,11 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   opacity = 1,
   color,
   preview = false,
+  showDimensions = false,
   isSelected = false,
   isDragging = false,
   onClick,
   onPointerDown,
-  // Fix: Destructure onPointerUp from props
   onPointerUp,
   onPointerOver,
   onPointerOut,
@@ -50,16 +109,18 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
   const { scene } = useGLTF(url, DRACO_DECODER_URL);
 
-  const { clonedScene, offset } = useMemo(() => {
+  const { clonedScene, offset, size } = useMemo(() => {
     const clone = scene.clone(true);
     clone.position.set(0, 0, 0);
     clone.rotation.set(0, 0, 0);
     clone.scale.set(1, 1, 1);
     
     const box = new THREE.Box3().setFromObject(clone);
+    const boxSize = new THREE.Vector3();
     let offsetX = 0; let offsetY = 0; let offsetZ = 0;
     
     if (!box.isEmpty() && Number.isFinite(box.min.x)) {
+        box.getSize(boxSize);
         const center = new THREE.Vector3();
         box.getCenter(center);
         offsetX = -center.x; 
@@ -91,11 +152,15 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         mesh.receiveShadow = true;
 
         if (isDragging) {
-            mesh.raycast = () => null; // Ignore raycast to allow wall detection behind
+            mesh.raycast = () => null; 
         }
       }
     });
-    return { clonedScene: clone, offset: [offsetX, offsetY, offsetZ] as [number, number, number] };
+    return { 
+        clonedScene: clone, 
+        offset: [offsetX, offsetY, offsetZ] as [number, number, number],
+        size: boxSize
+    };
   }, [scene, opacity, color, preview, isSelected, isDragging]);
 
   return (
@@ -103,7 +168,6 @@ export const HoldModel: React.FC<HoldModelProps> = ({
       position={position} rotation={rotation} 
       scale={[scale[0] * baseScale, scale[1] * baseScale, scale[2] * baseScale]}
       onPointerDown={preview ? undefined : onPointerDown}
-      // Fix: Add onPointerUp event handler to the Three.js group
       onPointerUp={preview ? undefined : onPointerUp}
       onPointerOver={preview ? undefined : onPointerOver}
       onPointerOut={preview ? undefined : onPointerOut}
@@ -111,6 +175,9 @@ export const HoldModel: React.FC<HoldModelProps> = ({
       onContextMenu={preview ? undefined : onContextMenu}
     >
         <primitive object={clonedScene} position={offset} />
+        {showDimensions && size && (
+            <DimensionHelper size={size} scale={scale} baseScale={baseScale} />
+        )}
     </group>
   );
 };
