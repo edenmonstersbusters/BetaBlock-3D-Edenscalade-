@@ -75,7 +75,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                         className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-white/5 rounded-full text-xs font-bold transition-all text-gray-400 hover:text-white"
                     >
                         <LayoutGrid size={14} />
-                        <span>Mes Projets</span>
+                        <span>Mes Murs</span>
                     </button>
                     <button 
                         onClick={() => navigate('/profile')}
@@ -123,7 +123,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                         className="flex items-center gap-3 px-8 py-4 bg-gray-900 hover:bg-gray-800 text-white font-bold text-lg rounded-full border border-white/10 transition-all"
                     >
                         <LayoutGrid size={20} />
-                        <span>Mes Projets Privés</span>
+                        <span>Mes Murs Privés</span>
                     </button>
                 )}
             </div>

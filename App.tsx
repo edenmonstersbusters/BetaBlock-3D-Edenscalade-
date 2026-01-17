@@ -59,27 +59,43 @@ export default function App() {
 
   useEffect(() => {
     const path = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    const queryId = searchParams.get('id');
+
+    const loadWallData = async (id: string, targetMode: AppMode) => {
+        setCloudId(id);
+        setIsLoadingCloud(true);
+        const { data, error } = await api.getWall(id);
+        if (data) {
+            setConfig(data.config);
+            setHolds(data.holds);
+            setMetadata(data.metadata);
+            setMode(targetMode);
+        }
+        setIsLoadingCloud(false);
+    };
+
     if (path.startsWith('/view/')) {
         const id = path.split('/').pop();
         if (id) {
-            setCloudId(id);
-            setIsLoadingCloud(true);
-            api.getWall(id).then(({ data, error }) => {
-                if (data) {
-                    setConfig(data.config);
-                    setHolds(data.holds);
-                    setMetadata(data.metadata);
-                    setMode('VIEW');
-                }
-                setIsLoadingCloud(false);
-            });
+            loadWallData(id, 'VIEW');
         }
     } else if (path === '/builder') {
-        setMode('BUILD');
+        if (queryId) {
+            // Si on a un ID dans l'URL (via le bouton stylo), on charge ce mur
+            loadWallData(queryId, 'BUILD');
+        } else {
+            // Sinon on reste sur le state actuel (ou nouveau mur si reset)
+            setMode('BUILD');
+        }
     } else if (path === '/setter') {
-        setMode('SET');
+        if (queryId) {
+             loadWallData(queryId, 'SET');
+        } else {
+             setMode('SET');
+        }
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const handleSaveCloud = async (): Promise<boolean> => {
     if (!user) return false;

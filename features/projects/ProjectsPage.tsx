@@ -105,7 +105,7 @@ export const ProjectsPage: React.FC = () => {
                     <span className="font-bold">Hub Public</span>
                 </button>
                 <div className="flex items-center gap-3">
-                    <span className="text-sm font-black italic tracking-tighter text-blue-500">MES PROJETS</span>
+                    <span className="text-sm font-black italic tracking-tighter text-blue-500">MES MURS</span>
                     {user && <UserAvatar url={user.user_metadata?.avatar_url} name={user.user_metadata?.display_name || user.email} size="sm" />}
                 </div>
             </div>
@@ -113,7 +113,7 @@ export const ProjectsPage: React.FC = () => {
             <main className="max-w-7xl mx-auto px-6 py-12">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
                     <div>
-                        <h1 className="text-4xl font-black tracking-tight mb-2">Gestionnaire de Projets</h1>
+                        <h1 className="text-4xl font-black tracking-tight mb-2">Gestionnaire de Murs</h1>
                         <p className="text-gray-500">Gérez vos brouillons privés et vos publications publiques.</p>
                     </div>
                     <button 
@@ -121,7 +121,7 @@ export const ProjectsPage: React.FC = () => {
                         className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20"
                     >
                         <Plus size={20} />
-                        <span>Nouveau Projet</span>
+                        <span>Nouveau Mur</span>
                     </button>
                 </header>
 
@@ -133,7 +133,7 @@ export const ProjectsPage: React.FC = () => {
                 ) : projects.length === 0 ? (
                     <div className="text-center py-24 bg-gray-900/30 rounded-3xl border border-white/5 border-dashed">
                         <Box size={48} className="mx-auto mb-4 text-gray-700" />
-                        <h2 className="text-xl font-bold text-gray-400 mb-2">Aucun projet trouvé</h2>
+                        <h2 className="text-xl font-bold text-gray-400 mb-2">Aucun mur trouvé</h2>
                         <p className="text-gray-600 mb-8">Commencez à créer votre premier mur d'escalade 3D dès maintenant.</p>
                         <button onClick={() => navigate('/builder')} className="text-blue-500 hover:underline">Créer mon premier mur</button>
                     </div>
