@@ -226,7 +226,7 @@ export const ProjectsPage: React.FC = () => {
                                 {/* ÉTAPE 1: MOT CLÉ */}
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">
-                                        Étape 1 : Tapez "delete_wall"
+                                        Étape 1 : Tapez "delete_wall" en minuscule
                                     </label>
                                     <input 
                                         type="text"

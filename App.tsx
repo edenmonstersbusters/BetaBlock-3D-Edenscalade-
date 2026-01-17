@@ -85,7 +85,17 @@ export default function App() {
             // Si on a un ID dans l'URL (via le bouton stylo), on charge ce mur
             loadWallData(queryId, 'BUILD');
         } else {
-            // Sinon on reste sur le state actuel (ou nouveau mur si reset)
+            // FIX: Si on arrive sur /builder sans ID (ex: bouton "Nouveau Mur"), on RESET tout.
+            setConfig(INITIAL_CONFIG);
+            setHolds([]);
+            setMetadata({
+                name: "Nouveau Mur",
+                timestamp: new Date().toISOString(),
+                appVersion: APP_VERSION,
+                remixMode: null
+            });
+            setCloudId(null);
+            setGeneratedLink(null);
             setMode('BUILD');
         }
     } else if (path === '/setter') {
@@ -153,6 +163,7 @@ export default function App() {
   };
 
   const resetToNew = () => {
+    // On reset l'état local immédiatement
     setConfig(INITIAL_CONFIG);
     setHolds([]);
     setMetadata({
@@ -163,6 +174,8 @@ export default function App() {
     });
     setCloudId(null);
     setGeneratedLink(null);
+    
+    // Et on navigue vers l'URL propre (ce qui déclenchera aussi le useEffect, mais c'est sécurisé)
     navigate('/builder');
   };
 

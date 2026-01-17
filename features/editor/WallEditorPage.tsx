@@ -188,7 +188,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 config={config} holds={holds} onUpdate={setConfig} metadata={metadata}
                 onNext={() => navigate('/setter')} showModal={(c) => state.setModal(c)}
                 onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')}
-                onImport={() => logic.globalFileInputRef.current?.click()} onNew={onNewWall}
+                onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
                 onHome={() => logic.handleAction('exit')}
                 onRemoveSegment={logic.removeSegmentAction}
             />
@@ -216,7 +216,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 }}
                 onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)}
                 onExport={() => logic.handleAction('save')}
-                onImport={() => logic.globalFileInputRef.current?.click()} onNew={onNewWall}
+                onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
                 onHome={() => logic.handleAction('exit')}
             />
         )}

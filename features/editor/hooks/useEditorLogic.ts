@@ -196,6 +196,16 @@ export const useEditorLogic = ({
       });
   };
 
+  const handleNewWallRequest = () => {
+      state.setModal({
+          title: "Nouveau Mur",
+          message: "Vous allez créer un mur vierge. Toutes les modifications non sauvegardées sur le mur actuel seront perdues.",
+          confirmText: "Nouveau Mur",
+          isAlert: true,
+          onConfirm: onNewWall
+      });
+  };
+
   // --- Raccourcis Clavier ---
 
   useKeyboardShortcuts({
@@ -230,6 +240,7 @@ export const useEditorLogic = ({
   return {
     globalFileInputRef,
     performUndo, performRedo, saveToHistory,
-    handlePlaceHold, removeHoldsAction, removeSegmentAction, updateSegmentQuickly, handleAction
+    handlePlaceHold, removeHoldsAction, removeSegmentAction, updateSegmentQuickly, handleAction,
+    handleNewWallRequest
   };
 };
