@@ -26,6 +26,10 @@ interface SceneProps {
   onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
   onHoldDragEnd?: () => void;
   screenshotRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
+  // Dynamic Measure Props
+  isDynamicMeasuring?: boolean;
+  referenceHoldId?: string | null;
+  setReferenceHoldId?: (id: string | null) => void;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -41,7 +45,10 @@ export const Scene: React.FC<SceneProps> = ({
   onWallPointerUpdate,
   onHoldDrag,
   onHoldDragEnd,
-  screenshotRef
+  screenshotRef,
+  isDynamicMeasuring,
+  referenceHoldId,
+  setReferenceHoldId
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
@@ -55,25 +62,6 @@ export const Scene: React.FC<SceneProps> = ({
   const isHoveringSelected = hoveredHoldId && selectedPlacedHoldIds.includes(hoveredHoldId);
   const orbitEnabled = !draggingId && !isHoveringSelected;
 
-  // --- LOGIQUE DE MESURE ---
-  // Calculer les positions 3D des prises sélectionnées pour afficher la ligne
-  const measurementData = useMemo(() => {
-    if (selectedPlacedHoldIds.length !== 2) return null;
-    
-    // On doit retrouver les objets holds complets (avec données brutes pour recalculer ou utiliser props)
-    // Ici 'holds' contient déjà la position calculée "position: [x,y,z]" passée par WallEditorPage
-    const h1 = holds.find(h => h.id === selectedPlacedHoldIds[0]);
-    const h2 = holds.find(h => h.id === selectedPlacedHoldIds[1]);
-
-    if (h1 && h2) {
-        return {
-            start: new THREE.Vector3(...h1.position),
-            end: new THREE.Vector3(...h2.position)
-        };
-    }
-    return null;
-  }, [selectedPlacedHoldIds, holds]);
-
   useEffect(() => {
     if (draggingId) {
       document.body.style.cursor = 'grabbing';
@@ -84,6 +72,33 @@ export const Scene: React.FC<SceneProps> = ({
     }
     return () => { document.body.style.cursor = 'auto'; };
   }, [draggingId, isHoveringSelected]);
+
+  // --- LOGIQUE DE MESURE STATIQUE ---
+  const measurementData = useMemo(() => {
+    if (selectedPlacedHoldIds.length !== 2) return null;
+    const h1 = holds.find(h => h.id === selectedPlacedHoldIds[0]);
+    const h2 = holds.find(h => h.id === selectedPlacedHoldIds[1]);
+    if (h1 && h2) {
+        return {
+            start: new THREE.Vector3(...h1.position),
+            end: new THREE.Vector3(...h2.position)
+        };
+    }
+    return null;
+  }, [selectedPlacedHoldIds, holds]);
+
+  // --- LOGIQUE DE MESURE DYNAMIQUE ---
+  const dynamicMeasurementData = useMemo(() => {
+      if (!isDynamicMeasuring || !referenceHoldId || !ghostPos) return null;
+      // On affiche la ligne seulement si on est en train de poser une prise (ghostPos actif)
+      const refHold = holds.find(h => h.id === referenceHoldId);
+      if (!refHold) return null;
+      
+      return {
+          start: new THREE.Vector3(...refHold.position),
+          end: ghostPos
+      };
+  }, [isDynamicMeasuring, referenceHoldId, ghostPos, holds]);
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
     if (draggingId) return;
@@ -142,9 +157,6 @@ export const Scene: React.FC<SceneProps> = ({
       if (mode !== 'SET') return;
 
       if (selectedPlacedHoldIds.length > 0) {
-        // Si on clique dans le vide mais qu'on a une sélection, 
-        // on ne désélectionne QUE si on n'est pas en mode mesure (optionnel, mais standard)
-        // Ici : comportement standard = désélection.
         e.stopPropagation();
         onSelectPlacedHold(null);
       } else if (selectedHoldDef) {
@@ -156,7 +168,6 @@ export const Scene: React.FC<SceneProps> = ({
     pointerDownScreenPos.current = null;
   };
 
-  // On désactive le menu par défaut du navigateur
   const preventDefaultContextMenu = (e: any) => {
     e.preventDefault();
   };
@@ -212,9 +223,14 @@ export const Scene: React.FC<SceneProps> = ({
           onPointerUp={handlePointerUp}
         />
         
-        {/* Ligne de mesure dynamique */}
+        {/* Ligne de mesure STATIQUE (Sélection de 2 prises) */}
         {measurementData && (
             <MeasurementLine start={measurementData.start} end={measurementData.end} />
+        )}
+        
+        {/* Ligne de mesure DYNAMIQUE (Fantôme + Référence) */}
+        {dynamicMeasurementData && (
+             <MeasurementLine start={dynamicMeasurementData.start} end={dynamicMeasurementData.end} />
         )}
 
         <Suspense fallback={null}>
@@ -227,7 +243,7 @@ export const Scene: React.FC<SceneProps> = ({
                     rotation={hold.rotation}
                     scale={hold.scale}
                     color={hold.color}
-                    isSelected={selectedPlacedHoldIds.includes(hold.id)}
+                    isSelected={selectedPlacedHoldIds.includes(hold.id) || referenceHoldId === hold.id}
                     isDragging={draggingId === hold.id}
                     onPointerOver={(e) => {
                       e.stopPropagation();
@@ -242,17 +258,20 @@ export const Scene: React.FC<SceneProps> = ({
                       pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
                       if (e.button === 0) {
                         e.stopPropagation();
-                        if (orbitRef.current) orbitRef.current.enabled = false;
-                        // On passe l'état "isMeasuring" implicitement via le handler du parent
-                        // mais ici on doit juste gérer le click
-                        const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-                        // Important : Si on veut mesurer, on peut soit utiliser CTRL, soit le mode dédié du parent.
-                        // Le parent gère la logique "isMeasuring" dans onSelectPlacedHold.
-                        onSelectPlacedHold(hold.id, isMultiSelect);
                         
-                        // Si pas en mode mesure et pas multi, on drag
-                        if (!isMultiSelect && selectedPlacedHoldIds.length <= 1) { // logic approx
-                             setDraggingId(hold.id);
+                        // LOGIQUE SELECTION REFERENCE DYNAMIQUE
+                        if (isDynamicMeasuring && !referenceHoldId && setReferenceHoldId) {
+                            setReferenceHoldId(hold.id);
+                            return;
+                        }
+
+                        if (orbitRef.current) orbitRef.current.enabled = false;
+                        const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
+                        if (mode === 'SET' && !isMultiSelect) {
+                           onSelectPlacedHold(hold.id, false);
+                           setDraggingId(hold.id);
+                        } else {
+                           onSelectPlacedHold(hold.id, isMultiSelect);
                         }
                       }
                     }}

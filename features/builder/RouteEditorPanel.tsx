@@ -2,7 +2,7 @@
 import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock, Ruler, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock, Ruler, CheckCircle, Target } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import '../../types';
 import { HoldModel } from '../../core/HoldModel';
@@ -34,15 +34,14 @@ interface RouteEditorPanelProps {
   onImport: (file: File) => void;
   onNew: () => void;
   onHome: () => void;
+  
   isMeasuring: boolean;
   onToggleMeasure: () => void;
-  // Note: On pourrait passer 'config' ici pour recalculer la distance précisément côté UI si besoin, 
-  // mais on peut le faire plus simplement si le parent passe la distance ou si on affiche juste l'état.
-  // Pour l'instant, faisons simple : le panel affiche juste l'état "Mesure" si actif.
-  // UPDATE : J'ai besoin de 'config' pour calculer la distance réelle ici aussi pour l'afficher dans le panel.
-  // Mais je ne l'ai pas dans les props actuelles. 
-  // Solution : On affiche la distance uniquement dans la scène 3D pour l'instant (MeasurementLine), 
-  // et dans le panel on met juste les instructions.
+  
+  // Props Mesure Dynamique
+  isDynamicMeasuring: boolean;
+  onToggleDynamicMeasure: () => void;
+  referenceHoldId: string | null;
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
@@ -50,7 +49,8 @@ const CATALOGUE_URL = `${BASE_URL}catalogue.json`;
 
 export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   onBack, selectedHold, onSelectHold, metadata, holdSettings, onUpdateSettings, placedHolds, onRemoveHold, onRemoveMultiple, onRemoveAllHolds, onChangeAllHoldsColor, selectedPlacedHoldIds, onUpdatePlacedHold, onSelectPlacedHold, onDeselect, onActionStart, onReplaceHold, onExport, onImport, onNew, onHome,
-  isMeasuring, onToggleMeasure
+  isMeasuring, onToggleMeasure,
+  isDynamicMeasuring, onToggleDynamicMeasure, referenceHoldId
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,11 +137,20 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     className={`flex items-center justify-center gap-2 py-3 rounded-lg text-xs font-bold transition-all border ${isMeasuring ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'}`}
                  >
                     <Ruler size={16} />
-                    <span>{isMeasuring ? 'Mesure Active' : 'Mesurer Écart'}</span>
+                    <span>{isMeasuring ? 'Règle Active' : 'Règle'}</span>
+                 </button>
+                 
+                 <button 
+                    onClick={onToggleDynamicMeasure}
+                    className={`flex items-center justify-center gap-2 py-3 rounded-lg text-xs font-bold transition-all border ${isDynamicMeasuring ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'}`}
+                    title="Mesure dynamique pendant la pose"
+                 >
+                    <Target size={16} className={isDynamicMeasuring ? "animate-pulse" : ""} />
+                    <span>{isDynamicMeasuring ? 'Mesure Dyn.' : 'Mesure Dyn.'}</span>
                  </button>
             </div>
             
-            {/* Instruction si mode mesure actif */}
+            {/* Instruction si mode mesure statique actif */}
             {isMeasuring && selectedPlacedHoldIds.length < 2 && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg animate-in fade-in">
                     <p className="text-xs text-yellow-200 text-center">
@@ -149,12 +158,29 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                     </p>
                 </div>
             )}
+            
+            {/* Instruction si mode mesure dynamique actif */}
+            {isDynamicMeasuring && !referenceHoldId && (
+                <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded-lg animate-in fade-in">
+                    <p className="text-xs text-blue-200 text-center">
+                        <Target size={12} className="inline mr-1"/>
+                        Sélectionnez une <span className="font-bold">prise de départ</span>.
+                    </p>
+                </div>
+            )}
+            {isDynamicMeasuring && referenceHoldId && (
+                <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded-lg animate-in fade-in flex items-center justify-between">
+                    <p className="text-xs text-blue-200">
+                        Mesure active depuis la prise sélectionnée.
+                    </p>
+                    <Target size={12} className="text-blue-400 animate-pulse"/>
+                </div>
+            )}
 
             {/* Affichage Distance dans le panel si 2 prises sélectionnées */}
             {selectedPlacedHoldIds.length === 2 && (
                 <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center justify-between animate-in slide-in-from-right">
                     <span className="text-xs text-gray-400 font-bold uppercase">Distance</span>
-                    {/* Note: La valeur exacte est affichée en 3D, ici on met un indicateur visuel */}
                     <span className="text-sm font-black text-yellow-400 flex items-center gap-2">
                         <Eye size={14} /> Voir sur le mur
                     </span>

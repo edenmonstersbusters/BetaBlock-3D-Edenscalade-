@@ -86,6 +86,13 @@ export const useEditorLogic = ({
     };
     
     setHolds(prev => [...prev, newHold]);
+
+    // LOGIQUE DE MESURE DYNAMIQUE
+    // Si actif et qu'on a une référence, on bascule en mode mesure statique sur la paire
+    if (state.isDynamicMeasuring && state.referenceHoldId) {
+        state.setIsMeasuring(true);
+        state.setSelectedPlacedHoldIds([state.referenceHoldId, newHold.id]);
+    }
   };
 
   const removeHoldsAction = useCallback((ids: string[], askConfirm: boolean = false) => {
@@ -97,6 +104,10 @@ export const useEditorLogic = ({
         const idSet = new Set(ids);
         setHolds(prev => prev.filter(h => !idSet.has(h.id)));
         state.setSelectedPlacedHoldIds((prev: string[]) => prev.filter(id => !idSet.has(id)));
+        // Si la prise de référence est supprimée, on reset
+        if (state.referenceHoldId && idSet.has(state.referenceHoldId)) {
+            state.setReferenceHoldId(null);
+        }
     };
 
     if (askConfirm) {

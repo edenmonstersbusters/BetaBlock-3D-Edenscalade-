@@ -220,10 +220,15 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 onHome={() => logic.handleAction('exit')}
                 isMeasuring={state.isMeasuring}
                 onToggleMeasure={() => {
-                     // Reset selection when entering/exiting measure mode
                      state.setSelectedPlacedHoldIds([]);
                      state.setIsMeasuring(prev => !prev);
                 }}
+                isDynamicMeasuring={state.isDynamicMeasuring}
+                onToggleDynamicMeasure={() => {
+                    state.setIsDynamicMeasuring(prev => !prev);
+                    state.setReferenceHoldId(null);
+                }}
+                referenceHoldId={state.referenceHoldId}
             />
         )}
 
@@ -248,6 +253,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                     state.setIsDirty(true);
                 }}
                 onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef}
+                isDynamicMeasuring={state.isDynamicMeasuring}
+                referenceHoldId={state.referenceHoldId}
+                setReferenceHoldId={state.setReferenceHoldId}
             />
         </div>
       </div>

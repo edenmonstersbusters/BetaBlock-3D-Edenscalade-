@@ -7,7 +7,11 @@ export const useEditorState = () => {
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
   const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
   const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
-  const [isMeasuring, setIsMeasuring] = useState(false); // NOUVEAU
+  
+  // Outils de Mesure
+  const [isMeasuring, setIsMeasuring] = useState(false);
+  const [isDynamicMeasuring, setIsDynamicMeasuring] = useState(false); // Mode mesure prédictive
+  const [referenceHoldId, setReferenceHoldId] = useState<string | null>(null); // Prise de départ
   
   // Interface
   const [modal, setModal] = useState<ModalConfig | null>(null);
@@ -32,8 +36,7 @@ export const useEditorState = () => {
             // Si on clique sur une prise déjà sélectionnée, on la désélectionne
             if (prev.includes(id)) return prev.filter(p => p !== id);
             
-            // Si on a déjà 2 prises, la nouvelle remplace la plus ancienne (FIFO) ou reset ? 
-            // UX Standard : Si on a déjà 2, on garde la dernière cliquée et on ajoute la nouvelle
+            // Si on a déjà 2 prises, la nouvelle remplace la plus ancienne
             if (prev.length >= 2) {
                 return [prev[1], id];
             }
@@ -56,7 +59,11 @@ export const useEditorState = () => {
     selectedHold, setSelectedHold,
     selectedPlacedHoldIds, setSelectedPlacedHoldIds,
     holdSettings, setHoldSettings,
+    
     isMeasuring, setIsMeasuring,
+    isDynamicMeasuring, setIsDynamicMeasuring,
+    referenceHoldId, setReferenceHoldId,
+
     modal, setModal,
     contextMenu, setContextMenu,
     showAuthModal, setShowAuthModal,
