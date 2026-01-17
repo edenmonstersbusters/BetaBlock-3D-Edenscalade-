@@ -6,6 +6,7 @@ import { auth } from '../../core/auth';
 import { UserProfile } from '../../types';
 import { WallCard } from '../gallery/WallCard';
 import { UserAvatar } from '../../components/ui/UserAvatar';
+import { GymSearchSelector } from './components/GymSearchSelector';
 import { ArrowLeft, Edit3, Save, MapPin, Dumbbell, TrendingUp, Activity, Calendar, Box, Heart, Loader2 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
@@ -121,7 +122,7 @@ export const ProfilePage: React.FC = () => {
                                 url={isEditing ? editData.avatar_url : profile.avatar_url}
                                 name={profile.display_name}
                                 size="xl"
-                                editable={isOwnProfile} // Toujours editable si c'est mon profil pour encourager l'upload
+                                editable={isOwnProfile} 
                                 onUpload={handleAvatarUpload}
                                 loading={isUploadingAvatar}
                                 className="shadow-2xl ring-4 ring-gray-900"
@@ -186,14 +187,21 @@ export const ProfilePage: React.FC = () => {
                                 <div className="space-y-2">
                                     <label className="text-xs text-gray-400 flex items-center gap-2"><Dumbbell size={12} className="text-purple-500"/> Salle Favorite</label>
                                     {isEditing ? (
-                                        <input 
+                                        <GymSearchSelector 
                                             value={editData.home_gym || ''} 
-                                            onChange={e => setEditData({...editData, home_gym: e.target.value})}
-                                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-blue-500 outline-none"
-                                            placeholder="Ex: Arkose Nation"
+                                            onChange={val => setEditData({...editData, home_gym: val})}
                                         />
                                     ) : (
-                                        <div className="text-lg font-medium">{profile.home_gym || <span className="text-gray-600 italic">Non renseignée</span>}</div>
+                                        <div className="text-lg font-medium flex items-center gap-2">
+                                            {profile.home_gym ? (
+                                                <>
+                                                    <span className="text-purple-400 italic">@</span>
+                                                    <span>{profile.home_gym}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-gray-600 italic">Non renseignée</span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
 
@@ -291,7 +299,7 @@ export const ProfilePage: React.FC = () => {
                                     createdAt={wall.created_at}
                                     thumbnail={wall.data?.metadata?.thumbnail}
                                     authorName={profile.display_name}
-                                    authorAvatarUrl={profile.avatar_url} // Passage de l'avatar
+                                    authorAvatarUrl={profile.avatar_url} 
                                     onClick={() => navigate(`/view/${wall.id}`)}
                                 />
                             ))}

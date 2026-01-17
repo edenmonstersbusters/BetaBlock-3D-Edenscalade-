@@ -1,5 +1,7 @@
 {
   "name": "BetaBlock 3D",
   "description": "A precise 3D climbing wall configurator allowing users to stack, resize, and angle wall segments with seamless geometry.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }
