@@ -19,15 +19,16 @@ interface GymSearchSelectorProps {
 
 /**
  * Composant interne ultra-compact pour un résultat de recherche
+ * Fix: Use React.FC to allow the 'key' prop when used in JSX maps
  */
-const GymResultItem = ({ 
-  gym, 
-  query, 
-  onSelect 
-}: { 
+const GymResultItem: React.FC<{ 
   gym: GymSearchResult; 
   query: string; 
   onSelect: () => void;
+}> = ({ 
+  gym, 
+  query, 
+  onSelect 
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLHeadingElement>(null);
