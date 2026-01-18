@@ -8,7 +8,6 @@ declare global {
         mesh: any;
         group: any;
         meshStandardMaterial: any;
-        // Fix: Add missing material and geometry types used in WallMesh.tsx
         lineBasicMaterial: any;
         boxGeometry: any;
         meshBasicMaterial: any;
@@ -19,7 +18,6 @@ declare global {
         spotLight: any;
         primitive: any;
         color: any;
-        // Fix: Add missing sphereGeometry for MeasurementLine component
         sphereGeometry: any;
       }
     }
@@ -34,9 +32,7 @@ export interface WallMetadata {
   authorId?: string;
   authorName?: string;
   authorAvatarUrl?: string;
-  isPublic?: boolean; // NOUVEAU : Gère la visibilité
-  
-  // Remix fields
+  isPublic?: boolean;
   parentId?: string;
   parentName?: string;
   parentAuthorName?: string;
@@ -91,7 +87,7 @@ export interface UserProfile {
   bio?: string;
   avatar_url?: string;
   location?: string;
-  home_gym?: string;
+  home_gym?: any; // Modifié pour accepter objet ou string
   climbing_grade?: string;
   climbing_style?: string;
   created_at: string;

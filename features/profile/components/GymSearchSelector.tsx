@@ -94,13 +94,13 @@ const GymResultItem: React.FC<{
 };
 
 interface GymSearchSelectorProps {
-  value: string;
-  onChange: (val: string) => void;
+  value: any;
+  onChange: (val: any) => void;
   placeholder?: string;
 }
 
 export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onChange, placeholder }) => {
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(typeof value === 'string' ? value : value?.name || '');
   const [results, setResults] = useState<GymSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -132,7 +132,6 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   };
 
   const searchGyms = async (searchQuery: string) => {
-    // Sécurité : au moins 2 caractères pour ne pas "faire bugger"
     if (!searchQuery || searchQuery.trim().length < 2) {
       setResults([]);
       setIsOpen(false);
@@ -147,32 +146,20 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
     setLoading(true);
     try {
       let data: any[] = [];
-      
-      // STRATÉGIE EN CASCADE (MOINS POINTILLEUSE)
-      
-      // 1. Essai avec ton PREFIXE miracle
       data = await fetchFromNominatim(`centre sportif ${searchQuery}`);
-      
-      // 2. Si rien avec le préfixe, essai avec suffixe climbing (plus large)
       if (data.length < 2) {
         const fallbackData = await fetchFromNominatim(`${searchQuery} climbing`);
         data = [...data, ...fallbackData];
       }
-
-      // 3. Si toujours peu de résultats, recherche brute (tolérance maximale aux fautes de frappe)
       if (data.length < 5) {
         const rawData = await fetchFromNominatim(searchQuery);
         data = [...data, ...rawData];
       }
 
-      // Nettoyage et formatage des résultats
       const parsedResults: GymSearchResult[] = data.map((item: any) => {
         const addr = item.address || {};
-        
-        // On prend le premier segment du display_name comme nom (simple et efficace)
         const nameParts = item.display_name.split(',');
         const rawName = nameParts[0].trim();
-        
         const street = addr.road || addr.pedestrian || "";
         const house = addr.house_number || "";
         const addressStr = `${house} ${street}`.trim() || addr.suburb || nameParts[1]?.trim() || "Adresse non renseignée";
@@ -186,10 +173,9 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
         };
       });
 
-      // Suppression des doublons basés sur le nom
       const uniqueResults = parsedResults.filter((v, i, a) => 
         a.findIndex(t => (t.name === v.name && t.city === v.city)) === i
-      ).slice(0, 50); // On garde les 50 meilleurs
+      ).slice(0, 50);
 
       setResults(uniqueResults);
       setIsOpen(uniqueResults.length > 0);
@@ -228,7 +214,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
         />
         {query && !loading && (
           <button 
-            onClick={() => { setQuery(''); onChange(''); setResults([]); setIsOpen(false); }}
+            onClick={() => { setQuery(''); onChange(null); setResults([]); setIsOpen(false); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-700 hover:text-white transition-colors"
           >
             <X size={12} />
@@ -240,7 +226,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
         <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-white/10 rounded-lg shadow-2xl z-[100] overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="p-1.5 border-b border-white/5 bg-black/40 flex items-center gap-1.5">
             <Globe size={10} className="text-blue-500/50" />
-            <span className="text-[7.5px] font-black text-gray-600 uppercase tracking-widest">Recherche intelligente (OSM) - Top 50</span>
+            <span className="text-[7.5px] font-black text-gray-600 uppercase tracking-widest">Nominatim (OSM) - Top 50</span>
           </div>
           <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
             {results.map((gym, idx) => (
@@ -248,7 +234,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
                 key={idx} 
                 gym={gym} 
                 onSelect={() => { 
-                  onChange(gym.name); 
+                  onChange(gym); // Renvoie l'objet complet
                   setQuery(gym.name); 
                   setIsOpen(false); 
                 }} 

@@ -7,7 +7,59 @@ import { UserProfile } from '../../types';
 import { WallCard } from '../gallery/WallCard';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { GymSearchSelector } from './components/GymSearchSelector';
-import { ArrowLeft, Edit3, Save, MapPin, Dumbbell, TrendingUp, Activity, Calendar, Box, Heart, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit3, Save, MapPin, Dumbbell, TrendingUp, Activity, Calendar, Box, Heart, Loader2, Navigation, ExternalLink } from 'lucide-react';
+
+/**
+ * Composant de carte pour afficher une salle favorite de manière élégante
+ */
+const FavoriteGymCard: React.FC<{ gym: any }> = ({ gym }) => {
+    if (!gym) return <span className="text-gray-600 italic">Non renseignée</span>;
+
+    // Gestion de la rétrocompatibilité (si gym est juste une string)
+    if (typeof gym === 'string') {
+        return (
+            <div className="flex items-center gap-2 text-lg font-medium">
+                <span className="text-purple-400 italic">@</span>
+                <span>{gym}</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-1 group relative bg-gray-900/40 border border-white/10 rounded-2xl p-3 flex items-start gap-3 transition-all hover:bg-gray-800/60 hover:border-purple-500/30 overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+                <Dumbbell size={64} className="rotate-12" />
+            </div>
+            
+            <div className="shrink-0 p-2.5 bg-purple-600/20 text-purple-400 rounded-xl group-hover:scale-110 transition-transform shadow-lg border border-purple-500/10">
+                <Navigation size={18} />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-[15px] font-black text-white leading-tight tracking-tight uppercase break-words">{gym.name}</h4>
+                    {gym.uri && (
+                        <a 
+                            href={gym.uri} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="p-1.5 text-gray-600 hover:text-blue-400 transition-colors bg-white/5 rounded-lg border border-white/5 shrink-0"
+                            title="Voir sur OpenStreetMap"
+                        >
+                            <ExternalLink size={12} />
+                        </a>
+                    )}
+                </div>
+                
+                <p className="text-[11px] text-gray-400 mt-1 break-words">{gym.address}</p>
+                
+                <div className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/10 rounded text-[9px] font-black text-purple-400 border border-purple-500/20 uppercase tracking-widest">
+                    {gym.city}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
@@ -18,7 +70,6 @@ export const ProfilePage: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
     
-    // État local pour le formulaire d'édition
     const [editData, setEditData] = useState<Partial<UserProfile>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -39,12 +90,11 @@ export const ProfilePage: React.FC = () => {
             const { data: walls } = await api.getWallsList(targetId);
 
             if (profileData) {
-                // Auto-détection du pays si vide et si c'est mon profil
                 if (!profileData.location && (!userId || userId === user?.id)) {
                     try {
                          const detectedCountry = new Intl.DisplayNames([navigator.language], { type: 'region' }).of(navigator.language.split('-')[1] || 'FR');
                          profileData.location = detectedCountry || "Terre";
-                    } catch (e) { /* Ignorer si l'API n'est pas dispo */ }
+                    } catch (e) { }
                 }
 
                 setProfile(profileData);
@@ -89,13 +139,10 @@ export const ProfilePage: React.FC = () => {
     if (!profile) return null;
 
     const isOwnProfile = !userId || userId === currentUser?.id;
-
-    // Année d'inscription
     const memberSince = new Date(profile.created_at).getFullYear();
 
     return (
         <div className="min-h-screen bg-gray-950 text-white font-sans overflow-x-hidden">
-            {/* Header / Nav */}
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/50 backdrop-blur-xl sticky top-0 z-50">
                 <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
                     <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
@@ -107,16 +154,11 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             <main className="max-w-5xl mx-auto px-6 py-12 space-y-12">
-                
-                {/* ZONE A: HERO SECTION & IDENTITY */}
                 <section className="relative">
-                     {/* Ambiance Lights */}
                     <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
                     <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
                     
                     <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
-                        
-                        {/* COLONNE GAUCHE : IDENTITÉ VISUELLE */}
                         <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left gap-6">
                             <UserAvatar 
                                 url={isEditing ? editData.avatar_url : profile.avatar_url}
@@ -151,7 +193,6 @@ export const ProfilePage: React.FC = () => {
                                 </p>
                             </div>
 
-                            {/* Bouton d'action principal */}
                             {isOwnProfile && (
                                 <button 
                                     onClick={isEditing ? handleSaveProfile : () => setIsEditing(true)}
@@ -163,12 +204,10 @@ export const ProfilePage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* COLONNE DROITE : CARTE D'IDENTITÉ GRIMPEUR */}
                         <div className="lg:col-span-8 bg-white/5 border border-white/10 backdrop-blur-md rounded-3xl p-6 lg:p-8">
                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Carte du Grimpeur</h3>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                {/* Localisation */}
                                 <div className="space-y-2">
                                     <label className="text-xs text-gray-400 flex items-center gap-2"><MapPin size={12} className="text-blue-500"/> QG / Localisation</label>
                                     {isEditing ? (
@@ -183,7 +222,6 @@ export const ProfilePage: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Salle */}
                                 <div className="space-y-2">
                                     <label className="text-xs text-gray-400 flex items-center gap-2"><Dumbbell size={12} className="text-purple-500"/> Salle Favorite</label>
                                     {isEditing ? (
@@ -192,20 +230,10 @@ export const ProfilePage: React.FC = () => {
                                             onChange={val => setEditData({...editData, home_gym: val})}
                                         />
                                     ) : (
-                                        <div className="text-lg font-medium flex items-center gap-2">
-                                            {profile.home_gym ? (
-                                                <>
-                                                    <span className="text-purple-400 italic">@</span>
-                                                    <span>{profile.home_gym}</span>
-                                                </>
-                                            ) : (
-                                                <span className="text-gray-600 italic">Non renseignée</span>
-                                            )}
-                                        </div>
+                                        <FavoriteGymCard gym={profile.home_gym} />
                                     )}
                                 </div>
 
-                                {/* Niveau */}
                                 <div className="space-y-2">
                                     <label className="text-xs text-gray-400 flex items-center gap-2"><TrendingUp size={12} className="text-emerald-500"/> Niveau Max</label>
                                     {isEditing ? (
@@ -220,7 +248,6 @@ export const ProfilePage: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Style */}
                                 <div className="space-y-2">
                                     <label className="text-xs text-gray-400 flex items-center gap-2"><Activity size={12} className="text-orange-500"/> Style</label>
                                     {isEditing ? (
@@ -261,7 +288,6 @@ export const ProfilePage: React.FC = () => {
                     </div>
                 </section>
 
-                {/* Stats Rapides */}
                 <section className="grid grid-cols-2 gap-4">
                     <div className="bg-gray-900/50 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
                          <div className="text-sm text-gray-400 font-bold uppercase">Murs Créés</div>
@@ -277,7 +303,6 @@ export const ProfilePage: React.FC = () => {
                     </div>
                 </section>
 
-                {/* Wall Listing */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between border-b border-white/5 pb-4">
                         <h2 className="text-2xl font-black tracking-tight">
