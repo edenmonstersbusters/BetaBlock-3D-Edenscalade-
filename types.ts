@@ -19,6 +19,8 @@ declare global {
         spotLight: any;
         primitive: any;
         color: any;
+        // Fix: Add missing sphereGeometry for MeasurementLine component
+        sphereGeometry: any;
       }
     }
   }
