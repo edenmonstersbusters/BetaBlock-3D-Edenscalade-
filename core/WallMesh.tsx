@@ -107,7 +107,10 @@ const WallPanel: React.FC<WallPanelProps> = ({
         onPointerMove={interactive ? (e) => onPointerMove?.(e, segment.id) : undefined}
         onPointerDown={interactive ? (e) => onPointerDown?.(e, segment.id) : undefined}
         onPointerUp={interactive ? (e) => onPointerUp?.(e, segment.id) : undefined}
-        onContextMenu={interactive ? (e) => onContextMenu?.(e, segment.id) : undefined}
+        onContextMenu={interactive ? (e) => {
+            e.stopPropagation();
+            onContextMenu?.(e, segment.id);
+        } : undefined}
       >
         <meshStandardMaterial map={texture} color="#ffffff" roughness={0.8} metalness={0.0} />
       </mesh>

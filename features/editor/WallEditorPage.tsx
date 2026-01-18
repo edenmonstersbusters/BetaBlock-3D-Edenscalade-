@@ -1,5 +1,5 @@
 
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 // Fix: Import useNavigate from 'react-router' instead of 'react-router-dom' to resolve missing export error.
 import { useNavigate } from 'react-router';
 
@@ -22,12 +22,12 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay';
 import { GlobalModal } from '../../components/ui/GlobalModal';
 import { ContextMenu } from '../../components/ui/ContextMenu';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { Undo2, Redo2, Save, Globe, ArrowLeft, Edit2 } from 'lucide-react';
+import { Undo2, Redo2, Save, Globe, ArrowLeft, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../../types';
 
 interface WallEditorProps {
-  mode: AppMode; // Mode initial venant du router
+  mode: AppMode;
   user: any;
   config: WallConfig;
   setConfig: React.Dispatch<React.SetStateAction<WallConfig>>;
@@ -63,20 +63,16 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 }) => {
   const navigate = useNavigate();
   const state = useEditorState();
+  const globalFileInputRef = useRef<HTMLInputElement>(null);
   
-  // État local pour les onglets
-  // Si on arrive en mode SET (ex: via /setter), on active l'onglet 'holds' par défaut
   const [activeTab, setActiveTab] = useState<EditorTab>(initialMode === 'SET' ? 'holds' : 'structure');
 
-  // Synchronisation inverse : Si l'onglet change, le mode effectif change
-  // Structure -> BUILD, Holds -> SET, Measure -> SET (mais read-only logique)
   const effectiveMode: AppMode = activeTab === 'structure' ? 'BUILD' : 'SET';
   
-  // En mode mesure, on force l'activation de la règle
   useEffect(() => {
      if (activeTab === 'measure') {
          state.setIsMeasuring(true);
-         state.setSelectedPlacedHoldIds([]); // Reset selection on enter
+         state.setSelectedPlacedHoldIds([]);
      } else {
          state.setIsMeasuring(false);
      }
@@ -84,7 +80,8 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   const logic = useEditorLogic({
     mode: effectiveMode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
-    undo, redo, recordAction, state, onHome, onNewWall
+    undo, redo, recordAction, state, onHome, onNewWall,
+    onTriggerImport: () => globalFileInputRef.current?.click()
   });
 
   const wrappedSaveCloud = async () => {
@@ -112,11 +109,18 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleGlobalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        logic.handleImportFile(file);
+        e.target.value = ''; 
+    }
+  };
+
   useEffect(() => {
     const handleGlobalClick = () => { if (state.contextMenu) state.setContextMenu(null); };
     window.addEventListener('click', handleGlobalClick);
-    window.addEventListener('contextmenu', handleGlobalClick);
-    return () => { window.removeEventListener('click', handleGlobalClick); window.removeEventListener('contextmenu', handleGlobalClick); };
+    return () => { window.removeEventListener('click', handleGlobalClick); };
   }, [state.contextMenu]);
 
   return (
@@ -124,8 +128,11 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       <LoadingOverlay isVisible={isLoadingCloud} />
       {state.showAuthModal && <AuthModal onClose={() => state.setShowAuthModal(false)} onSuccess={() => state.setShowAuthModal(false)} />}
       
+      {/* INPUT INVISIBLE POUR CTRL+O */}
+      <input type="file" ref={globalFileInputRef} className="hidden" accept=".json" onChange={handleGlobalFileChange} />
+
       {initialMode !== 'VIEW' && (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative shrink-0">
             <div className="flex items-center gap-4 justify-start">
                 <button onClick={() => logic.handleAction('exit')} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2">
                     <ArrowLeft size={16} />
@@ -159,65 +166,88 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* SIDEBAR CONTAINER */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* BOUTON TOGGLE SIDEBAR - Position Absolue & Fixe */}
         {initialMode !== 'VIEW' && (
-             <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-20 overflow-hidden relative">
-                 <SidebarTabs activeTab={activeTab} onTabChange={setActiveTab} />
-                 
-                 <div className="flex-1 overflow-hidden relative">
-                     {activeTab === 'structure' && (
-                        <EditorPanel 
-                            config={config} holds={holds} onUpdate={setConfig} metadata={metadata}
-                            onSwitchToHolds={() => setActiveTab('holds')} showModal={(c) => state.setModal(c)}
-                            onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')}
-                            onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
-                            onRemoveSegment={logic.removeSegmentAction}
-                        />
-                     )}
-                     
-                     {activeTab === 'holds' && (
-                        <RouteEditorPanel 
-                            selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold}
-                            metadata={metadata} holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
-                            placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} 
-                            onRemoveAllHolds={onRemoveAllHolds || (() => {})} onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
-                            selectedPlacedHoldIds={state.selectedPlacedHoldIds}
-                            onUpdatePlacedHold={(ids, u) => { 
-                                if (metadata.remixMode === 'structure') return;
-                                const idSet = new Set(ids); setHolds(hds => hds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); 
-                                state.setIsDirty(true);
-                            }}
-                            onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])}
-                            onActionStart={logic.saveToHistory} 
-                            onReplaceHold={(ids, def) => { 
-                                if (metadata.remixMode === 'structure') return;
-                                logic.saveToHistory(); const idSet = new Set(ids); setHolds(prev => prev.map(h => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); 
-                            }}
-                            onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)}
-                            onExport={() => logic.handleAction('save')} onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
-                            isDynamicMeasuring={state.isDynamicMeasuring} onToggleDynamicMeasure={() => { state.setIsDynamicMeasuring(prev => !prev); state.setReferenceHoldId(null); }}
-                        />
-                     )}
+            <div 
+                className="absolute top-1/2 z-[120] transition-all duration-300 ease-in-out"
+                style={{ 
+                    left: state.isSidebarOpen ? '300px' : '0px', 
+                    transform: 'translateY(-50%)' 
+                }}
+            >
+                <button 
+                    onClick={() => state.setIsSidebarOpen(!state.isSidebarOpen)}
+                    className="flex items-center justify-center w-6 h-12 bg-gray-800 border-y border-r border-gray-700 rounded-r-lg text-gray-400 hover:text-white hover:bg-gray-700 shadow-xl"
+                    title={state.isSidebarOpen ? "Masquer" : "Afficher"}
+                >
+                    {state.isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                </button>
+            </div>
+        )}
 
-                     {activeTab === 'measure' && (
-                        <MeasurePanel selectedHoldIds={state.selectedPlacedHoldIds} holds={holds} config={config} />
-                     )}
+        {/* SIDEBAR CONTAINER - Flex Item avec largeur transitionnelle */}
+        {initialMode !== 'VIEW' && (
+             <div 
+                className="relative flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 shadow-xl z-20 overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0"
+                style={{ width: state.isSidebarOpen ? '300px' : '0px' }}
+             >
+                 {/* Contenu interne à largeur fixe pour éviter l'écrasement ou le vide */}
+                 <div className="w-[300px] h-full flex flex-col bg-gray-900">
+                     <SidebarTabs activeTab={activeTab} onTabChange={setActiveTab} />
+                     
+                     <div className="flex-1 overflow-hidden relative">
+                         {activeTab === 'structure' && (
+                            <EditorPanel 
+                                config={config} holds={holds} onUpdate={setConfig} metadata={metadata}
+                                onSwitchToHolds={() => setActiveTab('holds')} showModal={(c) => state.setModal(c)}
+                                onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')}
+                                onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest}
+                                onRemoveSegment={logic.removeSegmentAction}
+                            />
+                         )}
+                         
+                         {activeTab === 'holds' && (
+                            <RouteEditorPanel 
+                                selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold}
+                                metadata={metadata} holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
+                                placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} 
+                                onRemoveAllHolds={onRemoveAllHolds || (() => {})} onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
+                                selectedPlacedHoldIds={state.selectedPlacedHoldIds}
+                                onUpdatePlacedHold={(ids, u) => { 
+                                    if (metadata.remixMode === 'structure') return;
+                                    logic.saveToHistory();
+                                    const idSet = new Set(ids); setHolds(hds => hds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); 
+                                }}
+                                onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])}
+                                onActionStart={logic.saveToHistory} 
+                                onReplaceHold={(ids, def) => { 
+                                    if (metadata.remixMode === 'structure') return;
+                                    logic.saveToHistory(); const idSet = new Set(ids); setHolds(prev => prev.map(h => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); 
+                                }}
+                                onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)}
+                                onExport={() => logic.handleAction('save')} onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest}
+                                isDynamicMeasuring={state.isDynamicMeasuring} onToggleDynamicMeasure={() => { state.setIsDynamicMeasuring(prev => !prev); state.setReferenceHoldId(null); }}
+                            />
+                         )}
+
+                         {activeTab === 'measure' && (
+                            <MeasurePanel selectedHoldIds={state.selectedPlacedHoldIds} holds={holds} config={config} />
+                         )}
+                     </div>
                  </div>
              </div>
         )}
 
-        {initialMode === 'VIEW' && (
-            <ViewerPanel 
-                wallId={cloudId || ''} metadata={metadata} config={config} holds={holds}
-                onHome={() => logic.handleAction('exit')} onRemix={onRemix || (() => {})} 
-                onShare={() => logic.handleAction('share')} onEdit={() => navigate(`/builder?id=${cloudId}`)}
-            />
-        )}
-
-        {/* 3D SCENE */}
-        <div className="flex-1 relative h-full">
-            {initialMode !== 'VIEW' && (
+        {/* 3D SCENE - Prend le reste de l'espace */}
+        <div className="flex-1 relative h-full bg-gray-950 min-w-0">
+            {initialMode === 'VIEW' ? (
+                <ViewerPanel 
+                    wallId={cloudId || ''} metadata={metadata} config={config} holds={holds}
+                    onHome={() => logic.handleAction('exit')} onRemix={onRemix || (() => {})} 
+                    onShare={() => logic.handleAction('share')} onEdit={() => navigate(`/builder?id=${cloudId}`)}
+                />
+            ) : (
                 <div className="fixed bottom-6 right-6 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
                     <button disabled={!canUndo} onClick={logic.performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
                     <button disabled={!canRedo} onClick={logic.performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
@@ -233,7 +263,10 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 selectedPlacedHoldIds={state.selectedPlacedHoldIds}
                 onSelectPlacedHold={state.handleSelectPlacedHold}
                 onContextMenu={(type, id, x, y, wx, wy) => state.setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
-                // En mode mesure, on désactive le drag (undefined)
+                
+                // TRACKING SOURIS SUR LE MUR (Pour le Smart Paste)
+                onWallPointerUpdate={(info) => state.setWallMousePosition(info)}
+
                 onHoldDrag={activeTab === 'measure' ? undefined : (id, x, y, segId) => {
                     if (metadata.remixMode === 'structure') return;
                     setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId: segId } : h))
@@ -249,7 +282,8 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       <ContextMenu 
         data={state.contextMenu} onClose={() => state.setContextMenu(null)} onUpdateData={state.setContextMenu}
         onCopyHold={() => { if (state.selectedPlacedHoldIds.length > 0) { const toCopy = holds.filter(h => state.selectedPlacedHoldIds.includes(h.id)); state.setClipboard(JSON.parse(JSON.stringify(toCopy))); } }} 
-        hasClipboard={state.clipboard.length > 0} onPasteHold={() => {}} 
+        hasClipboard={state.clipboard.length > 0} 
+        onPasteHold={(target) => logic.handlePaste(target)} // Passe maintenant la cible potentielle (clic droit)
         onDelete={(id, type) => { type === 'HOLD' ? logic.removeHoldsAction([id], true) : logic.removeSegmentAction(id); }}
         onRotateHold={(id, delta) => { if (metadata.remixMode === 'structure') return; logic.saveToHistory(); setHolds(hds => hds.map(h => id === h.id ? { ...h, spin: h.spin + delta } : h)); }}
         onColorHold={(id, c) => { if (metadata.remixMode === 'structure') return; logic.saveToHistory(); setHolds(hds => hds.map(h => id === h.id ? { ...h, color: c } : h)); }}

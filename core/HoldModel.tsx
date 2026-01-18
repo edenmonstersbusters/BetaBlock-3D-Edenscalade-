@@ -23,6 +23,7 @@ interface HoldModelProps {
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
+  userData?: any;
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
@@ -91,7 +92,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   onPointerUp,
   onPointerOver,
   onPointerOut,
-  onContextMenu
+  onContextMenu,
+  userData
 }) => {
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
   const { scene } = useGLTF(url, DRACO_DECODER_URL);
@@ -159,7 +161,11 @@ export const HoldModel: React.FC<HoldModelProps> = ({
       onPointerOver={preview ? undefined : onPointerOver}
       onPointerOut={preview ? undefined : onPointerOut}
       onClick={preview ? undefined : onClick}
-      onContextMenu={preview ? undefined : onContextMenu}
+      onContextMenu={preview ? undefined : (e) => {
+          e.stopPropagation(); // Stop propagation pour ne pas trigger le mur derrière
+          if (onContextMenu) onContextMenu(e);
+      }}
+      userData={userData}
     >
         <primitive object={clonedScene} position={offset} />
         {showDimensions && size && (

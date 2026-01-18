@@ -19,7 +19,11 @@ export const useEditorState = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [clipboard, setClipboard] = useState<PlacedHold[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // NOUVEAU
   
+  // Tracking Souris (Pour coller au curseur)
+  const [wallMousePosition, setWallMousePosition] = useState<{ x: number, y: number, segmentId: string } | null>(null); // NOUVEAU
+
   // Suivi des modifications
   const [isDirty, setIsDirty] = useState(false);
 
@@ -70,6 +74,9 @@ export const useEditorState = () => {
     clipboard, setClipboard,
     isEditingName, setIsEditingName,
     isDirty, setIsDirty,
+    
+    isSidebarOpen, setIsSidebarOpen,
+    wallMousePosition, setWallMousePosition,
 
     // Actions
     handleSelectPlacedHold

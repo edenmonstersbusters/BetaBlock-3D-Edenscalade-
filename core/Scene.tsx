@@ -7,9 +7,9 @@ import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
 import { DragController } from './DragController';
 import { ScreenshotHandler } from './ScreenshotHandler';
-import { MeasurementLine } from './MeasurementLine'; // IMPORT NOUVEAU
+import { MeasurementLine } from './MeasurementLine';
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
-import { calculateLocalCoords, resolveHoldWorldData } from '../utils/geometry';
+import { calculateLocalCoords } from '../utils/geometry';
 import '../types'; 
 
 interface SceneProps {
@@ -26,7 +26,6 @@ interface SceneProps {
   onHoldDrag?: (id: string, x: number, y: number, segmentId: string) => void;
   onHoldDragEnd?: () => void;
   screenshotRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
-  // Dynamic Measure Props
   isDynamicMeasuring?: boolean;
   referenceHoldId?: string | null;
   setReferenceHoldId?: (id: string | null) => void;
@@ -56,9 +55,8 @@ export const Scene: React.FC<SceneProps> = ({
   const [hoveredHoldId, setHoveredHoldId] = useState<string | null>(null);
   
   const orbitRef = useRef<any>(null);
-  const pointerDownScreenPos = useRef<{x: number, y: number} | null>(null);
+  const pointerDownRef = useRef<{x: number, y: number, button: number, time: number} | null>(null);
 
-  // Strategy: Disable orbit controls when hovering a selected hold to prioritize interaction
   const isHoveringSelected = hoveredHoldId && selectedPlacedHoldIds.includes(hoveredHoldId);
   const orbitEnabled = !draggingId && !isHoveringSelected;
 
@@ -73,7 +71,6 @@ export const Scene: React.FC<SceneProps> = ({
     return () => { document.body.style.cursor = 'auto'; };
   }, [draggingId, isHoveringSelected]);
 
-  // --- LOGIQUE DE MESURE STATIQUE ---
   const measurementData = useMemo(() => {
     if (selectedPlacedHoldIds.length !== 2) return null;
     const h1 = holds.find(h => h.id === selectedPlacedHoldIds[0]);
@@ -87,13 +84,10 @@ export const Scene: React.FC<SceneProps> = ({
     return null;
   }, [selectedPlacedHoldIds, holds]);
 
-  // --- LOGIQUE DE MESURE DYNAMIQUE ---
   const dynamicMeasurementData = useMemo(() => {
       if (!isDynamicMeasuring || !referenceHoldId || !ghostPos) return null;
-      // On affiche la ligne seulement si on est en train de poser une prise (ghostPos actif)
       const refHold = holds.find(h => h.id === referenceHoldId);
       if (!refHold) return null;
-      
       return {
           start: new THREE.Vector3(...refHold.position),
           end: ghostPos
@@ -124,52 +118,102 @@ export const Scene: React.FC<SceneProps> = ({
     setGhostRot(new THREE.Euler().setFromQuaternion(quaternion));
   };
 
+  // --- GESTION CENTRALISÉE DES ÉVÉNEMENTS SOURIS ---
+
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-    if (draggingId) return;
-    pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
+    // On enregistre les coordonnées et le bouton pressé
+    pointerDownRef.current = { 
+        x: e.clientX, 
+        y: e.clientY, 
+        button: e.button,
+        time: Date.now() 
+    };
   };
 
-  const handlePointerUp = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
-    if (!pointerDownScreenPos.current) return;
+  const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
+    if (!pointerDownRef.current) return;
     
-    const dx = e.clientX - pointerDownScreenPos.current.x;
-    const dy = e.clientY - pointerDownScreenPos.current.y;
+    const { x, y, button, time } = pointerDownRef.current;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // Si on a bougé (drag), on ne fait rien
-    if (dist > 5) {
-      pointerDownScreenPos.current = null;
-      return;
-    }
+    pointerDownRef.current = null;
+    
+    // DISTINCTION CLÉ : Si on a bougé de plus de 5px, c'est un DRAG (caméra ou objet), on ignore le clic
+    if (dist > 5) return;
 
-    // Gestion CLIC DROIT (Menu contextuel sur le mur)
-    if (e.button === 2) {
-      e.stopPropagation();
-      const coords = calculateLocalCoords(e.point, segmentId, config);
-      onContextMenu('SEGMENT', segmentId, e.clientX, e.clientY, coords?.x, coords?.y);
-      pointerDownScreenPos.current = null;
-      return;
-    }
-
-    // Gestion CLIC GAUCHE (Placement ou désélection)
-    if (e.button === 0) {
+    // --- CLIC GAUCHE (0) ---
+    if (button === 0) {
       if (draggingId) return;
-      if (mode !== 'SET') return;
+      
+      // Check if Hold
+      if (e.object.userData && (e.object.userData.type === 'HOLD' || e.object.parent?.userData?.type === 'HOLD')) {
+          const holdData = e.object.userData.type === 'HOLD' ? e.object.userData : e.object.parent!.userData;
+          const holdId = holdData.id;
 
-      if (selectedPlacedHoldIds.length > 0) {
-        e.stopPropagation();
-        onSelectPlacedHold(null);
-      } else if (selectedHoldDef) {
-        e.stopPropagation();
-        const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
-        onPlaceHold(e.point.clone(), normal, segmentId);
+          if (isDynamicMeasuring && !referenceHoldId && setReferenceHoldId) {
+            setReferenceHoldId(holdId);
+            e.stopPropagation();
+            return;
+          }
+
+          if (orbitRef.current) orbitRef.current.enabled = false;
+          const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
+          
+          if (mode === 'SET' && !isMultiSelect) {
+             onSelectPlacedHold(holdId, false);
+             setDraggingId(holdId);
+          } else {
+             onSelectPlacedHold(holdId, isMultiSelect);
+          }
+          e.stopPropagation();
+          return;
+      }
+
+      // Check if Wall (Placement)
+      if (mode === 'SET' && e.object.name === 'climbing-wall-panel') {
+          if (selectedPlacedHoldIds.length > 0) {
+            onSelectPlacedHold(null);
+            e.stopPropagation();
+          } else if (selectedHoldDef) {
+            const segmentId = e.object.userData.segmentId;
+            const normal = e.face!.normal.clone().transformDirection(e.object.matrixWorld).normalize();
+            onPlaceHold(e.point.clone(), normal, segmentId);
+            e.stopPropagation();
+          }
       }
     }
-    pointerDownScreenPos.current = null;
-  };
 
-  const preventDefaultContextMenu = (e: any) => {
-    e.preventDefault();
+    // --- CLIC DROIT (2) ---
+    if (button === 2) {
+        // C'est un clic droit STATIQUE (pas un drag caméra, car dist < 5px)
+        
+        // 1. Check Hold (même si sélectionnée)
+        let target = e.object;
+        let holdFound = false;
+        
+        // Traverser la hiérarchie pour trouver userData.type === 'HOLD'
+        while (target) {
+            if (target.userData && target.userData.type === 'HOLD') {
+                e.stopPropagation();
+                onContextMenu('HOLD', target.userData.id, e.clientX, e.clientY);
+                holdFound = true;
+                break;
+            }
+            if (target.parent) target = target.parent as THREE.Object3D;
+            else break;
+        }
+        if (holdFound) return;
+
+        // 2. Check Wall
+        if (e.object.name === 'climbing-wall-panel') {
+             const segmentId = e.object.userData.segmentId;
+             const coords = calculateLocalCoords(e.point, segmentId, config);
+             onContextMenu('SEGMENT', segmentId, e.clientX, e.clientY, coords?.x, coords?.y);
+             e.stopPropagation();
+        }
+    }
   };
 
   return (
@@ -181,7 +225,8 @@ export const Scene: React.FC<SceneProps> = ({
         onWallPointerUpdate?.(null);
         setHoveredHoldId(null);
       }}
-      onContextMenu={preventDefaultContextMenu}
+      // Empêcher le menu contextuel natif du navigateur
+      onContextMenu={(e) => e.preventDefault()}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -214,29 +259,27 @@ export const Scene: React.FC<SceneProps> = ({
       <directionalLight position={[5, 10, 5]} intensity={0.3} castShadow shadow-mapSize={[1024, 1024]} />
       <hemisphereLight intensity={0.2} color="#ffffff" groundColor="#000000" />
 
-      <group position={[0, 0, 0]}>
+      {/* GROUPE PRINCIPAL : Intercepte les événements pointeur pour toute la scène */}
+      <group 
+        position={[0, 0, 0]}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+      >
         <WallMesh 
           config={config} 
           interactive={mode === 'SET'}
           onPointerMove={handlePointerMove}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
         />
         
-        {/* Ligne de mesure STATIQUE (Sélection de 2 prises) */}
-        {measurementData && (
-            <MeasurementLine start={measurementData.start} end={measurementData.end} />
-        )}
-        
-        {/* Ligne de mesure DYNAMIQUE (Fantôme + Référence) */}
-        {dynamicMeasurementData && (
-             <MeasurementLine start={dynamicMeasurementData.start} end={dynamicMeasurementData.end} />
-        )}
+        {measurementData && <MeasurementLine start={measurementData.start} end={measurementData.end} />}
+        {dynamicMeasurementData && <MeasurementLine start={dynamicMeasurementData.start} end={dynamicMeasurementData.end} />}
 
         <Suspense fallback={null}>
             {holds.map((hold) => (
                 <HoldModel 
                     key={hold.id}
+                    // Injection des données pour la détection dans Scene
+                    userData={{ type: 'HOLD', id: hold.id }}
                     modelFilename={hold.filename} 
                     baseScale={hold.modelBaseScale}
                     position={hold.position}
@@ -245,50 +288,8 @@ export const Scene: React.FC<SceneProps> = ({
                     color={hold.color}
                     isSelected={selectedPlacedHoldIds.includes(hold.id) || referenceHoldId === hold.id}
                     isDragging={draggingId === hold.id}
-                    onPointerOver={(e) => {
-                      e.stopPropagation();
-                      setHoveredHoldId(hold.id);
-                    }}
-                    onPointerOut={(e) => {
-                      if (hoveredHoldId === hold.id) {
-                        setHoveredHoldId(null);
-                      }
-                    }}
-                    onPointerDown={(e) => {
-                      pointerDownScreenPos.current = { x: e.clientX, y: e.clientY };
-                      if (e.button === 0) {
-                        e.stopPropagation();
-                        
-                        // LOGIQUE SELECTION REFERENCE DYNAMIQUE
-                        if (isDynamicMeasuring && !referenceHoldId && setReferenceHoldId) {
-                            setReferenceHoldId(hold.id);
-                            return;
-                        }
-
-                        if (orbitRef.current) orbitRef.current.enabled = false;
-                        const isMultiSelect = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-                        if (mode === 'SET' && !isMultiSelect) {
-                           onSelectPlacedHold(hold.id, false);
-                           setDraggingId(hold.id);
-                        } else {
-                           onSelectPlacedHold(hold.id, isMultiSelect);
-                        }
-                      }
-                    }}
-                    onPointerUp={(e) => {
-                      if (!pointerDownScreenPos.current) return;
-                      const dx = e.clientX - pointerDownScreenPos.current.x;
-                      const dy = e.clientY - pointerDownScreenPos.current.y;
-                      const dist = Math.sqrt(dx * dx + dy * dy);
-                      pointerDownScreenPos.current = null;
-                      
-                      if (dist > 5) return;
-                      
-                      if (e.button === 2) {
-                        e.stopPropagation();
-                        onContextMenu('HOLD', hold.id, e.clientX, e.clientY);
-                      }
-                    }}
+                    onPointerOver={(e) => { e.stopPropagation(); setHoveredHoldId(hold.id); }}
+                    onPointerOut={(e) => { if (hoveredHoldId === hold.id) setHoveredHoldId(null); }}
                 />
             ))}
         </Suspense>
