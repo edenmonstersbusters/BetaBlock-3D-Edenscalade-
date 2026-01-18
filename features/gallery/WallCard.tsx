@@ -9,7 +9,7 @@ interface WallCardProps {
   name: string;
   createdAt: string;
   thumbnail?: string; 
-  authorId?: string; // NOUVEAU : On utilise l'ID pour le live fetch
+  authorId?: string;
   authorName?: string; 
   authorAvatarUrl?: string; 
   onClick: () => void;
@@ -20,6 +20,7 @@ export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbna
 
   useEffect(() => {
     if (authorId) {
+        // Résolution de l'identité via la table publique profiles
         api.getProfile(authorId).then(profile => {
             if (profile) {
                 setLiveAuthor({ name: profile.display_name, avatar: profile.avatar_url });

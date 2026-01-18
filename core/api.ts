@@ -3,7 +3,6 @@ import { supabase } from './supabase';
 import { BetaBlockFile, Comment, UserProfile } from '../types';
 
 const LOCAL_STORAGE_KEY = 'betablock_offline_walls';
-const PROFILE_CACHE = new Map<string, UserProfile>();
 
 const handleNetworkError = (err: any) => {
   console.warn("Supabase Request Error (Offline Mode Active):", err);
@@ -36,16 +35,29 @@ export const api = {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-          const avatarUrl = user?.user_metadata?.avatar_url;
+          const enrichedData = { 
+            ...data, 
+            metadata: { 
+              ...data.metadata, 
+              authorId: user.id
+            } 
+          };
+          
           const isPublic = data.metadata.isPublic || false;
-          const enrichedData = { ...data, metadata: { ...data.metadata, authorId: user.id, authorAvatarUrl: avatarUrl } };
-          const { data: result, error } = await supabase.from('walls').insert([{ name: data.metadata.name, data: enrichedData, is_public: isPublic, user_id: user.id }]).select().single();
+          const { data: result, error } = await supabase.from('walls').insert([{ 
+            name: data.metadata.name, 
+            data: enrichedData, 
+            is_public: isPublic, 
+            user_id: user.id 
+          }]).select().single();
+          
           if (!error && result) return { id: result.id, error: null };
+          if (error) throw error;
       }
       throw new Error("Fallback to local");
     } catch (err: any) {
       const localId = `local_${Date.now()}`;
-      const enrichedData = { ...data, metadata: { ...data.metadata, authorName: data.metadata.authorName || "Utilisateur Local", isPublic: false } };
+      const enrichedData = { ...data, metadata: { ...data.metadata, authorName: "Utilisateur Local", isPublic: false } };
       const localWall = { id: localId, name: data.metadata.name, data: enrichedData, created_at: new Date().toISOString(), is_public: false, is_local: true };
       saveLocalWall(localWall);
       return { id: localId, error: null };
@@ -61,8 +73,16 @@ export const api = {
     }
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non connecté");
+
       const isPublic = data.metadata.isPublic || false;
-      const { error } = await supabase.from('walls').update({ name: data.metadata.name, data: data, is_public: isPublic, user_id: user?.id }).eq('id', id);
+      const { error } = await supabase.from('walls').update({ 
+          name: data.metadata.name, 
+          data: data, 
+          is_public: isPublic, 
+          user_id: user.id 
+      }).eq('id', id);
+      
       if (error) throw error;
       return { error: null };
     } catch (err: any) { return { error: handleNetworkError(err) }; }
@@ -125,47 +145,69 @@ export const api = {
       const { data, error } = await supabase.from('walls').select('id, name, created_at, data, is_public, user_id').or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`).order('created_at', { ascending: false });
       if (!error && data) cloudProjects = data;
     } catch (e) { }
-    return { data: [...getLocalWalls(), ...cloudProjects], error: null };
+    return { data: [...getLocalWalls().filter(w => !cloudProjects.some(cp => cp.id === w.id)), ...cloudProjects], error: null };
   },
 
   async searchWalls(query: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const searchTerm = `%${query}%`;
-      const { data, error } = await supabase.from('walls').select('id, name, created_at, data, user_id').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await supabase.from('walls').select('id, name, created_at, data, user_id').eq('is_public', true).ilike('name', searchTerm).order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
       return { data, error: null };
     } catch (err: any) { return { data: getLocalWalls().filter(w => w.name.toLowerCase().includes(query.toLowerCase())), error: null }; }
   },
 
   async getProfile(userId: string): Promise<UserProfile | null> {
-    if (PROFILE_CACHE.has(userId)) return PROFILE_CACHE.get(userId)!;
     try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (!currentUser && userId === 'local_user') return { id: 'local_user', display_name: 'Utilisateur Local', created_at: new Date().toISOString(), stats: { total_walls: getLocalWalls().length, total_likes: 0, beta_level: 1 } };
-
-        // 1. Essayer le profil courant
-        if (currentUser && currentUser.id === userId) {
-             const profile = { id: userId, email: currentUser.email, display_name: currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || "Grimpeur", bio: currentUser.user_metadata?.bio || "", avatar_url: currentUser.user_metadata?.avatar_url, location: currentUser.user_metadata?.location || "", home_gym: currentUser.user_metadata?.home_gym || "", climbing_grade: currentUser.user_metadata?.climbing_grade || "", climbing_style: currentUser.user_metadata?.climbing_style || "", created_at: currentUser.created_at, stats: { total_walls: 0, total_likes: 0, beta_level: 1 } };
-             PROFILE_CACHE.set(userId, profile);
-             return profile;
+        if (userId === 'local_user') {
+            return { id: 'local_user', display_name: 'Utilisateur Local', created_at: new Date().toISOString(), stats: { total_walls: getLocalWalls().length, total_likes: 0, beta_level: 1 } };
         }
 
-        // 2. Chercher dans les murs (source secondaire d'identité)
-        const { data: wallData } = await supabase.from('walls').select('data').or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`).order('created_at', { ascending: false }).limit(1).single();
-        if (wallData) {
-             const profile = { id: userId, display_name: wallData.data.metadata.authorName || "Grimpeur Inconnu", created_at: wallData.data.metadata.timestamp, avatar_url: wallData.data.metadata.authorAvatarUrl, stats: { total_walls: 0, total_likes: 0, beta_level: 0 } };
-             PROFILE_CACHE.set(userId, profile);
-             return profile;
+        const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+        
+        if (profile) {
+            return { ...profile, stats: { total_walls: 0, total_likes: 0, beta_level: 1 } };
         }
+        
         return null;
-    } catch (e) { return null; }
+    } catch (e) { 
+        console.error("Profile fetch error:", e);
+        return null; 
+    }
   },
 
   async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<void> {
       try {
-        await supabase.auth.updateUser({ data: updates as any });
-        PROFILE_CACHE.delete(userId); 
-      } catch (e) { }
+        // Liste blanche des clés autorisées pour éviter d'envoyer 'stats' (qui ferait planter la DB)
+        const allowedKeys = ['display_name', 'avatar_url', 'bio', 'location', 'home_gym', 'climbing_grade', 'climbing_style'];
+        
+        const cleanUpdates: any = {};
+        allowedKeys.forEach(key => {
+            if (updates[key as keyof UserProfile] !== undefined) {
+                cleanUpdates[key] = updates[key as keyof UserProfile];
+            }
+        });
+
+        // 1. Mise à jour des métadonnées privées Auth (pour la session courante)
+        const { error: authError } = await supabase.auth.updateUser({ 
+          data: cleanUpdates
+        });
+        if (authError) throw new Error(authError.message);
+
+        // 2. Mise à jour de la table publique Profiles
+        // .upsert() est utilisé ici avec l'ID pour créer ou mettre à jour proprement
+        const { error: profileError } = await supabase.from('profiles').upsert({
+            id: userId,
+            ...cleanUpdates
+        });
+        
+        if (profileError) throw new Error(profileError.message);
+        
+      } catch (e: any) {
+          const msg = e.message || "Erreur de mise à jour";
+          console.error("Profile update error detail:", e);
+          throw new Error(msg); // On throw le message pour éviter [object Object] dans les alertes
+      }
   },
 
   async uploadAvatar(file: File): Promise<string | null> {

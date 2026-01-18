@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Fix: Import useNavigate from 'react-router' instead of 'react-router-dom' to resolve missing export error.
+import { useNavigate } from 'react-router';
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';

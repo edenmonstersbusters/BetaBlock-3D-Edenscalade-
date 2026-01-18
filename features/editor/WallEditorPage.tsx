@@ -1,6 +1,7 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Fix: Import useNavigate from 'react-router' instead of 'react-router-dom' to resolve missing export error.
+import { useNavigate } from 'react-router';
 
 // Core & Utils
 import { Scene } from '../../core/Scene';

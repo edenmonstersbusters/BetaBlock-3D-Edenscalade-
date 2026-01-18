@@ -1,7 +1,8 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+// Fix: Import MemoryRouter from 'react-router' instead of 'react-router-dom' to resolve export issues in some environments.
+import { MemoryRouter } from 'react-router';
 import App from './App';
 import './types';
 
