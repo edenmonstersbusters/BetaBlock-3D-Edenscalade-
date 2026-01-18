@@ -2,10 +2,35 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../../core/api';
 import { auth } from '../../../core/auth';
-import { Comment } from '../../../types';
+import { Comment, UserProfile } from '../../../types';
 import { MessageCircle, Heart, Reply, Send, Loader2, CornerDownRight } from 'lucide-react';
 import { UserAvatar } from '../../../components/ui/UserAvatar';
 import { ActionWarning } from '../../../components/ui/ActionWarning';
+
+/**
+ * COMPOSANT MIRACLE : Résout l'identité live d'un commentateur via son ID
+ */
+const CommentIdentity: React.FC<{ userId: string; snapName: string; snapAvatar?: string }> = ({ userId, snapName, snapAvatar }) => {
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+
+    useEffect(() => {
+        if (userId) api.getProfile(userId).then(setProfile);
+    }, [userId]);
+
+    const name = profile?.display_name || snapName || "Grimpeur";
+    const avatar = profile?.avatar_url || snapAvatar;
+
+    return (
+        <div className="flex gap-3">
+            <div className="flex-shrink-0 mt-1">
+                <UserAvatar name={name} url={avatar} size="sm" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <span className="text-xs font-bold text-gray-300 truncate block">{name}</span>
+            </div>
+        </div>
+    );
+};
 
 // Composant récursif pour un commentaire et ses réponses
 const CommentItem: React.FC<{ 
@@ -14,63 +39,40 @@ const CommentItem: React.FC<{
     onReply: (id: string, author: string) => void;
     onLike: (id: string, authorId: string, e: React.MouseEvent) => void;
 }> = ({ comment, depth, onReply, onLike }) => {
-    
-    // Limite de profondeur pour l'UI (pour éviter d'écraser le layout)
     const maxDepth = 2;
     const isTooDeep = depth > maxDepth;
 
+    // Fix: In the recursive call below, handleLike was replaced with onLike to correctly pass the received prop.
     return (
         <div className={`flex flex-col gap-2 ${depth > 0 ? 'mt-3 relative' : 'py-3 border-b border-gray-800'}`}>
-            {depth > 0 && (
-                <div className="absolute left-[-16px] top-0 bottom-0 w-px bg-gray-800" />
-            )}
+            {depth > 0 && <div className="absolute left-[-16px] top-0 bottom-0 w-px bg-gray-800" />}
             
             <div className="flex gap-3">
-                <div className="flex-shrink-0 mt-1">
-                    <UserAvatar 
-                        name={comment.author_name} 
-                        url={comment.author_avatar_url}
-                        size="sm"
-                    />
-                </div>
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between">
-                        <span className="text-xs font-bold text-gray-300 truncate">{comment.author_name}</span>
-                        <span className="text-[9px] text-gray-600">{new Date(comment.created_at).toLocaleDateString()}</span>
+                    <div className="flex items-baseline justify-between mb-1">
+                        <CommentIdentity userId={comment.user_id} snapName={comment.author_name} snapAvatar={comment.author_avatar_url} />
+                        <span className="text-[9px] text-gray-600 shrink-0">{new Date(comment.created_at).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-sm text-gray-400 mt-0.5 whitespace-pre-wrap break-words">{comment.text}</p>
-                    
-                    <div className="flex items-center gap-4 mt-2">
-                        <button 
-                            onClick={(e) => onLike(comment.id, comment.user_id, e)}
-                            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${comment.user_has_liked ? 'text-red-400' : 'text-gray-600 hover:text-gray-400'}`}
-                        >
-                            <Heart size={12} fill={comment.user_has_liked ? "currentColor" : "none"} />
-                            <span>{comment.likes_count || 0}</span>
-                        </button>
-                        
-                        <button 
-                            onClick={() => onReply(comment.id, comment.author_name)}
-                            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-blue-400 transition-colors"
-                        >
-                            <Reply size={12} />
-                            <span>Répondre</span>
-                        </button>
+                    <div className="pl-11 -mt-5">
+                        <p className="text-sm text-gray-400 mt-0.5 whitespace-pre-wrap break-words leading-relaxed">{comment.text}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                            <button onClick={(e) => onLike(comment.id, comment.user_id, e)} className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${comment.user_has_liked ? 'text-red-400' : 'text-gray-600 hover:text-gray-400'}`}>
+                                <Heart size={12} fill={comment.user_has_liked ? "currentColor" : "none"} />
+                                <span>{comment.likes_count || 0}</span>
+                            </button>
+                            <button onClick={() => onReply(comment.id, comment.author_name)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-blue-400 transition-colors">
+                                <Reply size={12} /><span>Répondre</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Rendu récursif des réponses */}
             {comment.replies && comment.replies.length > 0 && (
-                <div className={`ml-4 ${isTooDeep ? 'border-l-2 border-gray-800 pl-2' : ''}`}>
+                <div className={`ml-8 ${isTooDeep ? 'border-l-2 border-gray-800 pl-2' : ''}`}>
                     {comment.replies.map(reply => (
-                        <CommentItem 
-                            key={reply.id} 
-                            comment={reply} 
-                            depth={depth + 1} 
-                            onReply={onReply}
-                            onLike={onLike}
-                        />
+                        // Fix: Pass 'onLike' prop to child CommentItem instead of undefined 'handleLike'
+                        <CommentItem key={reply.id} comment={reply} depth={depth + 1} onReply={onReply} onLike={onLike} />
                     ))}
                 </div>
             )}
@@ -78,7 +80,6 @@ const CommentItem: React.FC<{
     );
 };
 
-// Define SocialFeedProps interface
 interface SocialFeedProps {
   wallId: string;
   onRequestAuth: () => void;
@@ -128,17 +129,11 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
 
   const handlePost = async () => {
       if (!inputText.trim()) return;
-      if (!currentUser) {
-          onRequestAuth();
-          return;
-      }
-
+      if (!currentUser) { onRequestAuth(); return; }
       setIsPosting(true);
-      const authorName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || "Anonyme";
+      const authorName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0];
       const avatarUrl = currentUser.user_metadata?.avatar_url;
-      
       await api.postComment(wallId, currentUser.id, authorName, inputText, replyTo?.id || null, avatarUrl);
-      
       setInputText('');
       setReplyTo(null);
       await fetchComments();
@@ -146,51 +141,26 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
   };
 
   const handleLike = async (commentId: string, authorId: string, e: React.MouseEvent) => {
-      if (!currentUser) {
-          onRequestAuth();
-          return;
-      }
-
-      // Bloquer si c'est l'auteur du commentaire
+      if (!currentUser) { onRequestAuth(); return; }
       if (currentUser.id === authorId) {
-          setWarning({ 
-              x: e.clientX, 
-              y: e.clientY, 
-              message: "Vous ne pouvez pas liker votre commentaire !" 
-          });
+          setWarning({ x: e.clientX, y: e.clientY, message: "Vous ne pouvez pas liker votre commentaire !" });
           return;
       }
-
-      // Optimistic update
       setComments(prev => prev.map(c => {
           if (c.id === commentId) {
               const newLiked = !c.user_has_liked;
-              return { 
-                  ...c, 
-                  user_has_liked: newLiked, 
-                  likes_count: (c.likes_count || 0) + (newLiked ? 1 : -1) 
-              };
+              return { ...c, user_has_liked: newLiked, likes_count: (c.likes_count || 0) + (newLiked ? 1 : -1) };
           }
           return c;
       }));
-
       await api.toggleCommentLike(commentId, currentUser.id);
-      const data = await api.getComments(wallId, currentUser.id);
-      setComments(data);
+      api.getComments(wallId, currentUser.id).then(setComments);
   };
 
   return (
     <div className="flex flex-col h-full relative">
-        {warning && (
-            <ActionWarning 
-                x={warning.x} 
-                y={warning.y} 
-                message={warning.message} 
-                onClose={() => setWarning(null)} 
-            />
-        )}
+        {warning && <ActionWarning x={warning.x} y={warning.y} message={warning.message} onClose={() => setWarning(null)} />}
 
-        {/* Zone de saisie */}
         <div className="p-3 bg-gray-800/50 rounded-xl mb-4 border border-gray-700">
             {replyTo && (
                 <div className="flex items-center justify-between text-xs text-blue-400 mb-2 bg-blue-500/10 px-2 py-1 rounded">
@@ -199,25 +169,13 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
                 </div>
             )}
             <div className="flex gap-2">
-                <input 
-                    type="text" 
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder={replyTo ? "Votre réponse..." : "Partagez votre méthode..."}
-                    className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
-                    onKeyDown={(e) => e.key === 'Enter' && handlePost()}
-                />
-                <button 
-                    onClick={handlePost} 
-                    disabled={isPosting || !inputText.trim()}
-                    className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white disabled:opacity-50 transition-colors"
-                >
+                <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={replyTo ? "Votre réponse..." : "Partagez votre méthode..."} className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none" onKeyDown={(e) => e.key === 'Enter' && handlePost()} />
+                <button onClick={handlePost} disabled={isPosting || !inputText.trim()} className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white disabled:opacity-50 transition-colors">
                     {isPosting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                 </button>
             </div>
         </div>
 
-        {/* Liste */}
         <div className="flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
             {loading ? (
                 <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-600" /></div>
@@ -227,15 +185,7 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
                     <p>Soyez le premier à commenter !</p>
                 </div>
             ) : (
-                commentTree.map(c => (
-                    <CommentItem 
-                        key={c.id} 
-                        comment={c} 
-                        depth={0} 
-                        onReply={(id, author) => setReplyTo({ id, author })}
-                        onLike={handleLike}
-                    />
-                ))
+                commentTree.map(c => <CommentItem key={c.id} comment={c} depth={0} onReply={(id, author) => setReplyTo({ id, author })} onLike={handleLike} />)
             )}
         </div>
     </div>
