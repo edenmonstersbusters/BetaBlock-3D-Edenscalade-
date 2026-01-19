@@ -14,8 +14,8 @@ export const FileControls: React.FC<FileControlsProps> = ({ onExport, onImport, 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onImport(file); // Appelle la fonction parent avec le fichier réel
-      e.target.value = ''; // Reset pour permettre de recharger le même fichier
+      onImport(file);
+      e.target.value = ''; // Reset input
     }
   };
 

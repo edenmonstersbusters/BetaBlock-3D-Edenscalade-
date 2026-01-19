@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-// Fix: Import routing components and hooks from 'react-router' instead of 'react-router-dom' to resolve missing export errors.
-import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router';
+import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 
 // Core imports
 import { api } from './core/api'; 

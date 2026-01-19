@@ -14,6 +14,8 @@ interface DimensionLabelProps {
 }
 
 const DimensionLabel: React.FC<DimensionLabelProps> = ({ value, position, label }) => (
+  // zIndexRange={[100, 0]} assure que les labels sont sous l'UI (TopBar z-110, Modales z-200) 
+  // mais au-dessus du canvas standard (z-0)
   <Html position={position} center distanceFactor={10} zIndexRange={[100, 0]}>
     <div className="bg-gray-950/80 border border-white/20 px-2 py-0.5 rounded text-[10px] font-mono text-white whitespace-nowrap backdrop-blur-sm pointer-events-none select-none">
       <span className="opacity-50 mr-1">{label}:</span>
@@ -52,22 +54,27 @@ const WallPanel: React.FC<WallPanelProps> = ({
     const indices: number[] = [];
     const uvs: number[] = [];
 
+    // Points de base (0-3)
     vertices.push(-wHalf, 0, 0); uvs.push(-wHalf / panelSize, cumulativeDist / panelSize);
     vertices.push(wHalf, 0, 0); uvs.push(wHalf / panelSize, cumulativeDist / panelSize);
     vertices.push(wHalf, 0, -thickness); uvs.push(wHalf / panelSize, cumulativeDist / panelSize);
     vertices.push(-wHalf, 0, -thickness); uvs.push(-wHalf / panelSize, cumulativeDist / panelSize);
 
+    // Points de sommet (4-7)
     vertices.push(-wHalf, topY, topZ); uvs.push(-wHalf / panelSize, (cumulativeDist + segment.height) / panelSize);
     vertices.push(wHalf, topY, topZ); uvs.push(wHalf / panelSize, (cumulativeDist + segment.height) / panelSize);
     vertices.push(wHalf, topY, topZ - thickness); uvs.push(wHalf / panelSize, (cumulativeDist + segment.height) / panelSize);
     vertices.push(-wHalf, topY, topZ - thickness); uvs.push(-wHalf / panelSize, (cumulativeDist + segment.height) / panelSize);
 
+    // Faces (Front, Back, Left, Right)
     indices.push(0, 1, 5, 0, 5, 4); // Front
     indices.push(2, 3, 7, 2, 7, 6); // Back
     indices.push(3, 0, 4, 3, 4, 7); // Left
     indices.push(1, 2, 6, 1, 6, 5); // Right
     
+    // Bottom cap (only for base)
     if (cumulativeDist === 0) indices.push(0, 3, 2, 0, 2, 1);
+    // Top cap (always, to ensure volume)
     indices.push(4, 5, 6, 4, 6, 7);
 
     const geo = new THREE.BufferGeometry();
@@ -78,12 +85,15 @@ const WallPanel: React.FC<WallPanelProps> = ({
     return geo;
   }, [width, thickness, panelSize, segment.height, topY, topZ, cumulativeDist]);
 
+  // Points pour la ligne de cotation de hauteur
   const heightLinePoints = useMemo(() => [
     new THREE.Vector3(width / 2 + 0.1, 0, 0.01),
     new THREE.Vector3(width / 2 + 0.1, topY, topZ + 0.01)
   ], [width, topY, topZ]);
 
   const heightLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(heightLinePoints), [heightLinePoints]);
+
+  // Fix: Create memoized THREE.Line object to use with primitive tag
   const heightLineObject = useMemo(() => new THREE.Line(heightLineGeometry), [heightLineGeometry]);
 
   return (
@@ -94,22 +104,21 @@ const WallPanel: React.FC<WallPanelProps> = ({
         userData={{ segmentId: segment.id }}
         castShadow 
         receiveShadow
-        // FIX SÉCURITÉ: On ne définit le handler que si c'est une fonction valide
-        onPointerMove={interactive && typeof onPointerMove === 'function' ? (e) => onPointerMove(e, segment.id) : undefined}
-        onPointerDown={interactive && typeof onPointerDown === 'function' ? (e) => onPointerDown(e, segment.id) : undefined}
-        onPointerUp={interactive && typeof onPointerUp === 'function' ? (e) => onPointerUp(e, segment.id) : undefined}
-        onContextMenu={interactive && typeof onContextMenu === 'function' ? (e) => {
-            e.stopPropagation();
-            onContextMenu(e, segment.id);
-        } : undefined}
+        onPointerMove={interactive ? (e) => onPointerMove?.(e, segment.id) : undefined}
+        onPointerDown={interactive ? (e) => onPointerDown?.(e, segment.id) : undefined}
+        onPointerUp={interactive ? (e) => onPointerUp?.(e, segment.id) : undefined}
+        onContextMenu={interactive ? (e) => onContextMenu?.(e, segment.id) : undefined}
       >
         <meshStandardMaterial map={texture} color="#ffffff" roughness={0.8} metalness={0.0} />
       </mesh>
 
+      {/* DIMENSIONS DE HAUTEUR DU PAN */}
+      {/* Fix: Use primitive to mount THREE.Line and avoid conflict with SVG 'line' tag in JSX */}
       <primitive object={heightLineObject}>
         <lineBasicMaterial attach="material" color="#ffffff" opacity={0.3} transparent />
       </primitive>
       
+      {/* Arrêts de ligne */}
       <mesh position={[width / 2 + 0.1, 0, 0.01]}>
         <boxGeometry args={[0.05, 0.005, 0.005]} />
         <meshBasicMaterial color="#ffffff" opacity={0.5} transparent />
@@ -182,6 +191,7 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     return tex;
   }, [panelSize]);
 
+  // Calcul des positions de base pour chaque segment
   const panels = useMemo(() => {
     const result = [];
     let currentY = 0;
@@ -203,15 +213,20 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     return result;
   }, [config.segments]);
 
+  // Ligne de cotation de largeur (bas du mur)
   const widthLinePoints = useMemo(() => [
     new THREE.Vector3(-config.width / 2, -0.05, 0.2),
     new THREE.Vector3(config.width / 2, -0.05, 0.2)
   ], [config.width]);
   const widthLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(widthLinePoints), [widthLinePoints]);
+
+  // Fix: Create memoized THREE.Line object to use with primitive tag
   const widthLineObject = useMemo(() => new THREE.Line(widthLineGeometry), [widthLineGeometry]);
 
   return (
     <group name="wall-group">
+      {/* DIMENSION DE LARGEUR GLOBALE */}
+      {/* Fix: Use primitive to mount THREE.Line and avoid conflict with SVG 'line' tag in JSX */}
       <primitive object={widthLineObject}>
         <lineBasicMaterial attach="material" color="#3b82f6" opacity={0.6} transparent />
       </primitive>

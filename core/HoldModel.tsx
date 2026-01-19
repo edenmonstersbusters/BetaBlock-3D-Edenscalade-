@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { useGLTF, Html } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
 import '../types';
@@ -14,54 +14,19 @@ interface HoldModelProps {
   opacity?: number;
   color?: string;
   preview?: boolean;
-  showDimensions?: boolean;
   isSelected?: boolean;
   isDragging?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
+  // Fix: Add missing onPointerUp to support interaction logic in Scene.tsx
   onPointerUp?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
-  userData?: any;
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
 const DRACO_DECODER_URL = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
-
-const DimensionHelper: React.FC<{ size: THREE.Vector3; scale: number[]; baseScale: number }> = ({ size, scale, baseScale }) => {
-    const realW = size.x * scale[0] * baseScale;
-    const realH = size.y * scale[1] * baseScale;
-    const hX = size.x / 2;
-    const hY = size.y / 2;
-    const padding = Math.max(size.x, size.y) * 0.05; 
-    const lineMaterial = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0.5, transparent: true });
-
-    const widthGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-hX, -hY - padding, 0), new THREE.Vector3(hX, -hY - padding, 0)
-    ]), [hX, hY, padding]);
-
-    const heightGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(hX + padding, -hY, 0), new THREE.Vector3(hX + padding, hY, 0)
-    ]), [hX, hY, padding]);
-
-    return (
-        <group>
-            <primitive object={new THREE.Line(widthGeo, lineMaterial)} />
-            <primitive object={new THREE.Line(heightGeo, lineMaterial)} />
-            <Html position={[0, -hY - padding - (padding * 0.5), 0]} center zIndexRange={[50, 0]}>
-                <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
-                    L: {realW.toFixed(2)}m
-                </div>
-            </Html>
-            <Html position={[hX + padding + (padding * 0.5), 0, 0]} center zIndexRange={[50, 0]}>
-                <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
-                    H: {realH.toFixed(2)}m
-                </div>
-            </Html>
-        </group>
-    );
-};
 
 export const HoldModel: React.FC<HoldModelProps> = ({ 
   modelFilename, 
@@ -72,37 +37,29 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   opacity = 1,
   color,
   preview = false,
-  showDimensions = false,
   isSelected = false,
   isDragging = false,
   onClick,
   onPointerDown,
+  // Fix: Destructure onPointerUp from props
   onPointerUp,
   onPointerOver,
   onPointerOut,
-  onContextMenu,
-  userData
+  onContextMenu
 }) => {
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
   const { scene } = useGLTF(url, DRACO_DECODER_URL);
 
-  const { clonedScene, offset, size } = useMemo(() => {
+  const { clonedScene, offset } = useMemo(() => {
     const clone = scene.clone(true);
     clone.position.set(0, 0, 0);
     clone.rotation.set(0, 0, 0);
     clone.scale.set(1, 1, 1);
     
-    // SOLUTION RADICALE : Utilisation des calques (Layers)
-    // Calque 0 = Objets interactifs (cliquables)
-    // Calque 1 = Objets fantômes (ignorés par le laser de la souris)
-    const targetLayer = (preview || isDragging) ? 1 : 0;
-
     const box = new THREE.Box3().setFromObject(clone);
-    const boxSize = new THREE.Vector3();
     let offsetX = 0; let offsetY = 0; let offsetZ = 0;
     
     if (!box.isEmpty() && Number.isFinite(box.min.x)) {
-        box.getSize(boxSize);
         const center = new THREE.Vector3();
         box.getCenter(center);
         offsetX = -center.x; 
@@ -111,9 +68,6 @@ export const HoldModel: React.FC<HoldModelProps> = ({
     }
     
     clone.traverse((child) => {
-      // On affecte le calque à absolument tous les enfants du modèle
-      child.layers.set(targetLayer);
-
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.geometry.computeVertexNormals();
@@ -135,36 +89,28 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         
         mesh.castShadow = true; 
         mesh.receiveShadow = true;
+
+        if (isDragging) {
+            mesh.raycast = () => null; // Ignore raycast to allow wall detection behind
+        }
       }
     });
-    return { 
-        clonedScene: clone, 
-        offset: [offsetX, offsetY, offsetZ] as [number, number, number],
-        size: boxSize
-    };
+    return { clonedScene: clone, offset: [offsetX, offsetY, offsetZ] as [number, number, number] };
   }, [scene, opacity, color, preview, isSelected, isDragging]);
 
   return (
     <group 
       position={position} rotation={rotation} 
       scale={[scale[0] * baseScale, scale[1] * baseScale, scale[2] * baseScale]}
-      // pointerEvents="none" est un bonus pour R3F, mais le vrai travail est fait par les calques
-      pointerEvents={preview || isDragging ? 'none' : 'auto'}
       onPointerDown={preview ? undefined : onPointerDown}
+      // Fix: Add onPointerUp event handler to the Three.js group
       onPointerUp={preview ? undefined : onPointerUp}
       onPointerOver={preview ? undefined : onPointerOver}
       onPointerOut={preview ? undefined : onPointerOut}
       onClick={preview ? undefined : onClick}
-      onContextMenu={preview ? undefined : (e) => {
-          e.stopPropagation();
-          if (onContextMenu) onContextMenu(e);
-      }}
-      userData={userData}
+      onContextMenu={preview ? undefined : onContextMenu}
     >
         <primitive object={clonedScene} position={offset} />
-        {showDimensions && size && (
-            <DimensionHelper size={size} scale={scale} baseScale={baseScale} />
-        )}
     </group>
   );
 };
