@@ -172,7 +172,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
             <div 
                 className="absolute top-1/2 z-[120] transition-all duration-300 ease-in-out"
                 style={{ 
-                    left: state.isSidebarOpen ? '300px' : '0px', 
+                    left: state.isSidebarOpen ? '320px' : '0px', 
                     transform: 'translateY(-50%)' 
                 }}
             >
@@ -186,14 +186,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
             </div>
         )}
 
-        {/* SIDEBAR CONTAINER - Flex Item avec largeur transitionnelle */}
+        {/* SIDEBAR CONTAINER - Flex Item avec largeur transitionnelle via classes */}
         {initialMode !== 'VIEW' && (
              <div 
-                className="relative flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 shadow-xl z-20 overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0"
-                style={{ width: state.isSidebarOpen ? '300px' : '0px' }}
+                className={`relative flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 shadow-xl z-20 overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0 ${state.isSidebarOpen ? 'w-[320px]' : 'w-0 border-none'}`}
              >
                  {/* Contenu interne à largeur fixe pour éviter l'écrasement ou le vide */}
-                 <div className="w-[300px] h-full flex flex-col bg-gray-900">
+                 <div className="w-[320px] h-full flex flex-col bg-gray-900">
                      <SidebarTabs activeTab={activeTab} onTabChange={setActiveTab} />
                      
                      <div className="flex-1 overflow-hidden relative">

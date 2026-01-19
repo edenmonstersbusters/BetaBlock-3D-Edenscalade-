@@ -140,8 +140,8 @@ export const Scene: React.FC<SceneProps> = ({
     
     pointerDownRef.current = null;
     
-    // DISTINCTION CLÉ : Si on a bougé de plus de 5px, c'est un DRAG (caméra ou objet), on ignore le clic
-    if (dist > 5) return;
+    // Si on a bougé de plus de 10px (tolérance augmentée), c'est un DRAG (caméra ou objet), on ignore
+    if (dist > 10) return;
 
     // --- CLIC GAUCHE (0) ---
     if (button === 0) {
@@ -187,7 +187,7 @@ export const Scene: React.FC<SceneProps> = ({
 
     // --- CLIC DROIT (2) ---
     if (button === 2) {
-        // C'est un clic droit STATIQUE (pas un drag caméra, car dist < 5px)
+        // C'est un clic droit propre (pas un drag caméra car dist < 10px)
         
         // 1. Check Hold (même si sélectionnée)
         let target = e.object;
@@ -269,6 +269,9 @@ export const Scene: React.FC<SceneProps> = ({
           config={config} 
           interactive={mode === 'SET'}
           onPointerMove={handlePointerMove}
+          // FIX: Passage explicite des handlers pour éviter les problèmes de bubbling
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
         />
         
         {measurementData && <MeasurementLine start={measurementData.start} end={measurementData.end} />}

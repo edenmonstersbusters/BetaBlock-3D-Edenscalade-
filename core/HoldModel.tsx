@@ -14,7 +14,7 @@ interface HoldModelProps {
   opacity?: number;
   color?: string;
   preview?: boolean;
-  showDimensions?: boolean; // NOUVEAU
+  showDimensions?: boolean;
   isSelected?: boolean;
   isDragging?: boolean;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
@@ -29,38 +29,26 @@ interface HoldModelProps {
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
 const DRACO_DECODER_URL = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
 
-// Composant interne pour afficher les dimensions
 const DimensionHelper: React.FC<{ size: THREE.Vector3; scale: number[]; baseScale: number }> = ({ size, scale, baseScale }) => {
-    // Calcul des dimensions réelles en mètres
     const realW = size.x * scale[0] * baseScale;
     const realH = size.y * scale[1] * baseScale;
-    
-    // Demi-dimensions locales
     const hX = size.x / 2;
     const hY = size.y / 2;
-
-    // Padding dynamique (20% de la taille max) pour éloigner les traits
     const padding = Math.max(size.x, size.y) * 0.05; 
-
     const lineMaterial = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0.5, transparent: true });
 
-    // Géométrie pour la largeur (en bas)
     const widthGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(-hX, -hY - padding, 0), new THREE.Vector3(hX, -hY - padding, 0)
     ]), [hX, hY, padding]);
 
-    // Géométrie pour la hauteur (à droite)
     const heightGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(hX + padding, -hY, 0), new THREE.Vector3(hX + padding, hY, 0)
     ]), [hX, hY, padding]);
 
     return (
         <group>
-            {/* Lignes */}
             <primitive object={new THREE.Line(widthGeo, lineMaterial)} />
             <primitive object={new THREE.Line(heightGeo, lineMaterial)} />
-
-            {/* Labels */}
             <Html position={[0, -hY - padding - (padding * 0.5), 0]} center zIndexRange={[50, 0]}>
                 <div className="bg-black/80 px-1 py-0.5 rounded text-[8px] text-white font-mono whitespace-nowrap border border-white/20">
                     L: {realW.toFixed(2)}m
@@ -140,7 +128,9 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         mesh.castShadow = true; 
         mesh.receiveShadow = true;
 
-        if (isDragging) {
+        // FIX CRITIQUE: Désactiver la détection de collision pour la prévisualisation et le drag
+        // Cela empêche la prise fantôme de "voler" le clic destiné au mur.
+        if (isDragging || preview) {
             mesh.raycast = () => null; 
         }
       }
@@ -162,7 +152,7 @@ export const HoldModel: React.FC<HoldModelProps> = ({
       onPointerOut={preview ? undefined : onPointerOut}
       onClick={preview ? undefined : onClick}
       onContextMenu={preview ? undefined : (e) => {
-          e.stopPropagation(); // Stop propagation pour ne pas trigger le mur derrière
+          e.stopPropagation();
           if (onContextMenu) onContextMenu(e);
       }}
       userData={userData}
