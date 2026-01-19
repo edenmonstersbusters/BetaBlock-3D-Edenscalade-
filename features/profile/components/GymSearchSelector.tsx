@@ -17,17 +17,19 @@ interface GymSearchSelectorProps {
   placeholder?: string;
 }
 
+interface GymResultItemProps {
+  gym: GymSearchResult;
+  query: string;
+  onSelect: () => void;
+}
+
 /**
  * Composant interne ultra-compact pour un résultat de recherche
  */
-const GymResultItem = ({ 
+const GymResultItem: React.FC<GymResultItemProps> = ({ 
   gym, 
   query, 
   onSelect 
-}: { 
-  gym: GymSearchResult; 
-  query: string; 
-  onSelect: () => void;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLHeadingElement>(null);

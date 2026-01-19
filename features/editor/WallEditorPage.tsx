@@ -1,5 +1,5 @@
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Core & Utils
@@ -20,7 +20,7 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay';
 import { GlobalModal } from '../../components/ui/GlobalModal';
 import { ContextMenu } from '../../components/ui/ContextMenu';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { Undo2, Redo2, Save, Globe, ArrowLeft, Edit2 } from 'lucide-react';
+import { Undo2, Redo2, Save, Globe, ArrowLeft, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Types
 import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../../types';
@@ -39,7 +39,7 @@ interface WallEditorProps {
   redo: (current: any, apply: any) => void;
   canUndo: boolean;
   canRedo: boolean;
-  onSaveCloud: () => Promise<boolean>; // Changé pour retourner un booléen
+  onSaveCloud: () => Promise<boolean>; 
   isSavingCloud: boolean;
   generatedLink: string | null;
   onHome: () => void;
@@ -61,6 +61,10 @@ export const WallEditor: React.FC<WallEditorProps> = ({
   isLoadingCloud, cloudId, screenshotRef
 }) => {
   const navigate = useNavigate();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Ref pour tracker la position de la souris sur le mur pour le Ctrl+V
+  const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
 
   // 1. Initialisation de l'état UI
   const state = useEditorState();
@@ -70,10 +74,11 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     mode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
     undo, redo, recordAction,
     state,
-    onHome, onNewWall
+    onHome, onNewWall,
+    cursorPosRef // On passe la ref pour que handlePaste puisse lire la position courante
   });
 
-  // 3. Wrapper pour la sauvegarde afin de gérer l'état isDirty et l'authentification
+  // 3. Wrapper pour la sauvegarde
   const wrappedSaveCloud = async () => {
       if (!user) {
           state.setShowAuthModal(true);
@@ -125,7 +130,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       
       {/* Top Bar */}
       {mode !== 'VIEW' && (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative shrink-0">
             <div className="flex items-center gap-4 justify-start">
                 <button onClick={() => logic.handleAction('exit')} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2">
                     <ArrowLeft size={16} />
@@ -174,54 +179,72 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        {mode === 'VIEW' ? (
-            <ViewerPanel 
-                wallId={cloudId || ''} metadata={metadata} config={config} holds={holds}
-                onHome={() => logic.handleAction('exit')} 
-                onRemix={onRemix || (() => {})} 
-                onShare={() => logic.handleAction('share')}
-                onEdit={() => navigate(`/builder?id=${cloudId}`)}
-            />
-        ) : mode === 'BUILD' ? (
-            <EditorPanel 
-                config={config} holds={holds} onUpdate={setConfig} metadata={metadata}
-                onNext={() => navigate('/setter')} showModal={(c) => state.setModal(c)}
-                onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')}
-                onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
-                onHome={() => logic.handleAction('exit')}
-                onRemoveSegment={logic.removeSegmentAction}
-            />
-        ) : (
-            <RouteEditorPanel 
-                onBack={() => navigate('/builder')} 
-                selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold}
-                metadata={metadata}
-                holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
-                placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} 
-                onRemoveAllHolds={onRemoveAllHolds || (() => {})} 
-                onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
-                selectedPlacedHoldIds={state.selectedPlacedHoldIds}
-                onUpdatePlacedHold={(ids, u) => { 
-                    if (metadata.remixMode === 'structure') return;
-                    const idSet = new Set(ids); setHolds(hds => hds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); 
-                    state.setIsDirty(true);
-                }}
-                onSelectPlacedHold={state.handleSelectPlacedHold} 
-                onDeselect={() => state.setSelectedPlacedHoldIds([])}
-                onActionStart={logic.saveToHistory} 
-                onReplaceHold={(ids, def) => { 
-                    if (metadata.remixMode === 'structure') return;
-                    logic.saveToHistory(); const idSet = new Set(ids); setHolds(prev => prev.map(h => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); 
-                }}
-                onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)}
-                onExport={() => logic.handleAction('save')}
-                onImport={() => logic.globalFileInputRef.current?.click()} onNew={logic.handleNewWallRequest}
-                onHome={() => logic.handleAction('exit')}
-            />
-        )}
+      <div className="flex flex-1 overflow-hidden relative">
+        
+        {/* Sidebar Container */}
+        <div 
+          className={`relative z-20 h-full bg-gray-900 border-r border-gray-800 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'}`}
+        >
+             {/* Contenu du Panel (Rendu conditionnel mais monté pour préserver l'état si besoin, ou démonté pour perf) */}
+             <div className="w-80 h-full">
+                {mode === 'VIEW' ? (
+                    <ViewerPanel 
+                        wallId={cloudId || ''} metadata={metadata} config={config} holds={holds}
+                        onHome={() => logic.handleAction('exit')} 
+                        onRemix={onRemix || (() => {})} 
+                        onShare={() => logic.handleAction('share')}
+                        onEdit={() => navigate(`/builder?id=${cloudId}`)}
+                    />
+                ) : mode === 'BUILD' ? (
+                    <EditorPanel 
+                        config={config} holds={holds} onUpdate={setConfig} metadata={metadata}
+                        onNext={() => navigate('/setter')} showModal={(c) => state.setModal(c)}
+                        onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')}
+                        onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest}
+                        onHome={() => logic.handleAction('exit')}
+                        onRemoveSegment={logic.removeSegmentAction}
+                    />
+                ) : (
+                    <RouteEditorPanel 
+                        onBack={() => navigate('/builder')} 
+                        selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold}
+                        metadata={metadata}
+                        holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
+                        placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} 
+                        onRemoveAllHolds={onRemoveAllHolds || (() => {})} 
+                        onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
+                        selectedPlacedHoldIds={state.selectedPlacedHoldIds}
+                        onUpdatePlacedHold={(ids, u) => { 
+                            if (metadata.remixMode === 'structure') return;
+                            const idSet = new Set(ids); setHolds(hds => hds.map(h => idSet.has(h.id) ? { ...h, ...u } : h)); 
+                            state.setIsDirty(true);
+                        }}
+                        onSelectPlacedHold={state.handleSelectPlacedHold} 
+                        onDeselect={() => state.setSelectedPlacedHoldIds([])}
+                        onActionStart={logic.saveToHistory} 
+                        onReplaceHold={(ids, def) => { 
+                            if (metadata.remixMode === 'structure') return;
+                            logic.saveToHistory(); const idSet = new Set(ids); setHolds(prev => prev.map(h => idSet.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); 
+                        }}
+                        onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)}
+                        onExport={() => logic.handleAction('save')}
+                        onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest}
+                        onHome={() => logic.handleAction('exit')}
+                    />
+                )}
+             </div>
+        </div>
 
-        <div className="flex-1 relative h-full">
+        {/* Toggle Sidebar Button */}
+        <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className={`absolute top-1/2 z-30 -translate-y-1/2 bg-gray-800 border border-gray-600 text-gray-400 p-1 rounded-r-lg hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all duration-300 shadow-xl ${isSidebarOpen ? 'left-80' : 'left-0'}`}
+            title={isSidebarOpen ? "Masquer le panneau" : "Afficher le panneau"}
+        >
+            {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        <div className="flex-1 relative h-full bg-black">
             {mode !== 'VIEW' && (
                 <div className="fixed bottom-6 right-6 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
                     <button disabled={!canUndo} onClick={logic.performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
@@ -236,6 +259,10 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 selectedPlacedHoldIds={state.selectedPlacedHoldIds}
                 onSelectPlacedHold={state.handleSelectPlacedHold}
                 onContextMenu={(type, id, x, y, wx, wy) => state.setContextMenu({ type, id, x, y, wallX: wx, wallY: wy })}
+                // Mise à jour de la Ref cursor à chaque mouvement
+                onWallPointerUpdate={(info) => {
+                    cursorPosRef.current = info;
+                }}
                 onHoldDrag={(id, x, y, segId) => {
                     if (metadata.remixMode === 'structure') return;
                     setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId: segId } : h))
@@ -249,15 +276,23 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       <ContextMenu 
         data={state.contextMenu} onClose={() => state.setContextMenu(null)} onUpdateData={state.setContextMenu}
         onCopyHold={() => { 
-            if (state.selectedPlacedHoldIds.length > 0) {
-                const toCopy = holds.filter(h => state.selectedPlacedHoldIds.includes(h.id));
+            // Logique de copie "intelligente" :
+            // Si la prise sur laquelle on a cliqué (state.contextMenu.id) est dans la sélection actuelle, on copie toute la sélection.
+            // Sinon (ex: clic droit direct sur une prise non sélectionnée), on ne copie que cette prise là.
+            let toCopyIds = [];
+            if (state.contextMenu?.id && state.selectedPlacedHoldIds.includes(state.contextMenu.id)) {
+                toCopyIds = state.selectedPlacedHoldIds;
+            } else if (state.contextMenu?.id) {
+                toCopyIds = [state.contextMenu.id];
+            }
+
+            if (toCopyIds.length > 0) {
+                const toCopy = holds.filter(h => toCopyIds.includes(h.id));
                 state.setClipboard(JSON.parse(JSON.stringify(toCopy))); 
             }
         }} 
         hasClipboard={state.clipboard.length > 0}
-        onPasteHold={(target) => {
-             // standard paste handled by logic shortcuts
-        }} 
+        onPasteHold={(target) => logic.handlePaste(target)} 
         onDelete={(id, type) => { 
             if (type === 'HOLD') {
               logic.removeHoldsAction([id], true); 
@@ -267,12 +302,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         }}
         onRotateHold={(id, delta) => { 
             if (metadata.remixMode === 'structure') return;
-            logic.saveToHistory(); setHolds(hds => hds.map(h => id === h.id ? { ...h, spin: h.spin + delta } : h)); 
+            logic.saveToHistory(); // Capture historique AVANT modif
+            setHolds(hds => hds.map(h => id === h.id ? { ...h, spin: h.spin + delta } : h)); 
         }}
-        // Fix: Remove duplicate onColorHold attribute
         onColorHold={(id, c) => { 
             if (metadata.remixMode === 'structure') return;
-            logic.saveToHistory(); setHolds(hds => hds.map(h => id === h.id ? { ...h, color: c } : h)); 
+            logic.saveToHistory(); // Capture historique AVANT modif
+            setHolds(hds => hds.map(h => id === h.id ? { ...h, color: c } : h)); 
         }}
         onSegmentUpdate={logic.updateSegmentQuickly}
       />

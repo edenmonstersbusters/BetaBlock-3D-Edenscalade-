@@ -1,9 +1,10 @@
 
-import { useCallback, useRef, Dispatch, SetStateAction } from 'react';
+import { useCallback, Dispatch, SetStateAction } from 'react';
 import * as THREE from 'three';
 import { calculateLocalCoords } from '../../../utils/geometry';
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';
-import { WallConfig, PlacedHold, AppMode, WallSegment, WallMetadata } from '../../../types';
+import { validateBetaBlockJson } from '../../../utils/validation';
+import { WallConfig, PlacedHold, AppMode, WallSegment, WallMetadata, BetaBlockFile } from '../../../types';
 
 interface UseEditorLogicProps {
   mode: AppMode;
@@ -26,14 +27,16 @@ interface UseEditorLogicProps {
   // Callbacks externes
   onHome: () => void;
   onNewWall: () => void;
+
+  // Refs
+  cursorPosRef: React.MutableRefObject<{ x: number, y: number, segmentId: string } | null>;
 }
 
 export const useEditorLogic = ({
   mode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
-  undo, redo, recordAction, state, onHome, onNewWall
+  undo, redo, recordAction, state, onHome, onNewWall,
+  cursorPosRef
 }: UseEditorLogicProps) => {
-
-  const globalFileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Gestion de l'Historique ---
   
@@ -56,6 +59,38 @@ export const useEditorLogic = ({
 
   // --- Logique Métier ---
 
+  // 1. IMPORTATION FIABILISÉE
+  const handleImportFile = useCallback((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const json = JSON.parse(e.target?.result as string);
+          const validated = validateBetaBlockJson(json);
+          
+          if (validated) {
+            saveToHistory();
+            // Mise à jour atomique (ou presque)
+            setConfig(validated.config);
+            setHolds(validated.holds);
+            // On garde l'ID auteur si c'est le même user, sinon on le laisse vide (nouveau propriétaire)
+            setMetadata({
+                ...validated.metadata,
+                authorId: validated.metadata.authorId === user?.id ? user.id : undefined
+            });
+            state.setIsDirty(true);
+            state.setModal({ title: "Succès", message: "Fichier chargé avec succès.", isAlert: true });
+          } else {
+            state.setModal({ title: "Erreur", message: "Fichier invalide ou corrompu.", isAlert: true });
+          }
+        } catch (err) {
+          console.error(err);
+          state.setModal({ title: "Erreur", message: "Impossible de lire le fichier.", isAlert: true });
+        }
+      };
+      reader.readAsText(file);
+  }, [saveToHistory, setConfig, setHolds, setMetadata, state, user]);
+
+  // 2. PLACEMENT
   const handlePlaceHold = (position: THREE.Vector3, normal: THREE.Vector3, segmentId: string) => {
     if (metadata.remixMode === 'structure') return;
     if (!state.selectedHold) return;
@@ -87,6 +122,71 @@ export const useEditorLogic = ({
     
     setHolds(prev => [...prev, newHold]);
   };
+
+  // 3. COLLAGE INTELLIGENT (PASTE)
+  const handlePaste = useCallback((targetPosition?: { x: number, y: number, segmentId: string }) => {
+      if (metadata.remixMode === 'structure') return;
+      if (state.clipboard.length === 0 || mode === 'VIEW') return;
+
+      saveToHistory();
+
+      // Déterminer la position cible : soit celle du clic droit, soit celle de la souris (Ctrl+V)
+      // Si aucune position souris n'est connue (souris hors du mur), on retombera sur un offset par défaut.
+      const effectiveTarget = targetPosition || cursorPosRef.current;
+
+      if (effectiveTarget) {
+          // On calcule le centre de gravité du clipboard pour coller "autour" de la cible
+          const avgX = state.clipboard.reduce((acc: number, h: PlacedHold) => acc + h.x, 0) / state.clipboard.length;
+          const avgY = state.clipboard.reduce((acc: number, h: PlacedHold) => acc + h.y, 0) / state.clipboard.length;
+
+          const toPaste = state.clipboard.map((h: PlacedHold) => {
+              const relX = h.x - avgX;
+              const relY = h.y - avgY;
+              
+              // On applique la position cible + le décalage relatif
+              let finalX = effectiveTarget.x + relX;
+              let finalY = effectiveTarget.y + relY;
+
+              // Clamping intelligent (Magnétisme)
+              const seg = config.segments.find(s => s.id === effectiveTarget.segmentId);
+              if (seg) {
+                  finalY = Math.max(0, Math.min(seg.height, finalY));
+              }
+              finalX = Math.max(-config.width/2, Math.min(config.width/2, finalX));
+
+              return {
+                  ...h,
+                  id: crypto.randomUUID(),
+                  segmentId: effectiveTarget.segmentId, // On colle tout sur le segment cible
+                  x: finalX,
+                  y: finalY
+              };
+          });
+          setHolds(prev => [...prev, ...toPaste]);
+      } 
+      // Si vraiment aucune position n'est connue (Ctrl+V sans survoler le mur), comportement fallback
+      else {
+          const toPaste = state.clipboard.map((h: PlacedHold) => {
+              // On décale légèrement et on clamp
+              let finalX = h.x + 0.1;
+              let finalY = h.y + 0.1;
+              const seg = config.segments.find(s => s.id === h.segmentId);
+              
+              if (seg) {
+                 finalY = Math.min(finalY, seg.height);
+              }
+              finalX = Math.min(finalX, config.width/2);
+
+              return { 
+                  ...h, 
+                  id: crypto.randomUUID(), 
+                  x: finalX, 
+                  y: finalY 
+              };
+          });
+          setHolds(prev => [...prev, ...toPaste]);
+      }
+  }, [metadata.remixMode, state.clipboard, mode, saveToHistory, config, setHolds, cursorPosRef]);
 
   const removeHoldsAction = useCallback((ids: string[], askConfirm: boolean = false) => {
     if (ids.length === 0 || mode === 'VIEW') return;
@@ -157,13 +257,10 @@ export const useEditorLogic = ({
 
   const handleAction = (type: 'save' | 'publish' | 'exit' | 'share') => {
       if (type === 'exit') {
-        // En mode VIEW ou si aucune modif, on sort direct
         if (mode === 'VIEW' || !state.isDirty) {
             onHome();
             return;
         }
-
-        // Sinon on demande confirmation
         state.setModal({
           title: "Quitter l'éditeur ?",
           message: "Toute modification non sauvegardée sera perdue.",
@@ -218,29 +315,19 @@ export const useEditorLogic = ({
             state.setClipboard(JSON.parse(JSON.stringify(toCopy))); 
         }
     },
-    paste: () => { 
-        if (metadata.remixMode === 'structure') return;
-        if (state.clipboard.length > 0 && mode !== 'VIEW') { 
-            saveToHistory(); 
-            const toPaste = state.clipboard.map((h: PlacedHold) => ({ 
-                ...h, 
-                id: crypto.randomUUID(), 
-                x: h.x + 0.1, 
-                y: Math.min(h.y + 0.1, config.segments.find(s => s.id === h.segmentId)?.height || h.y) 
-            }));
-            setHolds(prev => [...prev, ...toPaste]); 
-        } 
-    },
+    paste: () => handlePaste(), // Appel sans argument = collage clavier
     save: () => handleAction('save'),
-    open: () => globalFileInputRef.current?.click(),
+    // Note: Pour l'ouverture de fichier via raccourci, il faudrait trigger un input caché.
+    // On simplifie en retirant le raccourci 'open' pour l'instant pour éviter la complexité de ref.
+    open: () => {}, 
     deleteAction: () => removeHoldsAction(state.selectedPlacedHoldIds)
-  }, [performUndo, performRedo, state.selectedPlacedHoldIds, removeHoldsAction, state.clipboard, mode, holds, config, metadata.remixMode, user]);
+  }, [performUndo, performRedo, state.selectedPlacedHoldIds, removeHoldsAction, state.clipboard, mode, holds, config, metadata.remixMode, user, handlePaste, handleAction]);
 
 
   return {
-    globalFileInputRef,
     performUndo, performRedo, saveToHistory,
-    handlePlaceHold, removeHoldsAction, removeSegmentAction, updateSegmentQuickly, handleAction,
+    handlePlaceHold, handlePaste, handleImportFile,
+    removeHoldsAction, removeSegmentAction, updateSegmentQuickly, handleAction,
     handleNewWallRequest
   };
 };

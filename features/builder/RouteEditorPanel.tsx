@@ -2,7 +2,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
-import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock } from 'lucide-react';
+import { ArrowLeft, Box, Loader2, RotateCw, Scaling, Trash2, Eye, Palette, X, GitFork, Lock, Ruler } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import '../../types';
 import { HoldModel } from '../../core/HoldModel';
@@ -46,6 +46,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const [isPickingAllColor, setIsPickingAllColor] = useState(false);
+  const [showPreviewDimensions, setShowPreviewDimensions] = useState(false);
   
   const isHoldsLocked = metadata.remixMode === 'structure';
 
@@ -146,9 +147,18 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 
         {!anyHoldSelected && selectedHold && !isHoldsLocked && (
           <section className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
-            <div className="flex items-center space-x-2 text-[10px] font-black text-blue-400 uppercase tracking-widest px-1">
-              <Eye size={12} />
-              <span>Rendu 3D Temps Réel</span>
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center space-x-2 text-[10px] font-black text-blue-400 uppercase tracking-widest">
+                  <Eye size={12} />
+                  <span>Rendu 3D Temps Réel</span>
+                </div>
+                <button 
+                  onClick={() => setShowPreviewDimensions(!showPreviewDimensions)}
+                  className={`p-1 rounded hover:bg-white/10 transition-colors ${showPreviewDimensions ? 'text-blue-400' : 'text-gray-500'}`}
+                  title="Afficher les dimensions"
+                >
+                    <Ruler size={14} />
+                </button>
             </div>
             <div className="bg-gray-950/50 rounded-2xl border-2 border-blue-500/20 relative overflow-hidden h-56 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1)_0%,transparent_70%)] pointer-events-none" />
@@ -167,6 +177,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                                 scale={[holdSettings.scale, holdSettings.scale, holdSettings.scale]} 
                                 color={holdSettings.color} 
                                 preview={true} 
+                                showDimensions={showPreviewDimensions}
                               />
                           </Center>
                       </Suspense>

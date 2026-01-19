@@ -18,8 +18,9 @@ export const useKeyboardShortcuts = (
 ) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignorer si l'utilisateur tape dans un champ texte
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // SÉCURITÉ : Ignorer si l'utilisateur tape dans un champ texte
+      const target = e.target as HTMLElement;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) return;
       
       const isCtrl = e.ctrlKey || e.metaKey;
       const key = e.key; 
@@ -44,8 +45,6 @@ export const useKeyboardShortcuts = (
           }
         }
       } else if (key === 'Delete' || key === 'Backspace') {
-          // La vérification "si quelque chose est sélectionné" doit être faite dans le handler ou via une condition avant d'appeler ce hook,
-          // mais ici on appelle simplement l'action fournie.
           handlers.deleteAction();
       }
     };
