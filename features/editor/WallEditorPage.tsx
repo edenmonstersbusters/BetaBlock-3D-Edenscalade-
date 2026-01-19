@@ -167,12 +167,12 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       )}
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* BOUTON TOGGLE SIDEBAR - Position Absolue & Fixe */}
+        {/* BOUTON TOGGLE SIDEBAR - Ajustement de la position avec des unités standard (20rem = w-80) */}
         {initialMode !== 'VIEW' && (
             <div 
                 className="absolute top-1/2 z-[120] transition-all duration-300 ease-in-out"
                 style={{ 
-                    left: state.isSidebarOpen ? '320px' : '0px', 
+                    left: state.isSidebarOpen ? '20rem' : '0px', 
                     transform: 'translateY(-50%)' 
                 }}
             >
@@ -186,13 +186,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
             </div>
         )}
 
-        {/* SIDEBAR CONTAINER - Flex Item avec largeur transitionnelle via classes */}
+        {/* SIDEBAR CONTAINER - Utilisation de w-80 (320px) pour une largeur standard et responsive */}
         {initialMode !== 'VIEW' && (
              <div 
-                className={`relative flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 shadow-xl z-20 overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0 ${state.isSidebarOpen ? 'w-[320px]' : 'w-0 border-none'}`}
+                className={`relative flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 shadow-xl z-20 overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0 ${state.isSidebarOpen ? 'w-80' : 'w-0 border-none'}`}
              >
                  {/* Contenu interne à largeur fixe pour éviter l'écrasement ou le vide */}
-                 <div className="w-[320px] h-full flex flex-col bg-gray-900">
+                 <div className="w-80 h-full flex flex-col bg-gray-900">
                      <SidebarTabs activeTab={activeTab} onTabChange={setActiveTab} />
                      
                      <div className="flex-1 overflow-hidden relative">

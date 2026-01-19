@@ -32,6 +32,10 @@ export const DragController: React.FC<DragControllerProps> = ({
        const raycaster = new THREE.Raycaster();
        raycaster.setFromCamera(mouse, camera);
        
+       // CRITIQUE : Le laser du drag ne doit voir que le Calque 0 (le mur)
+       // et surtout PAS la prise qu'il déplace (qui est sur le Calque 1)
+       raycaster.layers.set(0);
+       
        const intersects = raycaster.intersectObjects(scene.children, true);
        const wallHit = intersects.find(hit => hit.object.name === 'climbing-wall-panel');
 

@@ -92,6 +92,11 @@ export const HoldModel: React.FC<HoldModelProps> = ({
     clone.rotation.set(0, 0, 0);
     clone.scale.set(1, 1, 1);
     
+    // SOLUTION RADICALE : Utilisation des calques (Layers)
+    // Calque 0 = Objets interactifs (cliquables)
+    // Calque 1 = Objets fantômes (ignorés par le laser de la souris)
+    const targetLayer = (preview || isDragging) ? 1 : 0;
+
     const box = new THREE.Box3().setFromObject(clone);
     const boxSize = new THREE.Vector3();
     let offsetX = 0; let offsetY = 0; let offsetZ = 0;
@@ -106,6 +111,9 @@ export const HoldModel: React.FC<HoldModelProps> = ({
     }
     
     clone.traverse((child) => {
+      // On affecte le calque à absolument tous les enfants du modèle
+      child.layers.set(targetLayer);
+
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.geometry.computeVertexNormals();
@@ -127,12 +135,6 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         
         mesh.castShadow = true; 
         mesh.receiveShadow = true;
-
-        // FIX CRITIQUE: Désactiver la détection de collision pour la prévisualisation et le drag
-        // Cela empêche la prise fantôme de "voler" le clic destiné au mur.
-        if (isDragging || preview) {
-            mesh.raycast = () => null; 
-        }
       }
     });
     return { 
@@ -146,6 +148,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
     <group 
       position={position} rotation={rotation} 
       scale={[scale[0] * baseScale, scale[1] * baseScale, scale[2] * baseScale]}
+      // pointerEvents="none" est un bonus pour R3F, mais le vrai travail est fait par les calques
+      pointerEvents={preview || isDragging ? 'none' : 'auto'}
       onPointerDown={preview ? undefined : onPointerDown}
       onPointerUp={preview ? undefined : onPointerUp}
       onPointerOver={preview ? undefined : onPointerOver}

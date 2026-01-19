@@ -118,10 +118,7 @@ export const Scene: React.FC<SceneProps> = ({
     setGhostRot(new THREE.Euler().setFromQuaternion(quaternion));
   };
 
-  // --- GESTION CENTRALISÉE DES ÉVÉNEMENTS SOURIS ---
-
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-    // On enregistre les coordonnées et le bouton pressé
     pointerDownRef.current = { 
         x: e.clientX, 
         y: e.clientY, 
@@ -139,15 +136,11 @@ export const Scene: React.FC<SceneProps> = ({
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     pointerDownRef.current = null;
-    
-    // Si on a bougé de plus de 10px (tolérance augmentée), c'est un DRAG (caméra ou objet), on ignore
     if (dist > 10) return;
 
-    // --- CLIC GAUCHE (0) ---
     if (button === 0) {
       if (draggingId) return;
       
-      // Check if Hold
       if (e.object.userData && (e.object.userData.type === 'HOLD' || e.object.parent?.userData?.type === 'HOLD')) {
           const holdData = e.object.userData.type === 'HOLD' ? e.object.userData : e.object.parent!.userData;
           const holdId = holdData.id;
@@ -171,7 +164,6 @@ export const Scene: React.FC<SceneProps> = ({
           return;
       }
 
-      // Check if Wall (Placement)
       if (mode === 'SET' && e.object.name === 'climbing-wall-panel') {
           if (selectedPlacedHoldIds.length > 0) {
             onSelectPlacedHold(null);
@@ -185,15 +177,9 @@ export const Scene: React.FC<SceneProps> = ({
       }
     }
 
-    // --- CLIC DROIT (2) ---
     if (button === 2) {
-        // C'est un clic droit propre (pas un drag caméra car dist < 10px)
-        
-        // 1. Check Hold (même si sélectionnée)
         let target = e.object;
         let holdFound = false;
-        
-        // Traverser la hiérarchie pour trouver userData.type === 'HOLD'
         while (target) {
             if (target.userData && target.userData.type === 'HOLD') {
                 e.stopPropagation();
@@ -206,7 +192,6 @@ export const Scene: React.FC<SceneProps> = ({
         }
         if (holdFound) return;
 
-        // 2. Check Wall
         if (e.object.name === 'climbing-wall-panel') {
              const segmentId = e.object.userData.segmentId;
              const coords = calculateLocalCoords(e.point, segmentId, config);
@@ -221,11 +206,16 @@ export const Scene: React.FC<SceneProps> = ({
       shadows 
       gl={{ preserveDrawingBuffer: true }}
       camera={{ position: [8, 5, 12], fov: 40 }}
+      // CONFIGURATION CRITIQUE : Le raycaster de la scène ne doit voir que le Calque 0
+      raycaster={{ 
+          params: { Line: { threshold: 0.1 } },
+          // Cette ligne garantit que la souris ignore tout ce qui est sur le Calque 1 (Fantôme)
+          layers: new THREE.Layers().enable(0) 
+      }}
       onPointerLeave={() => {
         onWallPointerUpdate?.(null);
         setHoveredHoldId(null);
       }}
-      // Empêcher le menu contextuel natif du navigateur
       onContextMenu={(e) => e.preventDefault()}
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
@@ -259,7 +249,7 @@ export const Scene: React.FC<SceneProps> = ({
       <directionalLight position={[5, 10, 5]} intensity={0.3} castShadow shadow-mapSize={[1024, 1024]} />
       <hemisphereLight intensity={0.2} color="#ffffff" groundColor="#000000" />
 
-      {/* GROUPE PRINCIPAL : Intercepte les événements pointeur pour toute la scène */}
+      {/* GROUPE INTERACTIF : Placé sur le Calque 0 par défaut */}
       <group 
         position={[0, 0, 0]}
         onPointerDown={handlePointerDown}
@@ -269,7 +259,6 @@ export const Scene: React.FC<SceneProps> = ({
           config={config} 
           interactive={mode === 'SET'}
           onPointerMove={handlePointerMove}
-          // FIX: Passage explicite des handlers pour éviter les problèmes de bubbling
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
         />
@@ -281,7 +270,6 @@ export const Scene: React.FC<SceneProps> = ({
             {holds.map((hold) => (
                 <HoldModel 
                     key={hold.id}
-                    // Injection des données pour la détection dans Scene
                     userData={{ type: 'HOLD', id: hold.id }}
                     modelFilename={hold.filename} 
                     baseScale={hold.modelBaseScale}
@@ -296,22 +284,23 @@ export const Scene: React.FC<SceneProps> = ({
                 />
             ))}
         </Suspense>
-
-        {mode === 'SET' && selectedHoldDef && ghostPos && ghostRot && selectedPlacedHoldIds.length === 0 && !draggingId && (
-            <Suspense fallback={null}>
-                <HoldModel 
-                    modelFilename={selectedHoldDef.filename}
-                    baseScale={selectedHoldDef.baseScale}
-                    position={[ghostPos.x, ghostPos.y, ghostPos.z]}
-                    rotation={[ghostRot.x, ghostRot.y, ghostRot.z]}
-                    scale={[holdSettings.scale, holdSettings.scale, holdSettings.scale]}
-                    opacity={0.5}
-                    color={holdSettings.color}
-                    preview={true}
-                />
-            </Suspense>
-        )}
       </group>
+
+      {/* GROUPE FANTÔME : Sera rendu par la caméra (car elle voit tout par défaut), mais ignoré par le Raycaster */}
+      {mode === 'SET' && selectedHoldDef && ghostPos && ghostRot && selectedPlacedHoldIds.length === 0 && !draggingId && (
+          <Suspense fallback={null}>
+              <HoldModel 
+                  modelFilename={selectedHoldDef.filename}
+                  baseScale={selectedHoldDef.baseScale}
+                  position={[ghostPos.x, ghostPos.y, ghostPos.z]}
+                  rotation={[ghostRot.x, ghostRot.y, ghostRot.z]}
+                  scale={[holdSettings.scale, holdSettings.scale, holdSettings.scale]}
+                  opacity={0.5}
+                  color={holdSettings.color}
+                  preview={true} // HoldModel se mettra automatiquement sur le Calque 1
+              />
+          </Suspense>
+      )}
 
       <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#222" sectionColor="#333" infiniteGrid />
       <ContactShadows opacity={0.4} scale={20} blur={2} far={10} resolution={512} color="#000000" />
