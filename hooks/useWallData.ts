@@ -56,7 +56,7 @@ export const useWallData = () => {
         const { data } = await api.getWall(id);
         if (data) {
             setConfig(data.config);
-            setHolds(data.holds);
+            setHolds(Array.isArray(data.holds) ? data.holds.filter(h => h && h.id) : []); // Filtrage de sécurité
             setMetadata(data.metadata);
             setMode(targetMode);
         }

@@ -7,13 +7,16 @@ import { WallConfig, PlacedHold } from '../types';
  * Utilisé pour le Raycasting lors du placement ou du déplacement.
  */
 export const calculateLocalCoords = (point: THREE.Vector3, segmentId: string, config: WallConfig) => {
-    const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
+    if (!config.segments) return null;
+
+    const segmentIndex = config.segments.findIndex(s => s && s.id === segmentId);
     if (segmentIndex === -1) return null;
     
     let startY = 0; 
     let startZ = 0;
     for(let i = 0; i < segmentIndex; i++) {
         const s = config.segments[i]; 
+        if (!s) continue; // Skip null segments
         const r = (s.angle * Math.PI) / 180;
         startY += s.height * Math.cos(r); 
         startZ += s.height * Math.sin(r);
@@ -33,19 +36,24 @@ export const calculateLocalCoords = (point: THREE.Vector3, segmentId: string, co
  * en fonction de sa position relative sur le mur.
  */
 export const resolveHoldWorldData = (hold: PlacedHold, config: WallConfig) => {
-  const segmentIndex = config.segments.findIndex(s => s.id === hold.segmentId);
+  if (!hold || !config.segments) return null;
+
+  const segmentIndex = config.segments.findIndex(s => s && s.id === hold.segmentId);
   if (segmentIndex === -1) return null;
 
   let currentY = 0;
   let currentZ = 0;
   for (let i = 0; i < segmentIndex; i++) {
     const s = config.segments[i];
+    if (!s) continue;
     const rad = (s.angle * Math.PI) / 180;
     currentY += s.height * Math.cos(rad);
     currentZ += s.height * Math.sin(rad);
   }
 
   const segment = config.segments[segmentIndex];
+  if (!segment) return null;
+
   const rad = (segment.angle * Math.PI) / 180;
   
   const dirY = Math.cos(rad);

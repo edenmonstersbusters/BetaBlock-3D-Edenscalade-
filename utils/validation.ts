@@ -9,16 +9,16 @@ export const validateBetaBlockJson = (json: any): BetaBlockFile | null => {
   if (typeof config.width !== 'number' || !Array.isArray(config.segments)) return null;
   
   for (const seg of config.segments) {
-    if (!seg.id || typeof seg.height !== 'number' || typeof seg.angle !== 'number') return null;
+    if (!seg || !seg.id || typeof seg.height !== 'number' || typeof seg.angle !== 'number') return null;
   }
   
   for (const hold of json.holds) {
-    if (!hold.id || !hold.segmentId || typeof hold.x !== 'number' || typeof hold.y !== 'number') return null;
+    if (!hold || !hold.id || !hold.segmentId || typeof hold.x !== 'number' || typeof hold.y !== 'number') return null;
     
     // Vérification basique des limites (optionnel mais recommandé pour éviter les bugs visuels)
     const segment = config.segments.find((s: any) => s.id === hold.segmentId);
     if (!segment || hold.y > segment.height || Math.abs(hold.x) > config.width / 2) {
-      console.warn(`Validation: Prise ${hold.id} hors limites.`);
+      console.warn(`Validation: Prise ${hold?.id} hors limites.`);
     }
   }
   

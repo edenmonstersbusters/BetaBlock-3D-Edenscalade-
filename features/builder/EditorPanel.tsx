@@ -43,7 +43,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   const updateSegment = (id: string, updates: Partial<WallSegment>) => {
     if (isStructureLocked) return;
     if (updates.height !== undefined) {
-      const segmentHolds = holds.filter(h => h.segmentId === id);
+      const segmentHolds = holds.filter(h => h && h.segmentId === id);
       const outOfBounds = segmentHolds.some(h => h.y > updates.height!);
       if (outOfBounds) {
         showModal({ title: "Action impossible", message: "Des prises se trouvent au-dessus de la hauteur demandée.", isAlert: true });
@@ -52,14 +52,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     }
     onUpdate({
       ...config,
-      segments: config.segments.map((s) => s.id === id ? { ...s, ...updates } : s),
+      segments: config.segments.map((s) => (s && s.id === id) ? { ...s, ...updates } : s),
     });
   };
 
   const updateGlobal = (updates: Partial<WallConfig>) => {
     if (isStructureLocked) return;
     if (updates.width !== undefined) {
-      const outOfBounds = holds.some(h => Math.abs(h.x) > updates.width! / 2);
+      const outOfBounds = holds.some(h => h && Math.abs(h.x) > updates.width! / 2);
       if (outOfBounds) {
         showModal({ title: "Action impossible", message: "Des prises se trouvent en dehors de la largeur demandée.", isAlert: true });
         return;
@@ -69,16 +69,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden">
-      <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">Structure</h1>
-                <p className="text-[10px] text-gray-500">Géométrie & Pans</p>
-            </div>
-          </div>
-      </div>
-
+    <div className="flex flex-col h-full bg-gray-900 text-white w-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {metadata.parentId && (
             <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 mb-4 animate-in slide-in-from-top-2 duration-300">

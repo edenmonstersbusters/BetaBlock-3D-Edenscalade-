@@ -18,21 +18,24 @@ export const PlacedHoldsList: React.FC<PlacedHoldsListProps> = ({
     holds, selectedIds, onSelect, onRemove, isLocked, onRemoveAll, onGlobalColor 
 }) => {
     const [isPickingAllColor, setIsPickingAllColor] = useState(false);
+    
+    // Filtrage de sécurité
+    const validHolds = holds.filter(h => h && h.id);
 
     return (
         <section className="pt-4 border-t border-gray-800">
-             <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({holds.length})</span></div>
+             <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider mb-2"><span>Prises posées ({validHolds.length})</span></div>
             <div className="max-h-64 overflow-y-auto space-y-1">
-                {holds.slice().reverse().map((h, i) => (
+                {validHolds.slice().reverse().map((h, i) => (
                     <div key={h.id} className={`flex justify-between items-center text-xs p-2 rounded-lg border transition-colors ${selectedIds.includes(h.id) ? 'bg-blue-900/30 border-blue-500' : 'bg-gray-800 border-gray-700 hover:border-gray-500 cursor-pointer'}`} onClick={(e) => onSelect(h.id, e.ctrlKey || e.metaKey)}>
-                        <span className="text-gray-300 font-bold">Prise #{holds.length - i}</span>
+                        <span className="text-gray-300 font-bold">Prise #{validHolds.length - i}</span>
                         {!isLocked && (
                             <button onClick={(e) => { e.stopPropagation(); onRemove(h.id); }} className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
                         )}
                     </div>
                 ))}
             </div>
-            {holds.length > 0 && !isLocked && (
+            {validHolds.length > 0 && !isLocked && (
               <div className="space-y-2 mt-4">
                 {isPickingAllColor ? (
                   <div className="bg-gray-800 p-4 rounded-xl border-2 border-blue-500 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">

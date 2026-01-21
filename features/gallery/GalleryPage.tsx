@@ -58,6 +58,8 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
       loadDefaultWalls();
   };
 
+  const validWalls = walls.filter(w => w && w.id);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
@@ -169,7 +171,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
         ) : (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {walls.map(wall => (
+                    {validWalls.map(wall => (
                         <WallCard 
                             key={wall.id} id={wall.id} name={wall.name} createdAt={wall.created_at} 
                             thumbnail={wall.data?.metadata?.thumbnail} 
@@ -180,7 +182,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                     ))}
                 </div>
                 
-                {walls.length === 0 && (
+                {validWalls.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500 border border-dashed border-gray-800 rounded-xl bg-gray-900/50">
                         <Search size={32} className="mb-2 opacity-50"/>
                         <p>{isSearching ? `Aucun résultat pour "${searchQuery}"` : "Aucun mur public disponible."}</p>

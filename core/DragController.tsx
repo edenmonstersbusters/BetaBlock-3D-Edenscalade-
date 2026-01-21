@@ -40,7 +40,7 @@ export const DragController: React.FC<DragControllerProps> = ({
           const coords = calculateLocalCoords(wallHit.point, segmentId, config);
           
           if (coords) {
-             const segment = config.segments.find(s => s.id === segmentId);
+             const segment = config.segments.find(s => s && s.id === segmentId);
              if (segment) {
                 const clampedY = Math.max(0, Math.min(segment.height, coords.y));
                 const clampedX = Math.max(-config.width/2, Math.min(config.width/2, coords.x));

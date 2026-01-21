@@ -39,6 +39,8 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
     return `${BASE_URL}screenshot/${baseName}-${index}.png`;
   };
 
+  const validLibrary = library.filter(h => h && h.id);
+
   return (
     <>
         {/* Prévisualisation Flottante (Portal-like logic, fixed position) */}
@@ -82,7 +84,7 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Box size={14} />
-                <span>Catalogue ({library.length})</span>
+                <span>Catalogue ({validLibrary.length})</span>
                 {isReplacingMode && <span className="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full animate-pulse ml-2">REMPLACEMENT</span>}
               </div>
               {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -94,7 +96,7 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
                   <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                      {library.map((hold) => (
+                      {validLibrary.map((hold) => (
                           <button 
                             key={hold.id} 
                             onClick={() => onSelectHold(hold)} 

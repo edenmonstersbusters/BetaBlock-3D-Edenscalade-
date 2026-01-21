@@ -92,8 +92,6 @@ const WallPanel: React.FC<WallPanelProps> = ({
   ], [width, topY, topZ]);
 
   const heightLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(heightLinePoints), [heightLinePoints]);
-
-  // Fix: Create memoized THREE.Line object to use with primitive tag
   const heightLineObject = useMemo(() => new THREE.Line(heightLineGeometry), [heightLineGeometry]);
 
   return (
@@ -113,7 +111,6 @@ const WallPanel: React.FC<WallPanelProps> = ({
       </mesh>
 
       {/* DIMENSIONS DE HAUTEUR DU PAN */}
-      {/* Fix: Use primitive to mount THREE.Line and avoid conflict with SVG 'line' tag in JSX */}
       <primitive object={heightLineObject}>
         <lineBasicMaterial attach="material" color="#ffffff" opacity={0.3} transparent />
       </primitive>
@@ -198,7 +195,9 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     let currentZ = 0;
     let currentDist = 0;
 
-    for (const seg of config.segments) {
+    const validSegments = config.segments ? config.segments.filter(s => s && s.id) : [];
+
+    for (const seg of validSegments) {
       result.push({
         segment: seg,
         baseY: currentY,
@@ -219,14 +218,11 @@ export const WallMesh: React.FC<WallMeshProps> = ({ config, onPointerMove, onPoi
     new THREE.Vector3(config.width / 2, -0.05, 0.2)
   ], [config.width]);
   const widthLineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(widthLinePoints), [widthLinePoints]);
-
-  // Fix: Create memoized THREE.Line object to use with primitive tag
   const widthLineObject = useMemo(() => new THREE.Line(widthLineGeometry), [widthLineGeometry]);
 
   return (
     <group name="wall-group">
       {/* DIMENSION DE LARGEUR GLOBALE */}
-      {/* Fix: Use primitive to mount THREE.Line and avoid conflict with SVG 'line' tag in JSX */}
       <primitive object={widthLineObject}>
         <lineBasicMaterial attach="material" color="#3b82f6" opacity={0.6} transparent />
       </primitive>

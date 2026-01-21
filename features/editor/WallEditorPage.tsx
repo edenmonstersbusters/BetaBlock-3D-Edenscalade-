@@ -9,6 +9,7 @@ import { EditorPanel } from '../builder/EditorPanel';
 import { RouteEditorPanel } from '../builder/RouteEditorPanel';
 import { ViewerPanel } from '../viewer/ViewerPanel';
 import { EditorTopBar } from './components/EditorTopBar';
+import { SidebarTabs } from './components/SidebarTabs';
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay';
 import { GlobalModal } from '../../components/ui/GlobalModal';
 import { ContextMenu } from '../../components/ui/ContextMenu';
@@ -30,16 +31,26 @@ interface WallEditorProps {
 }
 
 export const WallEditor: React.FC<WallEditorProps> = ({ 
-  mode, user, config, setConfig, holds, setHolds, metadata, setMetadata,
+  mode: initialMode, user, config, setConfig, holds, setHolds, metadata, setMetadata,
   recordAction, undo, redo, canUndo, canRedo, onSaveCloud, isSavingCloud, generatedLink,
   onHome, onNewWall, onRemix, onRemoveAllHolds, onChangeAllHoldsColor, isLoadingCloud, cloudId, screenshotRef
 }) => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Gestion des onglets : détermine si on affiche "Structure" ou "Prises"
+  // Si le mode initial est SET (via URL), on démarre sur l'onglet holds.
+  const [activeTab, setActiveTab] = useState<'structure' | 'holds'>(initialMode === 'SET' ? 'holds' : 'structure');
+  
+  // Calcul du mode effectif (Derived Mode)
+  // VIEW est prioritaire. Sinon, l'onglet dicte BUILD ou SET.
+  const derivedMode: AppMode = initialMode === 'VIEW' ? 'VIEW' : (activeTab === 'structure' ? 'BUILD' : 'SET');
+
   const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
   const state = useEditorState();
+  
   const logic = useEditorLogic({
-    mode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
+    mode: derivedMode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
     undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef
   });
 
@@ -51,6 +62,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
   };
 
   const renderableHolds = useMemo(() => holds.map((h) => {
+      if (!h) return null; // Sécurité contre les éléments nulls
       const world = resolveHoldWorldData(h, config); return world ? { ...h, ...world } : null;
     }).filter((h) => h !== null), [holds, config]);
 
@@ -71,52 +83,67 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       {state.showAuthModal && <AuthModal onClose={() => state.setShowAuthModal(false)} onSuccess={() => state.setShowAuthModal(false)} />}
       
       <EditorTopBar 
-          mode={mode} metadata={metadata} setMetadata={(m) => { setMetadata(m); state.setIsDirty(true); }}
+          mode={derivedMode} metadata={metadata} setMetadata={(m) => { setMetadata(m); state.setIsDirty(true); }}
           isDirty={state.isDirty} isEditingName={state.isEditingName} setIsEditingName={state.setIsEditingName}
           onExit={() => logic.handleAction('exit')} onSave={() => logic.handleAction('save')} onPublish={() => logic.handleAction('publish')}
       />
 
       <div className="flex flex-1 overflow-hidden relative">
-        <div className={`relative z-20 h-full bg-gray-900 border-r border-gray-800 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'}`}>
-             <div className="w-80 h-full">
-                {mode === 'VIEW' ? (
+        <div className={`relative z-20 h-full bg-gray-900 border-r border-gray-800 transition-all duration-300 ease-in-out flex flex-col ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'}`}>
+             
+             {/* Onglets de navigation (uniquement hors mode VIEW) */}
+             {initialMode !== 'VIEW' && (
+                <SidebarTabs 
+                    activeTab={activeTab} 
+                    onChange={setActiveTab} 
+                    isRemixHoldsLocked={metadata.remixMode === 'structure'} // Si remix structure, on ne peut pas aller sur holds
+                />
+             )}
+
+             <div className="flex-1 w-80 overflow-hidden relative">
+                {initialMode === 'VIEW' ? (
                     <ViewerPanel wallId={cloudId || ''} metadata={metadata} config={config} holds={holds} onHome={() => logic.handleAction('exit')} onRemix={onRemix || (() => {})} onShare={() => logic.handleAction('share')} onEdit={() => navigate(`/builder?id=${cloudId}`)} />
-                ) : mode === 'BUILD' ? (
+                ) : activeTab === 'structure' ? (
                     <EditorPanel 
-                        config={config} holds={holds} onUpdate={setConfig} metadata={metadata} onNext={() => navigate('/setter')} showModal={(c) => state.setModal(c)}
+                        config={config} holds={holds} onUpdate={setConfig} metadata={metadata} 
+                        onNext={() => setActiveTab('holds')} 
+                        showModal={(c) => state.setModal(c)}
                         onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')} onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest} onHome={() => logic.handleAction('exit')} onRemoveSegment={logic.removeSegmentAction}
                     />
                 ) : (
                     <RouteEditorPanel 
-                        onBack={() => navigate('/builder')} selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold} metadata={metadata}
+                        onBack={() => setActiveTab('structure')} 
+                        selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold} metadata={metadata}
                         holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
                         placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} onRemoveAllHolds={onRemoveAllHolds || (() => {})} onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
-                        selectedPlacedHoldIds={state.selectedPlacedHoldIds} onUpdatePlacedHold={(ids, u) => { if (metadata.remixMode !== 'structure') { const s = new Set(ids); setHolds(h => h.map(x => s.has(x.id) ? { ...x, ...u } : x)); state.setIsDirty(true); }}}
+                        selectedPlacedHoldIds={state.selectedPlacedHoldIds} onUpdatePlacedHold={(ids, u) => { if (metadata.remixMode !== 'structure') { const s = new Set(ids); setHolds(h => h.map(x => (x && s.has(x.id)) ? { ...x, ...u } : x)); state.setIsDirty(true); }}}
                         onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])} onActionStart={logic.saveToHistory} 
-                        onReplaceHold={(ids, def) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => s.has(h.id) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}}
+                        onReplaceHold={(ids, def) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => (h && s.has(h.id)) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}}
                         onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)} onExport={() => logic.handleAction('save')} onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest} onHome={() => logic.handleAction('exit')}
                     />
                 )}
              </div>
         </div>
+        
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`absolute top-1/2 z-30 -translate-y-1/2 bg-gray-800 border border-gray-600 text-gray-400 p-1 rounded-r-lg hover:bg-blue-600 hover:text-white transition-all shadow-xl ${isSidebarOpen ? 'left-80' : 'left-0'}`}> {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />} </button>
+        
         <div className="flex-1 relative h-full bg-black">
-            {mode !== 'VIEW' && (
+            {initialMode !== 'VIEW' && (
                 <div className="fixed bottom-6 right-6 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
                     <button disabled={!canUndo} onClick={logic.performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
                     <button disabled={!canRedo} onClick={logic.performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
                 </div>
             )}
-            <Scene config={config} mode={mode} holds={renderableHolds as any} onPlaceHold={logic.handlePlaceHold} selectedHoldDef={state.selectedHold} holdSettings={state.holdSettings} selectedPlacedHoldIds={state.selectedPlacedHoldIds} onSelectPlacedHold={state.handleSelectPlacedHold} onContextMenu={(t, i, x, y, wx, wy) => state.setContextMenu({ type: t, id: i, x, y, wallX: wx, wallY: wy })} onWallPointerUpdate={(i) => { cursorPosRef.current = i; }} onHoldDrag={(id, x, y, segId) => { if (metadata.remixMode !== 'structure') { setHolds(prev => prev.map(h => h.id === id ? { ...h, x, y, segmentId: segId } : h)); state.setIsDirty(true); } }} onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef} />
+            <Scene config={config} mode={derivedMode} holds={renderableHolds as any} onPlaceHold={logic.handlePlaceHold} selectedHoldDef={state.selectedHold} holdSettings={state.holdSettings} selectedPlacedHoldIds={state.selectedPlacedHoldIds} onSelectPlacedHold={state.handleSelectPlacedHold} onContextMenu={(t, i, x, y, wx, wy) => state.setContextMenu({ type: t, id: i, x, y, wallX: wx, wallY: wy })} onWallPointerUpdate={(i) => { cursorPosRef.current = i; }} onHoldDrag={(id, x, y, segId) => { if (metadata.remixMode !== 'structure') { setHolds(prev => prev.map(h => (h && h.id === id) ? { ...h, x, y, segmentId: segId } : h)); state.setIsDirty(true); } }} onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef} />
         </div>
       </div>
       <ContextMenu 
         data={state.contextMenu} onClose={() => state.setContextMenu(null)} onUpdateData={state.setContextMenu}
-        onCopyHold={() => { const ids = (state.contextMenu?.id && state.selectedPlacedHoldIds.includes(state.contextMenu.id)) ? state.selectedPlacedHoldIds : (state.contextMenu?.id ? [state.contextMenu.id] : []); if (ids.length) state.setClipboard(JSON.parse(JSON.stringify(holds.filter(h => ids.includes(h.id))))); }} 
+        onCopyHold={() => { const ids = (state.contextMenu?.id && state.selectedPlacedHoldIds.includes(state.contextMenu.id)) ? state.selectedPlacedHoldIds : (state.contextMenu?.id ? [state.contextMenu.id] : []); if (ids.length) state.setClipboard(JSON.parse(JSON.stringify(holds.filter(h => h && ids.includes(h.id))))); }} 
         hasClipboard={state.clipboard.length > 0} onPasteHold={(t) => logic.handlePaste(t)} 
         onDelete={(id, type) => type === 'HOLD' ? logic.removeHoldsAction([id], true) : logic.removeSegmentAction(id)}
-        onRotateHold={(id, d) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); setHolds(h => h.map(x => x.id === id ? { ...x, spin: x.spin + d } : x)); }}}
-        onColorHold={(id, c) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); setHolds(h => h.map(x => x.id === id ? { ...x, color: c } : x)); }}}
+        onRotateHold={(id, d) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, spin: x.spin + d } : x)); }}}
+        onColorHold={(id, c) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, color: c } : x)); }}}
         onSegmentUpdate={logic.updateSegmentQuickly}
       />
       <GlobalModal config={state.modal} onClose={() => state.setModal(null)} isSavingCloud={isSavingCloud} generatedLink={generatedLink || `${window.location.origin}/#/view/${cloudId}`} onSaveCloud={wrappedSaveCloud} onDownload={handleDownloadLocal} wallName={metadata.name} onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} />

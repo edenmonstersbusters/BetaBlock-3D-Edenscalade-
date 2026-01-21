@@ -39,11 +39,14 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
     day: 'numeric', month: 'long', year: 'numeric'
   });
 
-  const totalHolds = holds.length;
-  const maxOverhang = Math.max(...config.segments.map(s => s.angle));
+  const validHolds = holds ? holds.filter(h => h && h.id) : [];
+  const validSegments = config.segments ? config.segments.filter(s => s && s.id) : [];
 
-  const totalClimbingLength = config.segments.reduce((acc, s) => acc + s.height, 0);
-  const totalVerticalHeight = config.segments.reduce((acc, s) => {
+  const totalHolds = validHolds.length;
+  const maxOverhang = validSegments.length > 0 ? Math.max(...validSegments.map(s => s.angle)) : 0;
+
+  const totalClimbingLength = validSegments.reduce((acc, s) => acc + s.height, 0);
+  const totalVerticalHeight = validSegments.reduce((acc, s) => {
     const rad = (s.angle * Math.PI) / 180;
     return acc + (s.height * Math.cos(rad));
   }, 0);
@@ -190,7 +193,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                     </div>
                     <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
                         <div className="text-gray-500 text-[10px] uppercase mb-1 flex items-center gap-1"><Layers size={10} /> Pans</div>
-                        <div className="text-2xl font-mono text-white">{config.segments.length}</div>
+                        <div className="text-2xl font-mono text-white">{validSegments.length}</div>
                     </div>
                     
                     <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">

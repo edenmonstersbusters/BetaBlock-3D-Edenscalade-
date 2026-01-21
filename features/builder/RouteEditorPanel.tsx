@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Box, RotateCw, Scaling, GitFork, Lock } from 'lucide-react';
+import { Box, RotateCw, Scaling, GitFork, Lock } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import { FileControls } from '../../components/ui/FileControls';
 import { ColorPalette } from '../../components/ui/ColorPalette';
@@ -35,12 +35,14 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 
   useEffect(() => {
     fetch(CATALOGUE_URL).then(r => r.json()).then(data => {
-        setLibrary(Array.isArray(data) ? data.map((item: any, i: number) => ({
+        setLibrary(Array.isArray(data) ? data
+            .filter((item: any) => item && (item.id || item.name)) // Filtre initial
+            .map((item: any, i: number) => ({
              id: String(item.id || item.name || crypto.randomUUID()),
              name: item.nom_affichage || item.name,
-             filename: (item.nom_du_fichier || item.filename).endsWith('.glb') ? item.nom_du_fichier || item.filename : `${item.nom_du_fichier || item.filename}.glb`,
+             filename: (item.nom_du_fichier || item.filename || '').endsWith('.glb') ? (item.nom_du_fichier || item.filename) : `${item.nom_du_fichier || item.filename}.glb`,
              category: item.category || 'General', baseScale: i === 0 ? 0.02 : 0.001
-        })).filter(h => h.id) : []);
+        })).filter(h => h.id && h.filename && h.filename !== '.glb') : []); // Filtre final robuste
         setLoading(false);
     }).catch(e => { console.error(e); setLoading(false); });
   }, []);
@@ -48,13 +50,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const anyHoldSelected = selectedPlacedHoldIds.length > 0;
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-[60] overflow-hidden relative">
-       <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
-        <div className="flex items-center space-x-3 overflow-hidden">
-          <button onClick={onBack} className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white flex-shrink-0"><ArrowLeft size={20} /></button>
-          <div className="overflow-hidden"><h1 className="text-lg font-bold text-white truncate">Ouverture</h1><p className="text-xs text-gray-500 truncate">Pose de prises</p></div>
-        </div>
-      </div>
+    <div className="flex flex-col h-full bg-gray-900 text-white w-full relative">
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {metadata.parentId && (
             <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
@@ -65,7 +61,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         )}
         {anyHoldSelected ? (
           <HoldInspector 
-             selectedHolds={placedHolds.filter(h => selectedPlacedHoldIds.includes(h.id))}
+             selectedHolds={placedHolds.filter(h => h && selectedPlacedHoldIds.includes(h.id))}
              onUpdate={(u) => { if(!isHoldsLocked) onUpdatePlacedHold(selectedPlacedHoldIds, u); }}
              onRemove={onRemoveMultiple} onDeselect={onDeselect} isLocked={isHoldsLocked}
              onToggleReplaceMode={() => { if(!isHoldsLocked) { setCatalogueExpanded(true); setIsReplacingMode(true); } }}

@@ -12,13 +12,15 @@ interface SegmentManagerProps {
 }
 
 export const SegmentManager: React.FC<SegmentManagerProps> = ({ segments, onUpdateSegment, onRemoveSegment, onActionStart }) => {
+  const validSegments = segments.filter(s => s && s.id);
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between text-sm font-medium text-gray-400 uppercase tracking-wider">
-        <div className="flex items-center space-x-2"><Ruler size={14} /><span>Pans de Mur ({segments.length})</span></div>
+        <div className="flex items-center space-x-2"><Ruler size={14} /><span>Pans de Mur ({validSegments.length})</span></div>
       </div>
       <div className="space-y-3">
-        {segments.map((seg, index) => (
+        {validSegments.map((seg, index) => (
           <div key={seg.id} className="group relative bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
             <div className="flex justify-between items-center mb-3">
               <span className="text-xs font-bold text-gray-500 bg-gray-900 px-2 py-1 rounded">#{index + 1}</span>

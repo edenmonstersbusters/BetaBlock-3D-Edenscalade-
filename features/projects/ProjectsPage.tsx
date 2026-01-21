@@ -40,6 +40,8 @@ export const ProjectsPage: React.FC = () => {
         setTogglingId(null);
     };
 
+    const validProjects = projects.filter(p => p && p.id);
+
     return (
         <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar">
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/50 backdrop-blur-xl sticky top-0 z-50">
@@ -57,14 +59,14 @@ export const ProjectsPage: React.FC = () => {
 
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-32 text-gray-600"><Loader2 size={48} className="animate-spin mb-4 text-blue-500" /><span className="font-mono text-xs uppercase tracking-widest animate-pulse">Chargement de vos fichiers...</span></div>
-                ) : projects.length === 0 ? (
+                ) : validProjects.length === 0 ? (
                     <div className="text-center py-24 bg-gray-900/30 rounded-3xl border border-white/5 border-dashed">
                         <Box size={48} className="mx-auto mb-4 text-gray-700" /><h2 className="text-xl font-bold text-gray-400 mb-2">Aucun mur trouvé</h2>
                         <button onClick={() => navigate('/builder')} className="text-blue-500 hover:underline">Créer mon premier mur</button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {projects.map(p => {
+                        {validProjects.map(p => {
                             const isPublic = !!p.is_public;
                             return (
                                 <div key={p.id} className="relative group">

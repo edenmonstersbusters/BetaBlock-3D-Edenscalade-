@@ -13,6 +13,8 @@ interface ProfilePortfolioProps {
 }
 
 export const ProfilePortfolio: React.FC<ProfilePortfolioProps> = ({ walls, isOwnProfile, authorName, authorAvatarUrl, onWallClick, onCreateClick }) => {
+    const validWalls = walls.filter(w => w && w.id);
+
     return (
         <section className="space-y-8 pt-8 relative">
             <div className="flex items-center justify-between">
@@ -24,13 +26,13 @@ export const ProfilePortfolio: React.FC<ProfilePortfolioProps> = ({ walls, isOwn
                     </div>
                 </div>
                 <div className="px-4 py-2 bg-gray-900 border border-white/5 rounded-2xl text-xs font-bold text-gray-400">
-                    {walls.length} murs
+                    {validWalls.length} murs
                 </div>
             </div>
 
-            {walls.length > 0 ? (
+            {validWalls.length > 0 ? (
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {walls.map(wall => (
+                    {validWalls.map(wall => (
                         <WallCard 
                             key={wall.id} id={wall.id} name={wall.name} createdAt={wall.created_at} 
                             thumbnail={wall.data?.metadata?.thumbnail} 
