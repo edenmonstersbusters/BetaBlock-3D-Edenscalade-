@@ -3,19 +3,19 @@
 
 Ce document recense l'intégralité des fichiers du projet, leur rôle, et leur volumétrie approximative. Il sert de carte pour la maintenance et le développement.
 
-**Dernière mise à jour :** v1.3 (Live Profile Sync & Gemini Gym Search)
-**Total Fichiers :** ~39 fichiers
+**Dernière mise à jour :** v1.4 (Refonte Profil & Documentation précise)
+**Total Fichiers :** ~40 fichiers
 **État Global :** Application React/Three.js avec routing, backend Supabase, IA Gemini et architecture modulaire.
 
 ---
 
 ## 📂 Racine (Configuration & Entrée)
 
-| Fichier | Lignes (~approx) | Description |
+| Fichier | Lignes | Description |
 | :--- | :---: | :--- |
 | `index.html` | 45 | Point d'entrée HTML. Styles globaux et ImportMap. |
 | `index.tsx` | 35 | Point d'entrée React. Router et Montage. |
-| `App.tsx` | **160** | **App Shell.** Routing, Auth Listener, et chargement initial des données de mur. |
+| `App.tsx` | **229** | **App Shell.** Routing, Auth Listener, et chargement initial des données de mur. |
 | `types.ts` | 85 | Définitions TypeScript globales. |
 | `metadata.json` | 10 | Métadonnées de l'application et permissions. |
 | `PROJECT_STRUCTURE.md` | N/A | Ce fichier. |
@@ -56,7 +56,7 @@ Ce document recense l'intégralité des fichiers du projet, leur rôle, et leur 
 ### 👤 profile/ (Utilisateur)
 | Fichier | Lignes | Description |
 | :--- | :---: | :--- |
-| `ProfilePage.tsx` | **285** | Page Profil. Carte Grimpeur, Edition, Stats. |
+| `ProfilePage.tsx` | **315** | Page Profil. Carte Grimpeur, Edition, Stats (Refonte UI). |
 | `components/GymSearchSelector.tsx` | **105** | Recherche de salle via Google Gemini API. |
 
 ### 📁 projects/ (Dashboard Privé)
@@ -75,7 +75,7 @@ Ce document recense l'intégralité des fichiers du projet, leur rôle, et leur 
 | `HoldModel.tsx` | 90 | Composant 3D d'une prise (GLTF). |
 | `DragController.tsx` | 65 | Logique de déplacement sur surface 3D. |
 | `ScreenshotHandler.tsx` | 55 | Capture d'écran du canvas. |
-| `api.ts` | **285** | **API Layer.** CRUD Supabase + Enrichissement Profils Live. |
+| `api.ts` | **185** | **API Layer.** CRUD Supabase + Enrichissement Profils Live. |
 | `auth.ts` | 75 | Wrapper Auth Supabase. |
 | `supabase.ts` | 15 | Client Supabase. |
 
@@ -86,7 +86,7 @@ Ce document recense l'intégralité des fichiers du projet, leur rôle, et leur 
 | Fichier | Lignes | Description |
 | :--- | :---: | :--- |
 | `ui/GlobalModal.tsx` | **185** | Modale polyvalente (Save, Share, Alert). |
-| `ui/ContextMenu.tsx` | 100 | Menu clic-droit. |
+| `ui/ContextMenu.tsx` | **100** | Menu clic-droit. |
 | `ui/LoadingOverlay.tsx` | 20 | Loader plein écran. |
 | `ui/FileControls.tsx` | 45 | Boutons fichiers. |
 | `ui/ColorPalette.tsx` | 40 | Sélecteur couleurs. |

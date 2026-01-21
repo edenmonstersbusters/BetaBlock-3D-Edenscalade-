@@ -1,182 +1,30 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
-
-// Core imports
-import { api } from './core/api'; 
-import { auth } from './core/auth';
-
-// Feature Components
-import { WallEditor } from './features/editor/WallEditorPage'; // Nouveau composant extrait
+import React from 'react';
+import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
+import { WallEditor } from './features/editor/WallEditorPage';
 import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
-
-// Custom Hooks
 import { useHistory } from './hooks/useHistory';
-
-// Types
-import { WallConfig, AppMode, PlacedHold, BetaBlockFile, WallMetadata } from './types';
+import { useWallData } from './hooks/useWallData';
 import './types';
 
-const APP_VERSION = "1.1";
-
-const INITIAL_CONFIG: WallConfig = {
-  width: 4.5,
-  segments: [
-    { id: '1', height: 2.2, angle: 0 },
-    { id: '2', height: 2.0, angle: 30 },
-    { id: '3', height: 1.5, angle: 15 },
-  ],
-};
-
 export default function App() {
-  const [mode, setMode] = useState<AppMode>('BUILD');
-  const [config, setConfig] = useState<WallConfig>(INITIAL_CONFIG);
-  const [holds, setHolds] = useState<PlacedHold[]>([]);
-  const [metadata, setMetadata] = useState<WallMetadata>({
-    name: "Nouveau Mur",
-    timestamp: new Date().toISOString(),
-    appVersion: APP_VERSION,
-    remixMode: null
-  });
-  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
-  const [isSavingCloud, setIsSavingCloud] = useState(false);
-  const [cloudId, setCloudId] = useState<string | null>(null);
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  
-  const screenshotRef = useRef<(() => Promise<string | null>) | null>(null);
-  const history = useHistory({ config, holds });
   const navigate = useNavigate();
-  const location = useLocation();
+  const {
+    mode, config, setConfig, holds, setHolds, metadata, setMetadata,
+    isLoadingCloud, isSavingCloud, cloudId, generatedLink, user,
+    screenshotRef, handleSaveCloud, handleRemix, resetToNew
+  } = useWallData();
+  
+  const history = useHistory({ config, holds });
 
-  useEffect(() => {
-    auth.getUser().then(setUser);
-    const { data: { subscription } } = auth.onAuthStateChange(setUser);
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const path = location.pathname;
-    const searchParams = new URLSearchParams(location.search);
-    const queryId = searchParams.get('id');
-
-    const loadWallData = async (id: string, targetMode: AppMode) => {
-        setCloudId(id);
-        setIsLoadingCloud(true);
-        const { data, error } = await api.getWall(id);
-        if (data) {
-            setConfig(data.config);
-            setHolds(data.holds);
-            setMetadata(data.metadata);
-            setMode(targetMode);
-        }
-        setIsLoadingCloud(false);
-    };
-
-    if (path.startsWith('/view/')) {
-        const id = path.split('/').pop();
-        if (id) {
-            loadWallData(id, 'VIEW');
-        }
-    } else if (path === '/builder') {
-        if (queryId) {
-            // Si on a un ID dans l'URL (via le bouton stylo), on charge ce mur
-            loadWallData(queryId, 'BUILD');
-        } else {
-            // FIX: Si on arrive sur /builder sans ID (ex: bouton "Nouveau Mur"), on RESET tout.
-            setConfig(INITIAL_CONFIG);
-            setHolds([]);
-            setMetadata({
-                name: "Nouveau Mur",
-                timestamp: new Date().toISOString(),
-                appVersion: APP_VERSION,
-                remixMode: null
-            });
-            setCloudId(null);
-            setGeneratedLink(null);
-            setMode('BUILD');
-        }
-    } else if (path === '/setter') {
-        if (queryId) {
-             loadWallData(queryId, 'SET');
-        } else {
-             setMode('SET');
-        }
-    }
-  }, [location.pathname, location.search]);
-
-  const handleSaveCloud = async (): Promise<boolean> => {
-    if (!user) return false;
-    setIsSavingCloud(true);
-    let screenshot = null;
-    try {
-        if (screenshotRef.current) {
-            screenshot = await screenshotRef.current();
-        }
-    } catch(e) { console.error("Screenshot failed during save", e); }
-    
-    const dataToSave: BetaBlockFile = {
-      version: APP_VERSION,
-      metadata: { 
-          ...metadata, 
-          timestamp: new Date().toISOString(),
-          thumbnail: screenshot || undefined,
-          authorName: user.user_metadata?.display_name || user.email?.split('@')[0]
-      },
-      config,
-      holds
-    };
-
-    let result;
-    if (cloudId) {
-        result = await api.updateWall(cloudId, dataToSave);
-    } else {
-        const saveRes = await api.saveWall(dataToSave);
-        result = { error: saveRes.error };
-        if (saveRes.id) setCloudId(saveRes.id);
-    }
-    
-    setIsSavingCloud(false);
-    if (!result.error) {
-        setGeneratedLink(`${window.location.origin}/#/view/${cloudId}`);
-        return true;
-    }
-    return false;
-  };
-
-  const handleRemix = (remixMode: 'structure' | 'holds') => {
-      const newMetadata: WallMetadata = {
-          ...metadata,
-          name: `Remix de ${metadata.name}`,
-          timestamp: new Date().toISOString(),
-          parentId: cloudId || undefined,
-          parentName: metadata.name,
-          parentAuthorName: metadata.authorName,
-          remixMode: remixMode
-      };
-      setMetadata(newMetadata);
-      setCloudId(null);
-      setGeneratedLink(null);
-      navigate(remixMode === 'holds' ? '/setter' : '/builder');
-  };
-
-  const resetToNew = () => {
-    // On reset l'état local immédiatement
-    setConfig(INITIAL_CONFIG);
-    setHolds([]);
-    setMetadata({
-        name: "Nouveau Mur",
-        timestamp: new Date().toISOString(),
-        appVersion: APP_VERSION,
-        remixMode: null
-    });
-    setCloudId(null);
-    setGeneratedLink(null);
-    
-    // Et on navigue vers l'URL propre (ce qui déclenchera aussi le useEffect, mais c'est sécurisé)
-    navigate('/builder');
+  // Props communes pour WallEditor pour réduire la duplication
+  const editorProps = {
+    user, config, setConfig, holds, setHolds, metadata, setMetadata,
+    ...history, onSaveCloud: handleSaveCloud, isSavingCloud,
+    generatedLink, onHome: () => navigate('/'), onNewWall: resetToNew,
+    isLoadingCloud, cloudId, screenshotRef
   };
 
   return (
@@ -185,43 +33,23 @@ export default function App() {
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/:userId" element={<ProfilePage />} />
       <Route path="/projects" element={<ProjectsPage />} />
+      
       <Route path="/builder" element={
-        <WallEditor 
-          mode="BUILD" user={user}
-          config={config} setConfig={setConfig} 
-          holds={holds} setHolds={setHolds} 
-          metadata={metadata} setMetadata={setMetadata}
-          {...history} onSaveCloud={handleSaveCloud} isSavingCloud={isSavingCloud} 
-          generatedLink={generatedLink} onHome={() => navigate('/')} 
-          onNewWall={resetToNew} isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
-        />
+        <WallEditor mode="BUILD" {...editorProps} />
       } />
+      
       <Route path="/setter" element={
         <WallEditor 
-          mode="SET" user={user}
-          config={config} setConfig={setConfig} 
-          holds={holds} setHolds={setHolds} 
-          metadata={metadata} setMetadata={setMetadata}
-          {...history} onSaveCloud={handleSaveCloud} isSavingCloud={isSavingCloud} 
-          generatedLink={generatedLink} onHome={() => navigate('/')} 
-          onNewWall={resetToNew}
+          mode="SET" {...editorProps}
           onRemoveAllHolds={() => { history.recordAction({ config, holds }); setHolds([]); }}
           onChangeAllHoldsColor={(color: string) => { history.recordAction({ config, holds }); setHolds(prev => prev.map(h => ({ ...h, color }))); }}
-          isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
         />
       } />
+      
       <Route path="/view/:id" element={
-        <WallEditor 
-          mode="VIEW" user={user}
-          config={config} setConfig={setConfig} 
-          holds={holds} setHolds={setHolds} 
-          metadata={metadata} setMetadata={setMetadata}
-          {...history} onSaveCloud={handleSaveCloud} isSavingCloud={isSavingCloud} 
-          generatedLink={generatedLink} onHome={() => navigate('/')} 
-          onNewWall={resetToNew} onRemix={handleRemix}
-          isLoadingCloud={isLoadingCloud} cloudId={cloudId} screenshotRef={screenshotRef}
-        />
+        <WallEditor mode="VIEW" {...editorProps} onRemix={handleRemix} />
       } />
+      
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
