@@ -1,5 +1,4 @@
-
-import { useCallback, Dispatch, SetStateAction } from 'react';
+import React, { useCallback, Dispatch, SetStateAction } from 'react';
 import * as THREE from 'three';
 import { calculateLocalCoords } from '../../../utils/geometry';
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';

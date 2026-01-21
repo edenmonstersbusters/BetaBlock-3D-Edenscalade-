@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { WallConfig, PlacedHold, WallMetadata } from '../../types';
+import { WallConfig, PlacedHold, WallMetadata, UserProfile } from '../../types';
 import { Home, Share2, GitFork, Calendar, Ruler, Layers, Box, Heart, MessageSquare, ArrowUp, Activity, Edit3 } from 'lucide-react';
 import { SocialFeed } from './components/SocialFeed';
 import { api } from '../../core/api';
@@ -28,7 +28,12 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
   const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   
-  const [displayAvatarUrl, setDisplayAvatarUrl] = useState<string | undefined | null>(metadata.authorAvatarUrl);
+  // State pour le profil LIVE de l'auteur (pour éviter les noms/avatars périmés)
+  const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
+  
+  // Fallback sur les métadonnées si le profil live n'est pas encore chargé
+  const displayAvatarUrl = authorProfile?.avatar_url || metadata.authorAvatarUrl;
+  const displayName = authorProfile?.display_name || metadata.authorName || "Anonyme";
 
   const dateStr = new Date(metadata.timestamp).toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric'
@@ -44,28 +49,22 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
   }, 0);
 
   useEffect(() => {
+      // 1. Check Ownership & Social Stats
       auth.getUser().then(user => {
-          // Vérification de propriété
           if (user && metadata.authorId && user.id === metadata.authorId) {
               setIsOwner(true);
           }
-          
           if (!wallId) return;
           api.getWallSocialStatus(wallId, user?.id).then(setSocialStats);
       });
-  }, [wallId, metadata.authorId]);
 
-  useEffect(() => {
-      if (!metadata.authorAvatarUrl && metadata.authorId) {
+      // 2. Fetch Live Author Profile (Source of Truth)
+      if (metadata.authorId) {
           api.getProfile(metadata.authorId).then(profile => {
-              if (profile?.avatar_url) {
-                  setDisplayAvatarUrl(profile.avatar_url);
-              }
+              if (profile) setAuthorProfile(profile);
           });
-      } else {
-          setDisplayAvatarUrl(metadata.authorAvatarUrl);
       }
-  }, [metadata.authorAvatarUrl, metadata.authorId]);
+  }, [wallId, metadata.authorId]);
 
   const handleLikeWall = async (e: React.MouseEvent) => {
       const user = await auth.getUser();
@@ -101,7 +100,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
       {showRemixModal && (
         <RemixModal 
             wallName={metadata.name} 
-            authorName={metadata.authorName || "Anonyme"} 
+            authorName={displayName} 
             onClose={() => setShowRemixModal(false)}
             onSelect={(mode) => {
                 setShowRemixModal(false);
@@ -166,10 +165,10 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
             {/* Auteur & Infos */}
             <section className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3">
                 <div className="flex items-center gap-3 text-sm text-gray-300">
-                    <UserAvatar url={displayAvatarUrl} name={metadata.authorName} size="md" />
+                    <UserAvatar url={displayAvatarUrl} name={displayName} size="md" />
                     <div className="min-w-0 flex-1">
                         <span className="block text-xs text-gray-500 uppercase">Créé par</span>
-                        <span className="font-bold text-white truncate block">{metadata.authorName || "Anonyme"}</span>
+                        <span className="font-bold text-white truncate block">{displayName}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-300">

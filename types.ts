@@ -8,7 +8,6 @@ declare global {
         mesh: any;
         group: any;
         meshStandardMaterial: any;
-        // Fix: Add missing material and geometry types used in WallMesh.tsx
         lineBasicMaterial: any;
         boxGeometry: any;
         meshBasicMaterial: any;
@@ -32,7 +31,7 @@ export interface WallMetadata {
   authorId?: string;
   authorName?: string;
   authorAvatarUrl?: string;
-  isPublic?: boolean; // NOUVEAU : Gère la visibilité
+  isPublic?: boolean;
   
   // Remix fields
   parentId?: string;
@@ -86,13 +85,24 @@ export interface UserProfile {
   id: string;
   display_name: string;
   email?: string;
-  bio?: string;
   avatar_url?: string;
+  
+  // New SQL Fields
+  bio?: string;
   location?: string;
-  home_gym?: string;
+  home_gym?: {
+    name: string;
+    city?: string;
+    address?: string;
+    country?: string;
+    uri?: string;
+  } | null; // JSONB in SQL
   climbing_grade?: string;
   climbing_style?: string;
+  
   created_at: string;
+  
+  // Computed stats
   stats?: {
     total_walls: number;
     total_likes: number;
