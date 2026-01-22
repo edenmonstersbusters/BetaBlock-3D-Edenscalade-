@@ -1,6 +1,6 @@
 
-import React, { useMemo } from 'react';
-import { useGLTF, Html } from '@react-three/drei';
+import React, { useMemo, useEffect } from 'react';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
 import '../types';
@@ -23,6 +23,7 @@ interface HoldModelProps {
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
+  onDimensionsCalculated?: (dims: { width: number; height: number; depth: number }) => void;
 }
 
 const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
@@ -45,7 +46,8 @@ export const HoldModel: React.FC<HoldModelProps> = ({
   onPointerUp,
   onPointerOver,
   onPointerOut,
-  onContextMenu
+  onContextMenu,
+  onDimensionsCalculated
 }) => {
   const url = `${BASE_URL}${encodeURIComponent(modelFilename)}`;
   const { scene } = useGLTF(url, DRACO_DECODER_URL);
@@ -100,6 +102,17 @@ export const HoldModel: React.FC<HoldModelProps> = ({
     return { clonedScene: clone, offset: [offsetX, offsetY, offsetZ] as [number, number, number], size: sizeVec };
   }, [scene, opacity, color, preview, isSelected, isDragging]);
 
+  // Remonter les dimensions calculées au parent
+  useEffect(() => {
+    if (onDimensionsCalculated && size) {
+        onDimensionsCalculated({
+            width: size.x * scale[0] * baseScale * 100,
+            height: size.y * scale[1] * baseScale * 100,
+            depth: size.z * scale[2] * baseScale * 100
+        });
+    }
+  }, [size, scale, baseScale, onDimensionsCalculated]);
+
   return (
     <group 
       position={position} rotation={rotation} 
@@ -113,21 +126,10 @@ export const HoldModel: React.FC<HoldModelProps> = ({
     >
         <primitive object={clonedScene} position={offset} />
         {showDimensions && size && (
-            <>
-                <mesh position={[0, 0, 0]}>
-                    <boxGeometry args={[size.x, size.y, size.z]} />
-                    <meshBasicMaterial color="#3b82f6" wireframe opacity={0.3} transparent />
-                </mesh>
-                <Html position={[0, size.y / 2 + (size.y * 0.2), 0]} center zIndexRange={[100, 0]}>
-                    <div className="flex flex-col gap-0.5 items-center">
-                        <div className="bg-gray-950/80 border border-blue-500/30 px-2 py-1 rounded text-[8px] font-mono text-blue-200 whitespace-nowrap backdrop-blur-md shadow-xl">
-                            <div>W: {(size.x * scale[0] * baseScale * 100).toFixed(1)} cm</div>
-                            <div>H: {(size.y * scale[1] * baseScale * 100).toFixed(1)} cm</div>
-                            <div>D: {(size.z * scale[2] * baseScale * 100).toFixed(1)} cm</div>
-                        </div>
-                    </div>
-                </Html>
-            </>
+            <mesh position={[0, 0, 0]}>
+                <boxGeometry args={[size.x, size.y, size.z]} />
+                <meshBasicMaterial color="#3b82f6" wireframe opacity={0.3} transparent />
+            </mesh>
         )}
     </group>
   );

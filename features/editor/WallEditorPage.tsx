@@ -37,13 +37,12 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
   
   // Gestion des onglets : détermine si on affiche "Structure" ou "Prises"
-  // Si le mode initial est SET (via URL), on démarre sur l'onglet holds.
   const [activeTab, setActiveTab] = useState<'structure' | 'holds'>(initialMode === 'SET' ? 'holds' : 'structure');
   
   // Calcul du mode effectif (Derived Mode)
-  // VIEW est prioritaire. Sinon, l'onglet dicte BUILD ou SET.
   const derivedMode: AppMode = initialMode === 'VIEW' ? 'VIEW' : (activeTab === 'structure' ? 'BUILD' : 'SET');
 
   const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
@@ -53,6 +52,14 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     mode: derivedMode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
     undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef
   });
+
+  // Timer d'initialisation pour éviter l'écran noir/vide au démarrage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const wrappedSaveCloud = async () => {
       if (!user) { state.setShowAuthModal(true); return false; }
@@ -79,7 +86,10 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   return (
     <div className="flex flex-col h-screen w-screen bg-black overflow-hidden font-sans">
-      <LoadingOverlay isVisible={isLoadingCloud} />
+      <LoadingOverlay 
+        isVisible={isLoadingCloud || isInitializing} 
+        message={isInitializing ? "Initialisation de l'atelier..." : "Chargement du mur..."} 
+      />
       {state.showAuthModal && <AuthModal onClose={() => state.setShowAuthModal(false)} onSuccess={() => state.setShowAuthModal(false)} />}
       
       <EditorTopBar 
@@ -96,7 +106,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 <SidebarTabs 
                     activeTab={activeTab} 
                     onChange={setActiveTab} 
-                    isRemixHoldsLocked={metadata.remixMode === 'structure'} // Si remix structure, on ne peut pas aller sur holds
+                    isRemixHoldsLocked={metadata.remixMode === 'structure'} 
                 />
              )}
 
