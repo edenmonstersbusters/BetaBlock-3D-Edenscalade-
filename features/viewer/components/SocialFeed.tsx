@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../../core/api';
 import { auth } from '../../../core/auth';
 import { Comment } from '../../../types';
@@ -7,17 +8,22 @@ import { MessageCircle, Heart, Reply, Send, Loader2, CornerDownRight } from 'luc
 import { UserAvatar } from '../../../components/ui/UserAvatar';
 import { ActionWarning } from '../../../components/ui/ActionWarning';
 
-// Composant récursif pour un commentaire et ses réponses
 const CommentItem: React.FC<{ 
     comment: Comment; 
     depth: number; 
     onReply: (id: string, author: string) => void;
     onLike: (id: string, authorId: string, e: React.MouseEvent) => void;
 }> = ({ comment, depth, onReply, onLike }) => {
-    
-    // Limite de profondeur pour l'UI (pour éviter d'écraser le layout)
+    const navigate = useNavigate();
     const maxDepth = 2;
     const isTooDeep = depth > maxDepth;
+
+    const handleAuthorClick = (e: React.MouseEvent) => {
+        if (comment.user_id) {
+            e.stopPropagation();
+            navigate(`/profile/${comment.user_id}`);
+        }
+    };
 
     return (
         <div className={`flex flex-col gap-2 ${depth > 0 ? 'mt-3 relative' : 'py-3 border-b border-gray-800'}`}>
@@ -26,8 +32,9 @@ const CommentItem: React.FC<{
             )}
             
             <div className="flex gap-3">
-                <div className="flex-shrink-0 mt-1">
+                <div className="flex-shrink-0 mt-1 cursor-pointer">
                     <UserAvatar 
+                        userId={comment.user_id}
                         name={comment.author_name} 
                         url={comment.author_avatar_url}
                         size="sm"
@@ -35,7 +42,12 @@ const CommentItem: React.FC<{
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between">
-                        <span className="text-xs font-bold text-gray-300 truncate">{comment.author_name}</span>
+                        <span 
+                            className="text-xs font-bold text-gray-300 truncate hover:underline hover:text-blue-400 cursor-pointer transition-colors"
+                            onClick={handleAuthorClick}
+                        >
+                            {comment.author_name}
+                        </span>
                         <span className="text-[9px] text-gray-600">{new Date(comment.created_at).toLocaleDateString()}</span>
                     </div>
                     <p className="text-sm text-gray-400 mt-0.5 whitespace-pre-wrap break-words">{comment.text}</p>
@@ -60,7 +72,6 @@ const CommentItem: React.FC<{
                 </div>
             </div>
 
-            {/* Rendu récursif des réponses */}
             {comment.replies && comment.replies.length > 0 && (
                 <div className={`ml-4 ${isTooDeep ? 'border-l-2 border-gray-800 pl-2' : ''}`}>
                     {comment.replies.map(reply => (
@@ -78,7 +89,6 @@ const CommentItem: React.FC<{
     );
 };
 
-// Define SocialFeedProps interface
 interface SocialFeedProps {
   wallId: string;
   onRequestAuth: () => void;
@@ -151,7 +161,6 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
           return;
       }
 
-      // Bloquer si c'est l'auteur du commentaire
       if (currentUser.id === authorId) {
           setWarning({ 
               x: e.clientX, 
@@ -161,7 +170,6 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
           return;
       }
 
-      // Optimistic update
       setComments(prev => prev.map(c => {
           if (c.id === commentId) {
               const newLiked = !c.user_has_liked;
@@ -190,7 +198,6 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
             />
         )}
 
-        {/* Zone de saisie */}
         <div className="p-3 bg-gray-800/50 rounded-xl mb-4 border border-gray-700">
             {replyTo && (
                 <div className="flex items-center justify-between text-xs text-blue-400 mb-2 bg-blue-500/10 px-2 py-1 rounded">
@@ -217,7 +224,6 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
             </div>
         </div>
 
-        {/* Liste */}
         <div className="flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
             {loading ? (
                 <div className="flex justify-center py-4"><Loader2 size={24} className="animate-spin text-gray-600" /></div>

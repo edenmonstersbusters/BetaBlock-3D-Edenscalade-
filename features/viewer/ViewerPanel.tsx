@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { WallConfig, PlacedHold, WallMetadata, UserProfile } from '../../types';
 import { Home, Share2, GitFork, Calendar, Ruler, Layers, Box, Heart, MessageSquare, ArrowUp, Activity, Edit3 } from 'lucide-react';
 import { SocialFeed } from './components/SocialFeed';
@@ -22,16 +23,15 @@ interface ViewerPanelProps {
 }
 
 export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, config, holds, onHome, onRemix, onShare, onEdit }) => {
+  const navigate = useNavigate();
   const [socialStats, setSocialStats] = useState({ likes: 0, hasLiked: false });
   const [showAuth, setShowAuth] = useState(false);
   const [showRemixModal, setShowRemixModal] = useState(false);
   const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   
-  // State pour le profil LIVE de l'auteur (pour éviter les noms/avatars périmés)
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
   
-  // Fallback sur les métadonnées si le profil live n'est pas encore chargé
   const displayAvatarUrl = authorProfile?.avatar_url || metadata.authorAvatarUrl;
   const displayName = authorProfile?.display_name || metadata.authorName || "Anonyme";
 
@@ -52,7 +52,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
   }, 0);
 
   useEffect(() => {
-      // 1. Check Ownership & Social Stats
       auth.getUser().then(user => {
           if (user && metadata.authorId && user.id === metadata.authorId) {
               setIsOwner(true);
@@ -61,7 +60,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
           api.getWallSocialStatus(wallId, user?.id).then(setSocialStats);
       });
 
-      // 2. Fetch Live Author Profile (Source of Truth)
       if (metadata.authorId) {
           api.getProfile(metadata.authorId).then(profile => {
               if (profile) setAuthorProfile(profile);
@@ -96,6 +94,12 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
       setSocialStats(updated);
   };
 
+  const handleAuthorClick = () => {
+    if (metadata.authorId) {
+        navigate(`/profile/${metadata.authorId}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden relative">
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
@@ -121,7 +125,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
         />
       )}
 
-      {/* Header */}
       <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0 flex-1">
              <button onClick={onHome} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 flex-shrink-0 transition-colors" title="Retour à la Galerie">
@@ -140,7 +143,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         
-        {/* Social Actions Header */}
         <div className="flex items-center">
             <button 
                 onClick={(e) => handleLikeWall(e)}
@@ -152,7 +154,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
         </div>
 
         <div className="space-y-6">
-            {/* Attribution Remix */}
             {metadata.parentId && (
                 <section className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
@@ -165,13 +166,15 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 </section>
             )}
 
-            {/* Auteur & Infos */}
-            <section className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3">
+            <section 
+                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3 cursor-pointer hover:bg-gray-800 transition-colors group/author"
+                onClick={handleAuthorClick}
+            >
                 <div className="flex items-center gap-3 text-sm text-gray-300">
-                    <UserAvatar url={displayAvatarUrl} name={displayName} size="md" />
+                    <UserAvatar userId={metadata.authorId} url={displayAvatarUrl} name={displayName} size="md" />
                     <div className="min-w-0 flex-1">
                         <span className="block text-xs text-gray-500 uppercase">Créé par</span>
-                        <span className="font-bold text-white truncate block">{displayName}</span>
+                        <span className="font-bold text-white truncate block group-hover/author:underline group-hover/author:text-blue-400 transition-colors">{displayName}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-300">
@@ -183,7 +186,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 </div>
             </section>
 
-            {/* Statistiques */}
             <section className="space-y-4">
                 <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Ruler size={14} /><span>Analyse du Mur</span></div>
                 <div className="grid grid-cols-2 gap-3">
@@ -217,7 +219,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 </div>
             </section>
 
-            {/* Discussion Intégrée */}
             <section className="pt-6 border-t border-gray-800">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
                     <MessageSquare size={12} />
@@ -229,7 +230,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
       </div>
 
-      {/* Actions Footer */}
       <div className="p-4 border-t border-gray-800 bg-gray-950 space-y-3">
         {isOwner && (
             <button 

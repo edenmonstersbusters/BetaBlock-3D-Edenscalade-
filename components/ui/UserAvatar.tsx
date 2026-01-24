@@ -1,8 +1,10 @@
 
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Camera } from 'lucide-react';
 
 interface UserAvatarProps {
+  userId?: string | null;
   url?: string | null;
   name?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -13,6 +15,7 @@ interface UserAvatarProps {
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ 
+  userId,
   url, 
   name = "Anon", 
   size = 'md', 
@@ -21,6 +24,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   onUpload,
   loading = false
 }) => {
+  const navigate = useNavigate();
   const sizeClasses = {
     xs: "w-6 h-6 text-[10px]",
     sm: "w-8 h-8 text-xs",
@@ -29,7 +33,6 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     xl: "w-32 h-32 md:w-40 md:h-40 text-4xl"
   };
 
-  // Génération d'un dégradé unique basé sur le nom
   const gradientStyle = useMemo(() => {
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const hue1 = hash % 360;
@@ -47,8 +50,18 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     }
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (userId && !editable) {
+        e.stopPropagation();
+        navigate(`/profile/${userId}`);
+    }
+  };
+
   return (
-    <div className={`relative group shrink-0 ${className}`}>
+    <div 
+      className={`relative group shrink-0 ${userId && !editable ? 'cursor-pointer' : ''} ${className}`}
+      onClick={handleClick}
+    >
       <div 
         className={`${sizeClasses[size]} rounded-full overflow-hidden flex items-center justify-center font-bold text-white shadow-lg border border-white/10 relative z-10`}
         style={url ? {} : gradientStyle}
@@ -59,7 +72,6 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           <span>{initials}</span>
         )}
         
-        {/* Overlay Loading */}
         {loading && (
              <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
                  <div className="w-1/2 h-1/2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -67,7 +79,6 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
         )}
       </div>
 
-      {/* Bouton Upload (si editable) */}
       {editable && !loading && (
         <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full z-20 backdrop-blur-[1px]">
           <Camera className="text-white drop-shadow-md" size={size === 'xl' ? 32 : 16} />

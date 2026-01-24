@@ -64,7 +64,6 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
     <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       
-      {/* NAVBAR */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
           <div className="flex items-center gap-2 group cursor-default">
              <div className="text-xl font-black italic tracking-tighter text-blue-500 group-hover:text-blue-400 transition-colors">BetaBlock</div>
@@ -83,7 +82,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                         onClick={() => navigate('/profile')}
                         className="flex items-center gap-2 p-1 pr-4 bg-gray-900/60 hover:bg-gray-800 border border-white/5 rounded-full transition-all group backdrop-blur-md"
                     >
-                        <UserAvatar url={user.user_metadata?.avatar_url} name={user.user_metadata?.display_name || user.email} size="sm" />
+                        <UserAvatar userId={user.id} url={user.user_metadata?.avatar_url} name={user.user_metadata?.display_name || user.email} size="sm" />
                         <span className="hidden sm:inline-block font-bold text-gray-300 group-hover:text-white truncate max-w-[150px]">
                             {user.user_metadata?.display_name || user.email?.split('@')[0]}
                         </span>
@@ -104,7 +103,6 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
           </div>
       </div>
 
-      {/* HEADER HERO (SANS SEARCH BAR) */}
       <header className="relative py-24 px-6 border-b border-white/10 overflow-hidden shrink-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-gray-950 to-gray-950 pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10 text-center">
@@ -132,16 +130,13 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
         </div>
       </header>
 
-      {/* HUB SECTION */}
       <main className="max-w-7xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-            {/* Titre Simple */}
             <div className="flex items-center gap-3 text-2xl font-black text-white tracking-tight self-start md:self-auto">
                 <Globe className="text-blue-500" size={24} />
                 <span>Galerie</span>
             </div>
 
-            {/* Petite Barre de Recherche Fonctionnelle */}
             <form onSubmit={handleSearch} className="relative w-full md:w-64 group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={14} />
                 <input 
@@ -175,6 +170,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                         <WallCard 
                             key={wall.id} id={wall.id} name={wall.name} createdAt={wall.created_at} 
                             thumbnail={wall.data?.metadata?.thumbnail} 
+                            authorId={wall.data?.metadata?.authorId}
                             authorName={wall.data?.metadata?.authorName}
                             authorAvatarUrl={wall.data?.metadata?.authorAvatarUrl}
                             onClick={() => navigate(`/view/${wall.id}`)}
@@ -197,7 +193,6 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
         )}
       </main>
 
-       {/* Footer */}
        <footer className="border-t border-white/5 bg-gray-950 py-12 mt-auto">
           <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-gray-500 text-sm">
               <div className="flex items-center gap-2">

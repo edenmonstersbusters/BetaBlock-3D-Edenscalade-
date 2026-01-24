@@ -71,9 +71,9 @@ export const ProfilePage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-950 text-white font-sans selection:bg-blue-500/30">
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-[100]">
-                <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-all group">
+                <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-all group">
                     <div className="p-1.5 rounded-lg bg-gray-900 group-hover:bg-blue-600 transition-colors"><ArrowLeft size={18} /></div>
-                    <span className="font-bold text-sm">Retour au Hub</span>
+                    <span className="font-bold text-sm">Retour</span>
                 </button>
                 <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-blue-500" /><span className="text-xs font-black uppercase tracking-widest text-gray-500">Profil Grimpeur</span></div>
             </div>
