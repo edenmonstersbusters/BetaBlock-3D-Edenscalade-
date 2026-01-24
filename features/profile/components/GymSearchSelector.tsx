@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, X, Dumbbell, Globe, ExternalLink, Navigation } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { Loader2, X, Dumbbell, ExternalLink, Navigation } from 'lucide-react';
 
 interface GymSearchResult {
   name: string;
@@ -57,64 +56,78 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   const searchGyms = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 2) { setResults([]); return; }
     setLoading(true);
+    
     try {
-      // Utilisation de process.env.API_KEY comme requis par l'environnement
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      let latLng = undefined;
+      // Utilisation de PHOTON (Komoot) : Moteur de recherche flou basé sur OSM
+      // Extrêmement rapide, gère les fautes de frappe et permet de filtrer par tags
+      let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&osm_tag=sport:climbing&limit=10`;
+      
+      // Optionnel : Ajout de la localisation pour prioriser les résultats proches
       try {
-        const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 1000 }));
-        latLng = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-      } catch (e) {}
+        const pos = await new Promise<GeolocationPosition>((res, rej) => 
+          navigator.geolocation.getCurrentPosition(res, rej, { timeout: 1000 })
+        );
+        url += `&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
+      } catch (e) {
+        // Fallback si la géolocalisation est refusée/indisponible
+      }
 
-      const prompt = `Find climbing gyms for query: "${searchQuery}". Format: Name | Address | City | Country`;
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          tools: [{ googleMaps: {} }],
-          toolConfig: { retrievalConfig: { latLng } },
-        },
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!data.features) {
+        setResults([]);
+        return;
+      }
+
+      const parsedResults: GymSearchResult[] = data.features.map((feature: any) => {
+        const p = feature.properties;
+        
+        // Photon retourne les composants d'adresse séparément
+        const name = p.name || "Salle sans nom";
+        const city = p.city || p.town || p.district || "";
+        const country = p.country || "";
+        const street = p.street ? (p.housenumber ? `${p.housenumber} ${p.street}` : p.street) : "";
+        
+        // On génère un lien Google Maps basé sur le nom et la ville pour plus de précision
+        const fullSearchQuery = `${name} ${city} ${country}`.trim();
+        const uri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullSearchQuery)}`;
+
+        return {
+          name,
+          address: street || city || country,
+          city,
+          country,
+          uri
+        };
       });
 
-      const text = response.text || "";
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      const mapsUris = new Map<string, string>();
-      chunks.forEach((chunk: any) => { if (chunk.maps?.title) mapsUris.set(chunk.maps.title.toLowerCase(), chunk.maps.uri); });
-
-      const parsedResults: GymSearchResult[] = text
-        .split('\n')
-        .map(line => line.replace(/^[-*•#]\s*/, '').trim())
-        .filter(line => line.includes('|'))
-        .map(line => {
-          const parts = line.split('|').map(s => s.trim());
-          const name = parts[0] || "";
-          const address = parts[1] || "";
-          const city = parts[2] || "";
-          const country = parts[3] || "";
-          const uri = mapsUris.get(name.toLowerCase());
-          
-          return { name, address, city, country, uri };
-        })
-        .filter(g => g.name.length > 0);
-
       setResults(parsedResults);
-      setLoading(false);
       setIsOpen(true);
     } catch (e) {
-      console.error(e);
+      console.error("Photon Search error:", e);
+      setResults([]);
+    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (query && query !== value?.name) {
+    if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
+    
+    // Si l'utilisateur a sélectionné une salle, on ne relance pas la recherche pour son propre nom
+    const isSelectedName = value?.name === query;
+    
+    if (query && !isSelectedName) {
         searchTimeout.current = window.setTimeout(() => {
             searchGyms(query);
-        }, 1000);
+        }, 300); // Délai de 300ms pour une sensation de "temps réel"
+    } else if (!query) {
+        setResults([]);
     }
-    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
-  }, [query]);
+    
+    return () => { if (searchTimeout.current) window.clearTimeout(searchTimeout.current); };
+  }, [query, value]);
 
   const handleSelect = (gym: GymSearchResult) => {
       setQuery(gym.name);
@@ -131,22 +144,25 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
                 value={query}
                 onChange={(e) => {
                     setQuery(e.target.value);
-                    if (!e.target.value) onChange(null);
+                    if (!e.target.value) {
+                        onChange(null);
+                        setIsOpen(false);
+                    }
                 }}
                 onFocus={() => { if(results.length > 0) setIsOpen(true); }}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-sm focus:border-blue-500 outline-none text-white placeholder-gray-600"
-                placeholder={placeholder || "Rechercher une salle..."}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-sm focus:border-blue-500 outline-none text-white placeholder-gray-600 transition-all shadow-inner"
+                placeholder={placeholder || "Nom de votre salle..."}
              />
              {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-500" size={16} />}
              {query && !loading && (
-                 <button onClick={() => { setQuery(''); onChange(null); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                 <button onClick={() => { setQuery(''); onChange(null); setResults([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
                      <X size={14} />
                  </button>
              )}
         </div>
         
         {isOpen && results.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-200">
                 {results.map((gym, i) => (
                     <GymResultItem key={i} gym={gym} onSelect={() => handleSelect(gym)} />
                 ))}
