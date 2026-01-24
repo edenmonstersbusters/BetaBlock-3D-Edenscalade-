@@ -20,19 +20,24 @@ const GymResultItem: React.FC<{ gym: GymSearchResult; onSelect: () => void }> = 
   return (
     <div
       onClick={onSelect}
-      className="w-full flex items-center gap-2 p-2 hover:bg-white/5 transition-all cursor-pointer group border-b border-white/5 last:border-0"
+      className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-all cursor-pointer group border-b border-white/5 last:border-0"
     >
-      <div className="shrink-0 p-1 bg-gray-800/50 rounded text-gray-600 group-hover:text-blue-400 transition-colors">
-        <Navigation size={12} />
+      <div className="shrink-0 p-2 bg-gray-800/50 rounded-lg text-gray-500 group-hover:text-blue-400 transition-colors shadow-inner">
+        <Navigation size={14} />
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center">
-        <h4 className="text-[12px] font-bold text-gray-300 group-hover:text-white truncate">{gym.name}</h4>
+        <h4 className="text-[13px] font-bold text-gray-200 group-hover:text-white truncate">{gym.name}</h4>
         <div className="flex items-center gap-1.5 opacity-60">
-          <span className="text-[10px] text-gray-500 truncate">{gym.address}</span>
-          <span className="text-[9px] font-black text-blue-500/50 uppercase tracking-tighter">{gym.city}</span>
+          <span className="text-[11px] text-gray-500 truncate">{gym.address}</span>
+          {gym.city && (
+              <>
+                <span className="text-[10px] text-gray-700">•</span>
+                <span className="text-[10px] font-black text-blue-500/70 uppercase tracking-tighter">{gym.city}</span>
+              </>
+          )}
         </div>
       </div>
-      {gym.uri && <ExternalLink size={12} className="text-gray-700" />}
+      {gym.uri && <ExternalLink size={14} className="text-gray-700 group-hover:text-gray-400 transition-colors" />}
     </div>
   );
 };
@@ -54,58 +59,62 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   }, []);
 
   const searchGyms = async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.length < 2) { setResults([]); return; }
-    setLoading(true);
+    if (!searchQuery || searchQuery.trim().length < 2) { 
+        setResults([]); 
+        setLoading(false);
+        return; 
+    }
     
+    setLoading(true);
     try {
-      // Utilisation de PHOTON (Komoot) : Moteur de recherche flou basé sur OSM
-      // Extrêmement rapide, gère les fautes de frappe et permet de filtrer par tags
-      let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&osm_tag=sport:climbing&limit=10`;
+      // Selon l'image Nominatim fournie par l'utilisateur, les résultats sont catégorisés 
+      // "Centre sportif" ou "Club de sport". On injecte ce préfixe directement dans la recherche.
+      const prefix = "Centre sportif ";
+      const finalQuery = `${prefix}${searchQuery}`;
       
-      // Optionnel : Ajout de la localisation pour prioriser les résultats proches
+      // On retire tout osm_tag et on utilise uniquement la recherche par texte avec préfixe
+      let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(finalQuery)}&limit=15`;
+      
+      // Géo-priorité si possible
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) => 
           navigator.geolocation.getCurrentPosition(res, rej, { timeout: 1000 })
         );
         url += `&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
-      } catch (e) {
-        // Fallback si la géolocalisation est refusée/indisponible
-      }
+      } catch (e) {}
 
       const response = await fetch(url);
+      if (!response.ok) throw new Error('Photon API error');
+      
       const data = await response.json();
 
-      if (!data.features) {
+      if (!data.features || data.features.length === 0) {
         setResults([]);
-        return;
+        setIsOpen(false);
+      } else {
+        const parsedResults: GymSearchResult[] = data.features.map((feature: any) => {
+          const p = feature.properties;
+          const name = p.name || p.street || "Établissement";
+          const city = p.city || p.town || p.district || "";
+          const country = p.country || "";
+          const street = p.street ? (p.housenumber ? `${p.housenumber} ${p.street}` : p.street) : "";
+          
+          const fullSearchQuery = `${name} ${city} ${country}`.trim();
+          const uri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullSearchQuery)}`;
+
+          return {
+            name,
+            address: street || city || country || "Adresse non spécifiée",
+            city,
+            country,
+            uri
+          };
+        });
+        setResults(parsedResults);
+        setIsOpen(true);
       }
-
-      const parsedResults: GymSearchResult[] = data.features.map((feature: any) => {
-        const p = feature.properties;
-        
-        // Photon retourne les composants d'adresse séparément
-        const name = p.name || "Salle sans nom";
-        const city = p.city || p.town || p.district || "";
-        const country = p.country || "";
-        const street = p.street ? (p.housenumber ? `${p.housenumber} ${p.street}` : p.street) : "";
-        
-        // On génère un lien Google Maps basé sur le nom et la ville pour plus de précision
-        const fullSearchQuery = `${name} ${city} ${country}`.trim();
-        const uri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullSearchQuery)}`;
-
-        return {
-          name,
-          address: street || city || country,
-          city,
-          country,
-          uri
-        };
-      });
-
-      setResults(parsedResults);
-      setIsOpen(true);
     } catch (e) {
-      console.error("Photon Search error:", e);
+      console.error("Gym search error:", e);
       setResults([]);
     } finally {
       setLoading(false);
@@ -115,15 +124,15 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     
-    // Si l'utilisateur a sélectionné une salle, on ne relance pas la recherche pour son propre nom
     const isSelectedName = value?.name === query;
     
-    if (query && !isSelectedName) {
+    if (query && !isSelectedName && query.length >= 2) {
         searchTimeout.current = window.setTimeout(() => {
             searchGyms(query);
-        }, 300); // Délai de 300ms pour une sensation de "temps réel"
+        }, 400); 
     } else if (!query) {
         setResults([]);
+        setLoading(false);
     }
     
     return () => { if (searchTimeout.current) window.clearTimeout(searchTimeout.current); };
@@ -138,7 +147,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   return (
     <div className="relative w-full" ref={dropdownRef}>
         <div className="relative">
-             <Dumbbell className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+             <Dumbbell className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isOpen ? 'text-blue-500' : 'text-gray-500'}`} size={16} />
              <input 
                 type="text" 
                 value={query}
@@ -147,25 +156,41 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
                     if (!e.target.value) {
                         onChange(null);
                         setIsOpen(false);
+                        setResults([]);
                     }
                 }}
                 onFocus={() => { if(results.length > 0) setIsOpen(true); }}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-sm focus:border-blue-500 outline-none text-white placeholder-gray-600 transition-all shadow-inner"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl py-3 pl-10 pr-10 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 outline-none text-white placeholder-gray-600 transition-all shadow-inner"
                 placeholder={placeholder || "Nom de votre salle..."}
              />
-             {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-500" size={16} />}
-             {query && !loading && (
-                 <button onClick={() => { setQuery(''); onChange(null); setResults([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
-                     <X size={14} />
-                 </button>
-             )}
+             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {loading && <Loader2 className="animate-spin text-blue-500" size={16} />}
+                {query && !loading && (
+                    <button 
+                        onClick={() => { setQuery(''); onChange(null); setResults([]); setIsOpen(false); }} 
+                        className="text-gray-500 hover:text-white transition-colors p-1"
+                    >
+                        <X size={14} />
+                    </button>
+                )}
+             </div>
         </div>
         
         {isOpen && results.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-50 max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar border-t-0">
+                <div className="p-2 border-b border-white/5 bg-gray-950/50">
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Salles d'escalade trouvées</span>
+                </div>
                 {results.map((gym, i) => (
                     <GymResultItem key={i} gym={gym} onSelect={() => handleSelect(gym)} />
                 ))}
+            </div>
+        )}
+
+        {isOpen && query.length >= 2 && !loading && results.length === 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-2xl p-4 text-center z-50 shadow-2xl">
+                <p className="text-xs text-gray-500 italic">Aucune salle trouvée pour "{query}"</p>
+                <p className="text-[9px] text-gray-700 uppercase font-black mt-2">Essayez avec le nom exact de la salle</p>
             </div>
         )}
     </div>
