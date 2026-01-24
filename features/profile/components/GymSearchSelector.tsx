@@ -58,7 +58,8 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
     if (!searchQuery || searchQuery.length < 2) { setResults([]); return; }
     setLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
+      // Guideline: ALWAYS use process.env.API_KEY for Gemini API
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       let latLng = undefined;
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 1000 }));
