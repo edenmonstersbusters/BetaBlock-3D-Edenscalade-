@@ -67,22 +67,14 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
     
     setLoading(true);
     try {
-      // Selon l'image Nominatim fournie par l'utilisateur, les résultats sont catégorisés 
-      // "Centre sportif" ou "Club de sport". On injecte ce préfixe directement dans la recherche.
+      // Selon votre demande : on cherche "Centre sportif" + votre texte.
+      // On n'utilise pas la position ni de tags OSM spécifiques, juste le texte.
       const prefix = "Centre sportif ";
       const finalQuery = `${prefix}${searchQuery}`;
       
-      // On retire tout osm_tag et on utilise uniquement la recherche par texte avec préfixe
-      let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(finalQuery)}&limit=15`;
+      // On utilise Photon pour sa rapidité et sa recherche floue (fuzzy)
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(finalQuery)}&limit=15`;
       
-      // Géo-priorité si possible
-      try {
-        const pos = await new Promise<GeolocationPosition>((res, rej) => 
-          navigator.geolocation.getCurrentPosition(res, rej, { timeout: 1000 })
-        );
-        url += `&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
-      } catch (e) {}
-
       const response = await fetch(url);
       if (!response.ok) throw new Error('Photon API error');
       
@@ -94,6 +86,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
       } else {
         const parsedResults: GymSearchResult[] = data.features.map((feature: any) => {
           const p = feature.properties;
+          // Photon renvoie le nom du lieu s'il existe, sinon la rue.
           const name = p.name || p.street || "Établissement";
           const city = p.city || p.town || p.district || "";
           const country = p.country || "";
@@ -124,7 +117,8 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     
-    const isSelectedName = value?.name === query;
+    // Si la requête est identique au nom déjà sélectionné, on ne cherche pas
+    const isSelectedName = (typeof value === 'object' && value?.name === query) || (typeof value === 'string' && value === query);
     
     if (query && !isSelectedName && query.length >= 2) {
         searchTimeout.current = window.setTimeout(() => {
@@ -179,7 +173,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
         {isOpen && results.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-50 max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar border-t-0">
                 <div className="p-2 border-b border-white/5 bg-gray-950/50">
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Salles d'escalade trouvées</span>
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Centres sportifs trouvés</span>
                 </div>
                 {results.map((gym, i) => (
                     <GymResultItem key={i} gym={gym} onSelect={() => handleSelect(gym)} />
@@ -189,8 +183,8 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
 
         {isOpen && query.length >= 2 && !loading && results.length === 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-2xl p-4 text-center z-50 shadow-2xl">
-                <p className="text-xs text-gray-500 italic">Aucune salle trouvée pour "{query}"</p>
-                <p className="text-[9px] text-gray-700 uppercase font-black mt-2">Essayez avec le nom exact de la salle</p>
+                <p className="text-xs text-gray-500 italic">Aucun centre trouvé pour "{query}"</p>
+                <p className="text-[9px] text-gray-700 uppercase font-black mt-2">Vérifiez l'orthographe du nom de la salle</p>
             </div>
         )}
     </div>
