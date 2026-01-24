@@ -67,37 +67,42 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
     
     setLoading(true);
     try {
-      // Selon votre demande : on cherche "Centre sportif" + votre texte.
-      // On n'utilise pas la position ni de tags OSM spécifiques, juste le texte.
+      // Préfixe strict selon votre demande
       const prefix = "Centre sportif ";
       const finalQuery = `${prefix}${searchQuery}`;
       
-      // On utilise Photon pour sa rapidité et sa recherche floue (fuzzy)
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(finalQuery)}&limit=15`;
+      // Utilisation de Nominatim en direct (format JSON + détails d'adresse)
+      // On n'utilise PAS la position lat/lon pour rester sur une recherche purement textuelle.
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(finalQuery)}&limit=15`;
       
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Photon API error');
+      const response = await fetch(url, {
+          headers: {
+              'Accept-Language': 'fr-FR,fr;q=0.9',
+          }
+      });
+      
+      if (!response.ok) throw new Error('Nominatim API error');
       
       const data = await response.json();
 
-      if (!data.features || data.features.length === 0) {
+      if (!data || data.length === 0) {
         setResults([]);
         setIsOpen(false);
       } else {
-        const parsedResults: GymSearchResult[] = data.features.map((feature: any) => {
-          const p = feature.properties;
-          // Photon renvoie le nom du lieu s'il existe, sinon la rue.
-          const name = p.name || p.street || "Établissement";
-          const city = p.city || p.town || p.district || "";
-          const country = p.country || "";
-          const street = p.street ? (p.housenumber ? `${p.housenumber} ${p.street}` : p.street) : "";
+        const parsedResults: GymSearchResult[] = data.map((item: any) => {
+          const addr = item.address;
           
-          const fullSearchQuery = `${name} ${city} ${country}`.trim();
-          const uri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullSearchQuery)}`;
+          // Nominatim met souvent le nom du lieu dans des champs comme 'leisure', 'amenity' ou 'sport'
+          const name = addr.leisure || addr.amenity || addr.sport || addr.building || item.display_name.split(',')[0];
+          const city = addr.city || addr.town || addr.village || addr.municipality || "";
+          const country = addr.country || "";
+          const street = addr.road ? (addr.house_number ? `${addr.house_number} ${addr.road}` : addr.road) : "";
+          
+          const uri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.display_name)}`;
 
           return {
             name,
-            address: street || city || country || "Adresse non spécifiée",
+            address: street || item.display_name.split(',').slice(1, 3).join(',').trim(),
             city,
             country,
             uri
@@ -117,13 +122,12 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
   useEffect(() => {
     if (searchTimeout.current) window.clearTimeout(searchTimeout.current);
     
-    // Si la requête est identique au nom déjà sélectionné, on ne cherche pas
     const isSelectedName = (typeof value === 'object' && value?.name === query) || (typeof value === 'string' && value === query);
     
     if (query && !isSelectedName && query.length >= 2) {
         searchTimeout.current = window.setTimeout(() => {
             searchGyms(query);
-        }, 400); 
+        }, 600); // Légèrement plus lent pour respecter les limites de Nominatim
     } else if (!query) {
         setResults([]);
         setLoading(false);
@@ -173,7 +177,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
         {isOpen && results.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-50 max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar border-t-0">
                 <div className="p-2 border-b border-white/5 bg-gray-950/50">
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Centres sportifs trouvés</span>
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Résultats Nominatim</span>
                 </div>
                 {results.map((gym, i) => (
                     <GymResultItem key={i} gym={gym} onSelect={() => handleSelect(gym)} />
@@ -184,7 +188,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
         {isOpen && query.length >= 2 && !loading && results.length === 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-2xl p-4 text-center z-50 shadow-2xl">
                 <p className="text-xs text-gray-500 italic">Aucun centre trouvé pour "{query}"</p>
-                <p className="text-[9px] text-gray-700 uppercase font-black mt-2">Vérifiez l'orthographe du nom de la salle</p>
+                <p className="text-[9px] text-gray-700 uppercase font-black mt-2">Recherche stricte activée</p>
             </div>
         )}
     </div>
