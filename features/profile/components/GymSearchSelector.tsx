@@ -58,7 +58,7 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
     if (!searchQuery || searchQuery.length < 2) { setResults([]); return; }
     setLoading(true);
     try {
-      // Guideline: ALWAYS use process.env.API_KEY for Gemini API
+      // Utilisation de process.env.API_KEY comme requis par l'environnement
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       let latLng = undefined;
       try {
@@ -91,7 +91,6 @@ export const GymSearchSelector: React.FC<GymSearchSelectorProps> = ({ value, onC
           const address = parts[1] || "";
           const city = parts[2] || "";
           const country = parts[3] || "";
-          // Attempt to match URI from grounding chunks
           const uri = mapsUris.get(name.toLowerCase());
           
           return { name, address, city, country, uri };
