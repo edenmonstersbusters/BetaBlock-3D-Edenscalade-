@@ -28,7 +28,7 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
     }
     const interval = setInterval(() => {
       setPreviewIndex((prev) => (prev % 4) + 1);
-    }, 1200); // Cycle rapide pour un feedback visuel direct
+    }, 2000); // Défilement ralenti à 2 secondes pour plus de clarté
     return () => clearInterval(interval);
   }, [hoveredHoldId]);
 
@@ -68,7 +68,8 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
               <Loader2 className="animate-spin text-blue-500" />
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2 mt-2">
+            /* Passage à 2 colonnes pour des images plus grandes et une meilleure visibilité */
+            <div className="grid grid-cols-2 gap-3 mt-2">
               {validLibrary.map((hold) => {
                 const isHovered = hoveredHoldId === hold.id;
                 const currentImgIndex = isHovered ? previewIndex : 1;
@@ -80,48 +81,50 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
                     onClick={() => onSelectHold(hold)} 
                     onMouseEnter={() => setHoveredHoldId(hold.id)}
                     onMouseLeave={() => setHoveredHoldId(null)}
-                    className={`group relative aspect-square rounded-xl border-2 overflow-hidden transition-all duration-300 ${
+                    className={`group relative aspect-square rounded-2xl border-2 overflow-hidden transition-all duration-500 ${
                       isSelected 
-                        ? 'border-blue-500 ring-4 ring-blue-500/20 bg-gray-700 scale-95' 
-                        : 'bg-gray-950 border-gray-800 hover:border-gray-500 hover:scale-105 hover:shadow-xl hover:z-10'
+                        ? 'border-blue-500 ring-4 ring-blue-500/20 bg-gray-800 scale-95' 
+                        : 'bg-gray-950 border-gray-800/50 hover:border-gray-400 hover:scale-105 hover:shadow-2xl hover:z-10'
                     }`}
                     title={hold.name}
                   >
-                    {/* Image de la prise */}
-                    <img 
-                      src={getThumbnailUrl(hold.filename, currentImgIndex)} 
-                      alt={hold.name}
-                      className="w-full h-full object-contain p-1 transition-opacity duration-200"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/111/444?text=?';
-                      }}
-                    />
+                    {/* Image principale - Cycle au survol */}
+                    <div className="w-full h-full relative">
+                        <img 
+                          src={getThumbnailUrl(hold.filename, currentImgIndex)} 
+                          alt={hold.name}
+                          className="w-full h-full object-contain p-2 transition-transform duration-700 ease-out group-hover:scale-110"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/111/444?text=?';
+                          }}
+                        />
+                    </div>
 
-                    {/* Indicateur de cycle (petits points en bas) */}
+                    {/* Indicateur de défilement (points) */}
                     {isHovered && (
-                      <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-0.5 pointer-events-none">
+                      <div className="absolute top-2 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
                         {[1, 2, 3, 4].map(idx => (
                           <div 
                             key={idx} 
-                            className={`w-1 h-1 rounded-full transition-colors ${
-                              idx === currentImgIndex ? 'bg-blue-400' : 'bg-gray-600/30'
+                            className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
+                              idx === currentImgIndex ? 'bg-blue-500 scale-125' : 'bg-gray-700'
                             }`} 
                           />
                         ))}
                       </div>
                     )}
 
-                    {/* Overlay Nom au survol */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-end p-2">
-                      <span className="text-[8px] font-black text-white uppercase truncate w-full leading-tight">
+                    {/* Overlay Nom au survol - Plus discret */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none p-3">
+                      <span className="text-[9px] font-black text-white uppercase tracking-tighter truncate block text-center">
                         {hold.name}
                       </span>
                     </div>
 
-                    {/* Badge de sélection */}
+                    {/* Badge sélection */}
                     {isSelected && (
-                      <div className="absolute top-1 right-1 p-0.5 bg-blue-500 rounded-full shadow-lg">
-                        <ImageIcon size={8} className="text-white" />
+                      <div className="absolute top-2 right-2 p-1 bg-blue-500 rounded-full shadow-lg ring-2 ring-white/20">
+                        <ImageIcon size={10} className="text-white" />
                       </div>
                     )}
                   </button>

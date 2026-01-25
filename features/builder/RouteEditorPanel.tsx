@@ -6,7 +6,6 @@ import { FileControls } from '../../components/ui/FileControls';
 import { ColorPalette } from '../../components/ui/ColorPalette';
 import { HoldCatalogue } from './components/HoldCatalogue';
 import { HoldInspector } from './components/HoldInspector';
-import { HoldPreview } from './components/HoldPreview';
 import { PlacedHoldsList } from './components/PlacedHoldsList';
 
 interface RouteEditorPanelProps {
@@ -29,20 +28,20 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
-  const [catalogueExpanded, setCatalogueExpanded] = useState(false);
+  const [catalogueExpanded, setCatalogueExpanded] = useState(true); // Étendu par défaut maintenant
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const isHoldsLocked = metadata.remixMode === 'structure';
 
   useEffect(() => {
     fetch(CATALOGUE_URL).then(r => r.json()).then(data => {
         setLibrary(Array.isArray(data) ? data
-            .filter((item: any) => item && (item.id || item.name)) // Filtre initial
+            .filter((item: any) => item && (item.id || item.name))
             .map((item: any, i: number) => ({
              id: String(item.id || item.name || crypto.randomUUID()),
              name: item.nom_affichage || item.name,
              filename: (item.nom_du_fichier || item.filename || '').endsWith('.glb') ? (item.nom_du_fichier || item.filename) : `${item.nom_du_fichier || item.filename}.glb`,
              category: item.category || 'General', baseScale: i === 0 ? 0.02 : 0.001
-        })).filter(h => h.id && h.filename && h.filename !== '.glb') : []); // Filtre final robuste
+        })).filter(h => h.id && h.filename && h.filename !== '.glb') : []);
         setLoading(false);
     }).catch(e => { console.error(e); setLoading(false); });
   }, []);
@@ -83,7 +82,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                </div>
           </section>
         )}
-        {!anyHoldSelected && selectedHold && !isHoldsLocked && <HoldPreview hold={selectedHold} settings={holdSettings} />}
+        
         <div className={isHoldsLocked ? "opacity-50 pointer-events-none grayscale" : ""}>
             <HoldCatalogue 
                library={library} loading={loading} selectedHoldId={selectedHold?.id}
