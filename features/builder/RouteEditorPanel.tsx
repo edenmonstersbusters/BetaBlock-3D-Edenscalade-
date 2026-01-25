@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Box, RotateCw, Scaling, GitFork, Lock } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import { FileControls } from '../../components/ui/FileControls';
@@ -7,6 +7,7 @@ import { ColorPalette } from '../../components/ui/ColorPalette';
 import { HoldCatalogue } from './components/HoldCatalogue';
 import { HoldInspector } from './components/HoldInspector';
 import { PlacedHoldsList } from './components/PlacedHoldsList';
+import { HoldPreview } from './components/HoldPreview';
 
 interface RouteEditorPanelProps {
   onBack: () => void;
@@ -28,7 +29,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 }) => {
   const [library, setLibrary] = useState<HoldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
-  const [catalogueExpanded, setCatalogueExpanded] = useState(true); // Étendu par défaut maintenant
+  const [catalogueExpanded, setCatalogueExpanded] = useState(true);
   const [isReplacingMode, setIsReplacingMode] = useState(false);
   const isHoldsLocked = metadata.remixMode === 'structure';
 
@@ -48,9 +49,37 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
 
   const anyHoldSelected = selectedPlacedHoldIds.length > 0;
 
+  // Déterminer quelle prise afficher dans la prévisualisation 3D
+  const previewHoldDef = useMemo(() => {
+    if (anyHoldSelected) {
+      // Si une prise est sélectionnée sur le mur, on cherche sa définition dans la bibliothèque
+      const firstSelected = placedHolds.find(h => h && selectedPlacedHoldIds.includes(h.id));
+      if (firstSelected) {
+        return library.find(def => def.id === firstSelected.modelId) || null;
+      }
+    }
+    // Sinon on affiche la prise sélectionnée dans le catalogue pour la pose
+    return selectedHold;
+  }, [anyHoldSelected, selectedPlacedHoldIds, placedHolds, library, selectedHold]);
+
+  // Settings à utiliser pour la preview (ceux du mur si sélectionné, sinon ceux de pose)
+  const previewSettings = useMemo(() => {
+    if (anyHoldSelected) {
+        const firstSelected = placedHolds.find(h => h && selectedPlacedHoldIds.includes(h.id));
+        if (firstSelected) {
+            return {
+                scale: firstSelected.scale[0],
+                rotation: firstSelected.spin,
+                color: firstSelected.color || '#ff8800'
+            };
+        }
+    }
+    return holdSettings;
+  }, [anyHoldSelected, selectedPlacedHoldIds, placedHolds, holdSettings]);
+
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white w-full relative">
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         {metadata.parentId && (
             <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
                 <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1"><GitFork size={12} /><span>REMIX {isHoldsLocked ? 'ARCHITECTE' : 'OUVREUR'}</span></div>
@@ -58,6 +87,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                 {isHoldsLocked && <div className="mt-2 flex items-center gap-2 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded"><Lock size={10} />PRISES VERROUILLÉES</div>}
             </div>
         )}
+
+        {/* SECTION 1: INSPECTEUR OU PARAMÈTRES DE POSE */}
         {anyHoldSelected ? (
           <HoldInspector 
              selectedHolds={placedHolds.filter(h => h && selectedPlacedHoldIds.includes(h.id))}
@@ -82,7 +113,13 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                </div>
           </section>
         )}
+
+        {/* SECTION 2: RENDU 3D TEMPS RÉEL (TOUJOURS ENTRE L'ÉDITION ET LE CATALOGUE) */}
+        {previewHoldDef && (
+           <HoldPreview hold={previewHoldDef} settings={previewSettings} />
+        )}
         
+        {/* SECTION 3: CATALOGUE */}
         <div className={isHoldsLocked ? "opacity-50 pointer-events-none grayscale" : ""}>
             <HoldCatalogue 
                library={library} loading={loading} selectedHoldId={selectedHold?.id}
@@ -91,6 +128,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
                isReplacingMode={isReplacingMode}
             />
         </div>
+
+        {/* SECTION 4: LISTE DES PRISES POSÉES */}
         <PlacedHoldsList 
             holds={placedHolds} selectedIds={selectedPlacedHoldIds} onSelect={onSelectPlacedHold} 
             onRemove={onRemoveHold} isLocked={isHoldsLocked || false} onRemoveAll={onRemoveAllHolds} 
