@@ -1,6 +1,5 @@
-
-import React from 'react';
-import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { WallEditor } from './features/editor/WallEditorPage';
 import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
@@ -11,6 +10,7 @@ import './types';
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     mode, config, setConfig, holds, setHolds, metadata, setMetadata,
     isLoadingCloud, isSavingCloud, cloudId, generatedLink, user,
@@ -23,13 +23,18 @@ export default function App() {
   const editorProps = {
     user, config, setConfig, holds, setHolds, metadata, setMetadata,
     ...history, onSaveCloud: handleSaveCloud, isSavingCloud,
-    generatedLink, onHome: () => navigate('/'), onNewWall: resetToNew,
+    generatedLink, onHome: () => navigate('/gallery'), onNewWall: resetToNew,
     isLoadingCloud, cloudId, screenshotRef
   };
 
   return (
     <Routes>
+      {/* Route par défaut : La Galerie (Page d'accueil) */}
       <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
+      
+      {/* Alias pour la galerie */}
+      <Route path="/gallery" element={<GalleryPage onResetState={resetToNew} />} />
+
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/:userId" element={<ProfilePage />} />
       <Route path="/projects" element={<ProjectsPage />} />

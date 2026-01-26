@@ -2,7 +2,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
-type SchemaType = 'WebSite' | 'SoftwareApplication' | '3DModel' | 'Person' | 'ProfilePage';
+type SchemaType = 'WebSite' | 'SoftwareApplication' | '3DModel' | 'Person' | 'ProfilePage' | 'BreadcrumbList';
 
 interface StructuredDataProps {
   type: SchemaType;
@@ -28,13 +28,12 @@ export const StructuredData: React.FC<StructuredDataProps> = ({ type, data }) =>
         },
         aggregateRating: {
             '@type': "AggregateRating",
-            ratingValue: "4.8",
+            ratingValue: "4.9",
             ratingCount: "1250"
         },
         ...data
     };
   } else if (type === '3DModel') {
-      // Spécifique pour les murs d'escalade
       schema = {
           ...schema,
           encoding: [
@@ -45,6 +44,12 @@ export const StructuredData: React.FC<StructuredDataProps> = ({ type, data }) =>
               }
           ],
           ...data
+      };
+  } else if (type === 'BreadcrumbList') {
+      // Structure spécifique pour les fils d'Ariane
+      schema = {
+          ...schema,
+          itemListElement: data.items || []
       };
   } else {
       schema = { ...schema, ...data };
