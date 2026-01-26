@@ -126,6 +126,7 @@ export const useWallData = () => {
     
     setIsSavingCloud(false);
     if (!result.error) {
+        // Lien avec hash pour compatibilité maximale
         setGeneratedLink(`${window.location.origin}/#/view/${cloudId}`);
         return true;
     }

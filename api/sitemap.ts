@@ -29,18 +29,18 @@ export default async function handler(request: Request) {
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>${BASE_URL}/builder</loc>
+    <loc>${BASE_URL}/#/builder</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>`;
 
-    // Ajout dynamique des murs
+    // Ajout dynamique des murs (avec Hashbang pour compatibilité HashRouter)
     walls.forEach((wall: any) => {
         const lastMod = wall.updated_at ? wall.updated_at.split('T')[0] : today;
         xml += `
   <url>
-    <loc>${BASE_URL}/view/${wall.id}</loc>
+    <loc>${BASE_URL}/#/view/${wall.id}</loc>
     <lastmod>${lastMod}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

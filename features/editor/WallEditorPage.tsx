@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scene } from '../../core/Scene';

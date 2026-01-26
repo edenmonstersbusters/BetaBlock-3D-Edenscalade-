@@ -2,11 +2,17 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="google-site-verification" content="-7DSIn6IrppEK6lkE0YhufW6uy4un1t-u69uafPkZVU" />
     
     <title>BetaBlock | Moteur de Murs d'Escalade 3D</title>
-    <meta name="description" content="Créez, visualisez et partagez des murs d'escalade en 3D. L'outil de référence pour les ouvreurs et les passionnés d'escalade.">
+    <meta name="description" content="L'outil de conception 3D ultime pour l'escalade. Créez des murs, ouvrez des blocs, visualisez en 3D et partagez avec la communauté des ouvreurs et grimpeurs.">
+    <meta name="keywords" content="Escalade, Climbing, 3D Wall, Route Setting, Ouvreur, Homewall, Spraywall, Simulator, BetaBlock, Bloc, Training, Kilter, Moonboard">
+    <meta name="author" content="BetaBlock Team">
+    <meta name="theme-color" content="#020617">
+
+    <!-- Favicon standard (fallback) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧗</text></svg>">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-JRE00Q9N65"></script>
@@ -20,7 +26,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Open Graph Default (Fallback) -->
+    <!-- Open Graph -->
     <meta property="og:site_name" content="BetaBlock 3D">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://betablock-3d.vercel.app/">
@@ -28,13 +34,6 @@
     <meta property="og:description" content="Concevez votre monde vertical directement dans le navigateur.">
     <meta property="og:image" content="https://betablock-3d.vercel.app/preview-image.jpg">
     <meta property="og:locale" content="fr_FR">
-    <meta property="og:locale:alternate" content="en_US">
-
-    <!-- Twitter / X -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="BetaBlock 3D">
-    <meta name="twitter:description" content="La nouvelle génération de modélisation de blocs.">
-    <meta name="twitter:image" content="https://betablock-3d.vercel.app/preview-image.jpg">
 
     <style>
       /* Masquer la barre de défilement pour Chrome, Safari et Opera */
@@ -50,6 +49,7 @@
       
       body {
         background-color: #020617; /* Slate 950 pour éviter le flash blanc */
+        overscroll-behavior: none; /* Empêche le rebond sur Mac/Mobile */
       }
     </style>
   <script type="importmap">
@@ -77,6 +77,6 @@
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
