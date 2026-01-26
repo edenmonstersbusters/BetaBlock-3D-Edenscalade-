@@ -66,6 +66,18 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
       <SEO 
         title="Hub Communautaire" 
         description="Explorez des milliers de murs d'escalade 3D créés par la communauté. Rejoignez les ouvreurs et partagez vos créations." 
+        schema={{
+            type: 'WebSite',
+            data: {
+                name: 'BetaBlock 3D',
+                url: 'https://betablock-3d.vercel.app/',
+                potentialAction: {
+                    '@type': 'SearchAction',
+                    target: 'https://betablock-3d.vercel.app/?q={search_term_string}',
+                    'query-input': 'required name=search_term_string'
+                }
+            }
+        }}
       />
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       

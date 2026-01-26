@@ -73,8 +73,27 @@ export const ProfilePage: React.FC = () => {
         <div className="min-h-screen bg-gray-950 text-white font-sans selection:bg-blue-500/30">
             <SEO 
                 title={`${profile.display_name} - Profil Grimpeur`} 
-                description={profile.bio || `Découvrez les créations de ${profile.display_name} sur BetaBlock 3D.`}
+                description={profile.bio || `Découvrez les ${userWalls.length} murs d'escalade créés par ${profile.display_name} sur BetaBlock 3D.`}
                 image={profile.avatar_url}
+                type="profile"
+                schema={{
+                    type: 'ProfilePage',
+                    data: {
+                        mainEntity: {
+                            '@type': 'Person',
+                            name: profile.display_name,
+                            description: profile.bio,
+                            image: profile.avatar_url,
+                            jobTitle: "Route Setter",
+                            homeLocation: { '@type': 'Place', name: profile.location },
+                            interactionStatistic: {
+                                '@type': 'InteractionCounter',
+                                interactionType: 'https://schema.org/LikeAction',
+                                userInteractionCount: profile.stats?.total_likes || 0
+                            }
+                        }
+                    }
+                }}
             />
 
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-[100]">

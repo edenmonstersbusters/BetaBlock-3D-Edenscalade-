@@ -105,9 +105,24 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden relative">
       <SEO 
         title={metadata.name || "Mur Sans Nom"} 
-        description={`Découvrez ce mur d'escalade 3D créé par ${displayName}. ${totalHolds} prises, ${totalVerticalHeight.toFixed(1)}m de haut.`}
+        description={`Découvrez ce mur d'escalade 3D créé par ${displayName}. ${totalHolds} prises, ${totalVerticalHeight.toFixed(1)}m de haut. Difficulté estimée : ${maxOverhang > 30 ? 'Expert' : 'Intermédiaire'}.`}
         image={metadata.thumbnail}
         author={displayName}
+        publishedTime={metadata.timestamp}
+        type="article"
+        schema={{
+            type: '3DModel',
+            data: {
+                name: metadata.name,
+                author: { '@type': 'Person', name: displayName },
+                image: metadata.thumbnail,
+                dateCreated: metadata.timestamp,
+                description: `Mur d'escalade 3D avec ${totalHolds} prises.`,
+                isAccessibleForFree: true,
+                material: "Wood, Resin",
+                fileFormat: "application/json"
+            }
+        }}
       />
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
