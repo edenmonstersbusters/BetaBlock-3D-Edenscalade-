@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 import { BetaBlockFile, Comment, UserProfile } from '../types';
 
@@ -84,7 +83,8 @@ export const api = {
         .insert([{ 
             name: data.metadata.name, 
             data: enrichedData,
-            is_public: data.metadata.isPublic || false 
+            is_public: data.metadata.isPublic || false,
+            parent_id: data.metadata.parentId || null // Sauvegarde du lien de parenté (Remix)
         }])
         .select().single();
 
@@ -235,7 +235,6 @@ export const api = {
             return null;
         }
 
-        // Récupération des ID de tous les murs de l'utilisateur (publics ou privés)
         const { data: userWalls } = await supabase
             .from('walls')
             .select('id')
@@ -243,7 +242,6 @@ export const api = {
         
         const wallIds = userWalls?.map(w => w.id) || [];
         
-        // Comptage des likes cumulés
         let totalLikesCount = 0;
         if (wallIds.length > 0) {
             const { count } = await supabase
@@ -331,7 +329,6 @@ export const api = {
         const { data, error } = await supabase.from('comments').select('*').eq('wall_id', wallId).order('created_at', { ascending: true });
         if (error) throw error;
 
-        // Enrichissement des commentaires avec les données de profil live
         const enrichedComments = await enrichWithProfiles(data || [], 'COMMENT');
 
         return Promise.all((enrichedComments || []).map(async (c: any) => {

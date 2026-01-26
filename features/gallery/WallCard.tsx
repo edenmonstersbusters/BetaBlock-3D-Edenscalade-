@@ -1,7 +1,6 @@
-
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Box, PlayCircle } from 'lucide-react';
+import { Clock, Box, PlayCircle, GitFork } from 'lucide-react';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 
 interface WallCardProps {
@@ -13,9 +12,15 @@ interface WallCardProps {
   authorName?: string; 
   authorAvatarUrl?: string; 
   onClick: () => void;
+  // New props for remix
+  isRemix?: boolean;
+  parentName?: string;
 }
 
-export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbnail, authorId, authorName, authorAvatarUrl, onClick }) => {
+export const WallCard: React.FC<WallCardProps> = ({ 
+  id, name, createdAt, thumbnail, authorId, authorName, authorAvatarUrl, onClick,
+  isRemix, parentName
+}) => {
   const navigate = useNavigate();
   
   const gradientStyle = useMemo(() => {
@@ -60,6 +65,13 @@ export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbna
           </div>
         )}
 
+        {isRemix && (
+            <div className="absolute top-2 right-2 px-2 py-1 bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded flex items-center gap-1 shadow-lg">
+                <GitFork size={10} />
+                <span>Remix</span>
+            </div>
+        )}
+
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 backdrop-blur-[2px]">
             <div className="transform scale-75 group-hover:scale-100 transition-transform duration-300">
                 <PlayCircle size={48} className="text-white drop-shadow-lg" />
@@ -68,7 +80,14 @@ export const WallCard: React.FC<WallCardProps> = ({ id, name, createdAt, thumbna
       </div>
 
       <div className="p-4">
-        <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-2">{name || "Mur Sans Nom"}</h3>
+        <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-1">{name || "Mur Sans Nom"}</h3>
+        
+        {isRemix && parentName && (
+             <div className="text-[10px] text-gray-500 flex items-center gap-1 mb-2">
+                 <GitFork size={10} className="rotate-180"/>
+                 <span>Inspiré de <span className="text-gray-400 font-medium">{parentName}</span></span>
+             </div>
+        )}
         
         <div className="flex items-center justify-between text-xs text-gray-500">
             <div 

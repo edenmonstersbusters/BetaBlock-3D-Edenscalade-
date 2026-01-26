@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../core/api';
@@ -191,6 +190,8 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                             authorName={wall.data?.metadata?.authorName}
                             authorAvatarUrl={wall.data?.metadata?.authorAvatarUrl}
                             onClick={() => navigate(`/view/${wall.id}`)}
+                            isRemix={!!wall.data?.metadata?.parentId}
+                            parentName={wall.data?.metadata?.parentName}
                         />
                     ))}
                 </div>

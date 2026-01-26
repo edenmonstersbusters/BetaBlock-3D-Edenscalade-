@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WallConfig, PlacedHold, WallMetadata, UserProfile } from '../../types';
@@ -54,8 +53,11 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
   useEffect(() => {
       auth.getUser().then(user => {
+          // CONDITION STRICTE : L'utilisateur doit être connecté ET son ID doit correspondre à l'auteur
           if (user && metadata.authorId && user.id === metadata.authorId) {
               setIsOwner(true);
+          } else {
+              setIsOwner(false);
           }
           if (!wallId) return;
           api.getWallSocialStatus(wallId, user?.id).then(setSocialStats);
@@ -254,6 +256,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
       </div>
 
       <div className="p-4 border-t border-gray-800 bg-gray-950 space-y-3">
+        {/* LE BOUTON EDITER NE S'AFFICHE QUE SI L'UTILISATEUR EST LE CRÉATEUR */}
         {isOwner && (
             <button 
                 onClick={onEdit} 

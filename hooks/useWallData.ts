@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../core/api';
@@ -70,14 +69,21 @@ export const useWallData = () => {
         if (queryId) {
             loadWallData(queryId, 'BUILD');
         } else {
-            resetLocalState();
-            setMode('BUILD');
+            // CORRECTION REMIX : On ne reset pas si on vient d'une action de remix (via location.state)
+            const state = location.state as { fromRemix?: boolean } | null;
+            if (!state?.fromRemix) {
+                resetLocalState();
+                setMode('BUILD');
+            }
         }
     } else if (path === '/setter') {
         if (queryId) {
              loadWallData(queryId, 'SET');
         } else {
-             setMode('SET');
+             const state = location.state as { fromRemix?: boolean } | null;
+             if (!state?.fromRemix) {
+                setMode('SET');
+             }
         }
     }
   }, [location.pathname, location.search]);
@@ -134,12 +140,17 @@ export const useWallData = () => {
           parentId: cloudId || undefined,
           parentName: metadata.name,
           parentAuthorName: metadata.authorName,
-          remixMode: remixMode
+          remixMode: remixMode,
+          // On reset l'auteur pour le nouveau mur
+          authorId: undefined,
+          authorName: undefined,
+          authorAvatarUrl: undefined
       };
       setMetadata(newMetadata);
       setCloudId(null);
       setGeneratedLink(null);
-      navigate(remixMode === 'holds' ? '/setter' : '/builder');
+      // CORRECTION REMIX : On passe state: { fromRemix: true } pour éviter le reset dans useEffect
+      navigate(remixMode === 'holds' ? '/setter' : '/builder', { state: { fromRemix: true } });
   };
 
   const resetToNew = () => {
