@@ -7,6 +7,7 @@ import { WallCard } from './WallCard';
 import { AuthModal } from '../../components/auth/AuthModal';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { Plus, Loader2, Search, Database, LogIn, LogOut, LayoutGrid, Globe, X } from 'lucide-react';
+import { SEO } from '../../components/SEO';
 
 interface GalleryPageProps {
   onResetState?: () => void;
@@ -62,6 +63,10 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
+      <SEO 
+        title="Hub Communautaire" 
+        description="Explorez des milliers de murs d'escalade 3D créés par la communauté. Rejoignez les ouvreurs et partagez vos créations." 
+      />
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">

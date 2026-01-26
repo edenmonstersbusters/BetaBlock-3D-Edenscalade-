@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import './types';
 
@@ -29,8 +30,10 @@ const getInitialRoute = () => {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <MemoryRouter initialEntries={[getInitialRoute()]}>
-      <App />
-    </MemoryRouter>
+    <HelmetProvider>
+      <MemoryRouter initialEntries={[getInitialRoute()]}>
+        <App />
+      </MemoryRouter>
+    </HelmetProvider>
   </React.StrictMode>
 );

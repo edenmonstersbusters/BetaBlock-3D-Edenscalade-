@@ -8,6 +8,7 @@ import { ArrowLeft, ShieldCheck, Loader2 } from 'lucide-react';
 import { ProfileHero } from './components/ProfileHero';
 import { ProfileStats } from './components/ProfileStats';
 import { ProfilePortfolio } from './components/ProfilePortfolio';
+import { SEO } from '../../components/SEO';
 
 export const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
@@ -70,6 +71,12 @@ export const ProfilePage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-950 text-white font-sans selection:bg-blue-500/30">
+            <SEO 
+                title={`${profile.display_name} - Profil Grimpeur`} 
+                description={profile.bio || `Découvrez les créations de ${profile.display_name} sur BetaBlock 3D.`}
+                image={profile.avatar_url}
+            />
+
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-[100]">
                 <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-all group">
                     <div className="p-1.5 rounded-lg bg-gray-900 group-hover:bg-blue-600 transition-colors"><ArrowLeft size={18} /></div>

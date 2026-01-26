@@ -16,6 +16,7 @@ import { ContextMenu } from '../../components/ui/ContextMenu';
 import { AuthModal } from '../../components/auth/AuthModal';
 import { Undo2, Redo2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../../types';
+import { SEO } from '../../components/SEO';
 
 interface WallEditorProps {
   mode: AppMode; user: any;
@@ -86,6 +87,11 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   return (
     <div className="flex flex-col h-screen w-screen bg-black overflow-hidden font-sans">
+      <SEO 
+        title={initialMode === 'VIEW' ? "Visualisation" : "Atelier de Création"} 
+        description="Concevez votre mur d'escalade en 3D avec précision."
+      />
+      
       <LoadingOverlay 
         isVisible={isLoadingCloud || isInitializing} 
         message={isInitializing ? "Initialisation de l'atelier..." : "Chargement du mur..."} 

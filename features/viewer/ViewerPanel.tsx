@@ -10,6 +10,7 @@ import { AuthModal } from '../../components/auth/AuthModal';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { ActionWarning } from '../../components/ui/ActionWarning';
 import { RemixModal } from './components/RemixModal';
+import { SEO } from '../../components/SEO';
 
 interface ViewerPanelProps {
   wallId: string;
@@ -102,6 +103,13 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden relative">
+      <SEO 
+        title={metadata.name || "Mur Sans Nom"} 
+        description={`Découvrez ce mur d'escalade 3D créé par ${displayName}. ${totalHolds} prises, ${totalVerticalHeight.toFixed(1)}m de haut.`}
+        image={metadata.thumbnail}
+        author={displayName}
+      />
+
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
       
       {showRemixModal && (
