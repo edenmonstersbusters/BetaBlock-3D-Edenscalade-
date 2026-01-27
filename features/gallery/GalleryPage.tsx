@@ -82,7 +82,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
       
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
           <div className="flex items-center gap-2 group cursor-default">
-             <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+             <span className="text-3xl">🧗</span>
              <div className="text-xl font-black italic tracking-tighter text-blue-500 group-hover:text-blue-400 transition-colors">BetaBlock</div>
           </div>
           <div className="flex items-center gap-4">
@@ -219,7 +219,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
                   <span className="font-mono">v1.1 Stable</span>
               </div>
               <div className="font-mono opacity-50">
-                  © 2025 BetaBlock. Open Source Climbing Engine.
+                  © 2026 BetaBlock. Open Source Climbing Engine.
               </div>
           </div>
       </footer>

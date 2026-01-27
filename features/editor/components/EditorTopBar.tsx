@@ -24,7 +24,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             <div className="flex items-center gap-4 justify-start">
                 <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group">
                     <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                    <img src="/logo.png" alt="Logo" className="w-5 h-5 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                    <span className="text-xl">🧗</span>
                     <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline group-hover:text-blue-400 transition-colors">BetaBlock</span>
                 </button>
             </div>
