@@ -3,13 +3,29 @@ export const config = {
   runtime: 'edge',
 };
 
+// Fonction utilitaire pour échapper les caractères spéciaux XML
+function escapeXml(unsafe: string): string {
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
+}
+
 export default async function handler(request: Request) {
   const BASE_URL = 'https://betablock-3d.vercel.app';
+  // Note: En production réelle, ces clés devraient être dans process.env
   const SUPABASE_URL = 'https://ezfbjejmhfkpfxbmlwpo.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV6ZmJqZWptaGZrcGZ4Ym1sd3BvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MDg4NjYsImV4cCI6MjA4MzI4NDg2Nn0.RZxFE1gHS4gtznagF9RHFtp-JOFGCFVflO971rr7FcQ';
 
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/walls?select=id,updated_at&is_public=eq.true`, {
+    // Récupération des 1000 derniers murs publics
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/walls?select=id,updated_at,created_at&is_public=eq.true&order=updated_at.desc&limit=1000`, {
         headers: {
             'apikey': SUPABASE_KEY,
             'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -25,27 +41,21 @@ export default async function handler(request: Request) {
     const today = new Date().toISOString().split('T')[0];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${BASE_URL}/</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${BASE_URL}/builder</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>`;
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
     walls.forEach((wall: any) => {
-        const lastMod = wall.updated_at ? wall.updated_at.split('T')[0] : today;
+        // On utilise updated_at s'il existe, sinon created_at, sinon aujourd'hui
+        const dateRaw = wall.updated_at || wall.created_at;
+        const lastMod = dateRaw ? dateRaw.split('T')[0] : today;
+        
+        // URL Propre (Sans le #) pour le futur passage en production
+        const loc = `${BASE_URL}/view/${escapeXml(wall.id)}`;
+
         xml += `
   <url>
-    <loc>${BASE_URL}/view/${wall.id}</loc>
+    <loc>${loc}</loc>
     <lastmod>${lastMod}</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>`;
     });
@@ -57,7 +67,7 @@ export default async function handler(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Cache-Control': 's-maxage=3600, stale-while-revalidate'
+        'Cache-Control': 's-maxage=3600, stale-while-revalidate' // Cache 1 heure
       }
     });
 

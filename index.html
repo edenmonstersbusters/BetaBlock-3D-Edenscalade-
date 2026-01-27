@@ -53,6 +53,23 @@
         overscroll-behavior: none; /* Empêche le rebond sur Mac/Mobile */
       }
     </style>
+
+    <!-- Gestion du Base Path pour le BrowserRouter -->
+    <script>
+      // Si on n'est PAS dans un environnement de preview Google/WebContainer
+      // On injecte <base href="/"> pour que les chemins relatifs (./index.tsx) partent de la racine
+      // Cela permet de recharger la page sur /view/123 sans erreur 404
+      const isPreview = window.location.hostname.includes('googleusercontent') || 
+                       window.location.hostname.includes('ai.studio') || 
+                       window.location.hostname.includes('webcontainer');
+      
+      if (!isPreview) {
+        const base = document.createElement('base');
+        base.href = '/';
+        document.head.appendChild(base);
+      }
+    </script>
+
   <script type="importmap">
 {
   "imports": {

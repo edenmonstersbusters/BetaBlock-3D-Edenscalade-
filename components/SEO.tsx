@@ -39,7 +39,7 @@ export const SEO: React.FC<SEOProps> = ({
   const fullTitle = `${title} | ${siteTitle}`;
   
   // Construction de l'URL Canonique (Nettoyage des hash et query params)
-  const currentUrl = url || window.location.href.split('?')[0];
+  const currentUrl = url || window.location.href.split('#')[0].split('?')[0];
 
   // Détection simple de la langue (par défaut FR)
   const lang = typeof navigator !== 'undefined' && navigator.language.startsWith('en') ? 'en' : 'fr';
@@ -97,10 +97,10 @@ export const SEO: React.FC<SEOProps> = ({
                         '@type': 'ListItem',
                         position: i + 1,
                         name: b.name,
-                        // Construction d'URL propre pour Google
+                        // Construction d'URL compatible HashRouter pour Google
                         item: b.url.startsWith('http') 
                               ? b.url 
-                              : `https://betablock-3d.vercel.app${b.url.startsWith('/') ? '' : '/'}${b.url}`
+                              : `https://betablock-3d.vercel.app/#${b.url.startsWith('/') ? '' : '/'}${b.url}`
                     }))
                 }}
             />
