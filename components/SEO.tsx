@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { StructuredData } from './StructuredData';
@@ -20,7 +21,7 @@ interface SEOProps {
 export const SEO: React.FC<SEOProps> = ({ 
   title, 
   description = "Créez, modélisez et partagez vos murs d'escalade en 3D. L'outil ultime pour les ouvreurs et les passionnés.", 
-  image = "./logo.png", 
+  image = "https://betablock-3d.vercel.app/preview-image.jpg", 
   url,
   type = 'website',
   author,
