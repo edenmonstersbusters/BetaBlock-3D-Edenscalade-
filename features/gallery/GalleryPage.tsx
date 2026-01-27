@@ -72,9 +72,9 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
       setSearchQuery('');
       setIsSearching(false);
       loadDefaultWalls();
-      // Nettoyage de l'URL si nécessaire sans recharger
+      // Nettoyage de l'URL propre (BrowserRouter)
       if (window.history.pushState) {
-          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.hash;
+          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
           window.history.pushState({path:newUrl},'',newUrl);
       }
   };
