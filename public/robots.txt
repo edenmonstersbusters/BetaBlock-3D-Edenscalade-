@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-# Sitemap généré automatiquement par l'API Serverless
-Sitemap: https://betablock-3d.vercel.app/api/sitemap
+Sitemap: https://betablock-3d.vercel.app/sitemap.xml
