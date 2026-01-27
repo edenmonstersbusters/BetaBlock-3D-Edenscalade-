@@ -48,8 +48,8 @@ export default async function handler(request: Request) {
         const dateRaw = wall.updated_at || wall.created_at;
         const lastMod = dateRaw ? dateRaw.split('T')[0] : today;
         
-        // URL Propre (Sans le #) pour le futur passage en production
-        const loc = `${BASE_URL}/view/${escapeXml(wall.id)}`;
+        // URL HashRouter : On inclut /#/ pour que le lien soit fonctionnel au clic
+        const loc = `${BASE_URL}/#/view/${escapeXml(wall.id)}`;
 
         xml += `
   <url>
