@@ -31,12 +31,32 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
     setLoading(false);
   }, []);
 
+  // Déclenchement de la recherche (factorisé pour usage URL et Form)
+  const executeSearch = useCallback(async (query: string) => {
+      setLoading(true);
+      setIsSearching(true);
+      const { data } = await api.searchWalls(query);
+      setWalls(data || []);
+      setLoading(false);
+  }, []);
+
   useEffect(() => {
     auth.getUser().then(setUser);
     const { data: { subscription } } = auth.onAuthStateChange(setUser);
-    loadDefaultWalls();
+    
+    // Vérification des paramètres URL pour la Search Box Google (?q=...)
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
+    
+    if (q) {
+        setSearchQuery(q);
+        executeSearch(q);
+    } else {
+        loadDefaultWalls();
+    }
+    
     return () => subscription.unsubscribe();
-  }, [loadDefaultWalls]);
+  }, [loadDefaultWalls, executeSearch]);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -45,17 +65,18 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
         resetSearch();
         return;
     }
-    setLoading(true);
-    setIsSearching(true);
-    const { data } = await api.searchWalls(searchQuery);
-    setWalls(data || []);
-    setLoading(false);
+    executeSearch(searchQuery);
   };
 
   const resetSearch = () => {
       setSearchQuery('');
       setIsSearching(false);
       loadDefaultWalls();
+      // Nettoyage de l'URL si nécessaire sans recharger
+      if (window.history.pushState) {
+          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.hash;
+          window.history.pushState({path:newUrl},'',newUrl);
+      }
   };
 
   const validWalls = walls.filter(w => w && w.id);
@@ -65,6 +86,9 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
       <SEO 
         title="Hub Communautaire" 
         description="Explorez des milliers de murs d'escalade 3D créés par la communauté. Rejoignez les ouvreurs et partagez vos créations." 
+        breadcrumbs={[
+            { name: 'Accueil', url: '/' }
+        ]}
         schema={{
             type: 'WebSite',
             data: {

@@ -1,7 +1,11 @@
-
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { StructuredData } from './StructuredData';
+
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
 
 interface SEOProps {
   title: string;
@@ -12,6 +16,7 @@ interface SEOProps {
   author?: string;
   publishedTime?: string;
   modifiedTime?: string;
+  breadcrumbs?: BreadcrumbItem[];
   schema?: {
       type: 'WebSite' | 'SoftwareApplication' | '3DModel' | 'Person' | 'ProfilePage' | 'BreadcrumbList';
       data: any;
@@ -27,6 +32,7 @@ export const SEO: React.FC<SEOProps> = ({
   author,
   publishedTime,
   modifiedTime,
+  breadcrumbs,
   schema
 }) => {
   const siteTitle = "BetaBlock 3D";
@@ -80,6 +86,24 @@ export const SEO: React.FC<SEOProps> = ({
             <StructuredData type={schema.type} data={schema.data} />
         ) : (
             <StructuredData type="SoftwareApplication" data={{}} />
+        )}
+
+        {/* Injection JSON-LD pour les Breadcrumbs (Sitelinks) */}
+        {breadcrumbs && (
+            <StructuredData 
+                type="BreadcrumbList" 
+                data={{
+                    items: breadcrumbs.map((b, i) => ({
+                        '@type': 'ListItem',
+                        position: i + 1,
+                        name: b.name,
+                        // Construction d'URL compatible HashRouter pour Google
+                        item: b.url.startsWith('http') 
+                              ? b.url 
+                              : `https://betablock-3d.vercel.app/#${b.url.startsWith('/') ? '' : '/'}${b.url}`
+                    }))
+                }}
+            />
         )}
     </>
   );

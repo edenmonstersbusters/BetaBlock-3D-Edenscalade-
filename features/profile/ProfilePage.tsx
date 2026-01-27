@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../core/api';
@@ -76,6 +75,11 @@ export const ProfilePage: React.FC = () => {
                 description={profile.bio || `Découvrez les ${userWalls.length} murs d'escalade créés par ${profile.display_name} sur BetaBlock 3D.`}
                 image={profile.avatar_url}
                 type="profile"
+                breadcrumbs={[
+                    { name: 'Accueil', url: '/' },
+                    { name: 'Profils', url: '/' },
+                    { name: profile.display_name, url: `/profile/${userId || ''}` }
+                ]}
                 schema={{
                     type: 'ProfilePage',
                     data: {

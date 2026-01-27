@@ -112,6 +112,11 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
         author={displayName}
         publishedTime={metadata.timestamp}
         type="article"
+        breadcrumbs={[
+            { name: 'Accueil', url: '/' },
+            { name: 'Galerie', url: '/' },
+            { name: metadata.name || 'Mur', url: `/view/${wallId}` }
+        ]}
         schema={{
             type: '3DModel',
             data: {
