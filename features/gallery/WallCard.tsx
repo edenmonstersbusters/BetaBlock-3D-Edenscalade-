@@ -66,13 +66,23 @@ export const WallCard: React.FC<WallCardProps> = ({
         )}
 
         {isRemix && (
-            <div className="absolute top-2 right-2 px-2 py-1 bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded flex items-center gap-1 shadow-lg">
+            <div className="absolute top-2 right-2 px-2 py-1 bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded flex items-center gap-1 shadow-lg z-10">
                 <GitFork size={10} />
                 <span>Remix</span>
             </div>
         )}
 
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 backdrop-blur-[2px]">
+        {/* REPOSITIONNEMENT REMIX INFO SUR L'IMAGE */}
+        {isRemix && parentName && (
+             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-6 z-10">
+                 <div className="text-[10px] text-gray-300 flex items-center gap-1">
+                     <GitFork size={10} className="rotate-180 flex-shrink-0 text-blue-400"/>
+                     <span className="truncate">Inspiré de <span className="text-white font-medium">{parentName}</span></span>
+                 </div>
+             </div>
+        )}
+
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 backdrop-blur-[2px] z-20">
             <div className="transform scale-75 group-hover:scale-100 transition-transform duration-300">
                 <PlayCircle size={48} className="text-white drop-shadow-lg" />
             </div>
@@ -80,14 +90,7 @@ export const WallCard: React.FC<WallCardProps> = ({
       </div>
 
       <div className="p-4">
-        <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-1">{name || "Mur Sans Nom"}</h3>
-        
-        {isRemix && parentName && (
-             <div className="text-[10px] text-gray-500 flex items-center gap-1 mb-2">
-                 <GitFork size={10} className="rotate-180"/>
-                 <span>Inspiré de <span className="text-gray-400 font-medium">{parentName}</span></span>
-             </div>
-        )}
+        <h3 className="text-lg font-bold text-gray-100 truncate group-hover:text-blue-400 transition-colors mb-2">{name || "Mur Sans Nom"}</h3>
         
         <div className="flex items-center justify-between text-xs text-gray-500">
             <div 
@@ -109,7 +112,7 @@ export const WallCard: React.FC<WallCardProps> = ({
         </div>
       </div>
 
-      <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-500/30 rounded-xl pointer-events-none transition-colors"></div>
+      <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-500/30 rounded-xl pointer-events-none transition-colors z-30"></div>
     </div>
   );
 };

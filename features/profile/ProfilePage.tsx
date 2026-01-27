@@ -36,7 +36,12 @@ export const ProfilePage: React.FC = () => {
                 setProfile(profileData);
                 setEditData(profileData);
             }
-            setUserWalls(walls || []);
+            
+            // FILTRAGE STRICT : On ne montre que les murs PUBLICS sur le profil (Portfolio)
+            // Les murs privés sont gérés via /projects
+            const publicWalls = walls ? walls.filter(w => w.is_public) : [];
+            setUserWalls(publicWalls);
+            
             setLoading(false);
         };
         loadProfileData();
