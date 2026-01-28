@@ -17,7 +17,8 @@ const enrichWithProfiles = async (items: any[], type: 'WALL' | 'COMMENT') => {
     const userIds = new Set<string>();
     items.forEach(item => {
         if (type === 'WALL') {
-            const authorId = item.data?.metadata?.authorId;
+            // Priorité à la colonne user_id, fallback sur le JSON metadata
+            const authorId = item.user_id || item.data?.metadata?.authorId;
             if (authorId) userIds.add(authorId);
         } else {
             if (item.user_id) userIds.add(item.user_id);
@@ -34,16 +35,15 @@ const enrichWithProfiles = async (items: any[], type: 'WALL' | 'COMMENT') => {
 
     if (!profiles) return items;
 
-    // Typage explicite <string, any> pour éviter que les valeurs soient inférées comme 'unknown'
     const profileMap = new Map<string, any>(profiles.map((p: any) => [p.id, p]));
 
     // 3. Appliquer les mises à jour
     return items.map(item => {
         if (type === 'WALL') {
-            const authorId = item.data?.metadata?.authorId;
+            const authorId = item.user_id || item.data?.metadata?.authorId;
             const profile = profileMap.get(authorId);
             if (profile) {
-                // On écrase les métadonnées snapshot par les données live
+                // On écrase les métadonnées snapshot par les données live pour l'affichage
                 item.data.metadata.authorName = profile.display_name;
                 item.data.metadata.authorAvatarUrl = profile.avatar_url;
             }
@@ -65,7 +65,6 @@ export const api = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Vous devez être connecté.");
       
-      // On s'assure d'avoir les infos les plus récentes du profil pour le snapshot initial
       const { data: profile } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).single();
 
       const enrichedData = {
@@ -82,9 +81,10 @@ export const api = {
         .from('walls')
         .insert([{ 
             name: data.metadata.name, 
+            user_id: user.id, // SÉCURITÉ : Enregistrement explicite dans la colonne
             data: enrichedData,
             is_public: data.metadata.isPublic || false,
-            parent_id: data.metadata.parentId || null // Sauvegarde du lien de parenté (Remix)
+            parent_id: data.metadata.parentId || null
         }])
         .select().single();
 
@@ -97,10 +97,12 @@ export const api = {
 
   async updateWall(id: string, data: BetaBlockFile): Promise<{ error: string | null }> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('walls')
         .update({ 
             name: data.metadata.name, 
+            user_id: user?.id, // Mise à jour de sécurité de la colonne
             data: data,
             is_public: data.metadata.isPublic || false
         })
@@ -146,17 +148,18 @@ export const api = {
 
   async getWall(id: string): Promise<{ data: BetaBlockFile | null; error: string | null }> {
     try {
-      const { data: result, error } = await supabase.from('walls').select('data').eq('id', id).single();
+      // On sélectionne aussi user_id pour le fallback
+      const { data: result, error } = await supabase.from('walls').select('data, user_id').eq('id', id).single();
       if (error) throw error;
 
       let fileData = result.data as BetaBlockFile;
+      const authorId = result.user_id || fileData.metadata.authorId;
 
-      // ENRICHISSEMENT LIVE UNIQUE
-      if (fileData.metadata.authorId) {
+      if (authorId) {
           const { data: profile } = await supabase
             .from('profiles')
             .select('display_name, avatar_url')
-            .eq('id', fileData.metadata.authorId)
+            .eq('id', authorId)
             .maybeSingle();
           
           if (profile) {
@@ -173,8 +176,11 @@ export const api = {
 
   async getWallsList(userId?: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
-      let query = supabase.from('walls').select('id, name, created_at, data').eq('is_public', true);
-      if (userId) query = query.eq('data->metadata->>authorId', userId);
+      let query = supabase.from('walls').select('id, name, created_at, data, user_id').eq('is_public', true);
+      if (userId) {
+          // On cherche par colonne OU par JSON pour la compatibilité
+          query = query.or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`);
+      }
       const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
       
       if (error) throw error;
@@ -188,7 +194,10 @@ export const api = {
 
   async getUserProjects(userId: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
-      const { data, error } = await supabase.from('walls').select('id, name, created_at, data, is_public').eq('data->metadata->>authorId', userId).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('walls')
+        .select('id, name, created_at, data, is_public, user_id')
+        .or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`)
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');
@@ -202,7 +211,7 @@ export const api = {
   async searchWalls(query: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const searchTerm = `%${query}%`;
-      const { data, error } = await supabase.from('walls').select('id, name, created_at, data').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await supabase.from('walls').select('id, name, created_at, data, user_id').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');
@@ -238,7 +247,7 @@ export const api = {
         const { data: userWalls } = await supabase
             .from('walls')
             .select('id')
-            .eq('data->metadata->>authorId', userId);
+            .or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`);
         
         const wallIds = userWalls?.map(w => w.id) || [];
         
