@@ -38,8 +38,13 @@ export const SEO: React.FC<SEOProps> = ({
   const siteTitle = "BetaBlock 3D";
   const fullTitle = `${title} | ${siteTitle}`;
   
-  // Construction de l'URL Canonique (Nettoyage des hash et query params)
-  const currentUrl = url || window.location.href.split('#')[0].split('?')[0];
+  // Use production URL as base if in a blob environment
+  const isBlob = window.location.protocol === 'blob:';
+  const fallbackOrigin = 'https://betablock-3d.vercel.app';
+  
+  const currentUrl = url || (isBlob 
+    ? fallbackOrigin + (window.location.hash || '')
+    : window.location.href.split('#')[0].split('?')[0]);
 
   // Détection simple de la langue (par défaut FR)
   const lang = typeof navigator !== 'undefined' && navigator.language.startsWith('en') ? 'en' : 'fr';

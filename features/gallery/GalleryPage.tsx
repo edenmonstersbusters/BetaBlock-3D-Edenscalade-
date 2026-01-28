@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';
@@ -14,6 +15,7 @@ interface GalleryPageProps {
 
 export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [walls, setWalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
@@ -31,7 +33,6 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
     setLoading(false);
   }, []);
 
-  // Déclenchement de la recherche (factorisé pour usage URL et Form)
   const executeSearch = useCallback(async (query: string) => {
       setLoading(true);
       setIsSearching(true);
@@ -44,9 +45,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
     auth.getUser().then(setUser);
     const { data: { subscription } } = auth.onAuthStateChange(setUser);
     
-    // Vérification des paramètres URL pour la Search Box Google (?q=...)
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get('q');
+    const q = searchParams.get('q');
     
     if (q) {
         setSearchQuery(q);
@@ -56,7 +55,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
     }
     
     return () => subscription.unsubscribe();
-  }, [loadDefaultWalls, executeSearch]);
+  }, [loadDefaultWalls, executeSearch, searchParams]);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -65,18 +64,15 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
         resetSearch();
         return;
     }
+    setSearchParams({ q: searchQuery });
     executeSearch(searchQuery);
   };
 
   const resetSearch = () => {
       setSearchQuery('');
       setIsSearching(false);
+      setSearchParams({});
       loadDefaultWalls();
-      // Nettoyage de l'URL si nécessaire sans recharger
-      if (window.history.pushState) {
-          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.hash;
-          window.history.pushState({path:newUrl},'',newUrl);
-      }
   };
 
   const validWalls = walls.filter(w => w && w.id);

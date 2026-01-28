@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../core/api';
@@ -69,7 +70,6 @@ export const useWallData = () => {
         if (queryId) {
             loadWallData(queryId, 'BUILD');
         } else {
-            // CORRECTION REMIX : On ne reset pas si on vient d'une action de remix (via location.state)
             const state = location.state as { fromRemix?: boolean } | null;
             if (!state?.fromRemix) {
                 resetLocalState();
@@ -126,8 +126,13 @@ export const useWallData = () => {
     
     setIsSavingCloud(false);
     if (!result.error) {
-        // Lien avec hash pour compatibilité maximale
-        setGeneratedLink(`${window.location.origin}/#/view/${cloudId}`);
+        // Fallback to production domain for shareable links if we are in a blob/sandbox
+        const isBlob = window.location.protocol === 'blob:';
+        const origin = isBlob 
+          ? 'https://betablock-3d.vercel.app' 
+          : window.location.origin;
+          
+        setGeneratedLink(`${origin.replace(/\/$/, '')}/#/view/${cloudId || result.id}`);
         return true;
     }
     return false;
@@ -142,7 +147,6 @@ export const useWallData = () => {
           parentName: metadata.name,
           parentAuthorName: metadata.authorName,
           remixMode: remixMode,
-          // On reset l'auteur pour le nouveau mur
           authorId: undefined,
           authorName: undefined,
           authorAvatarUrl: undefined
@@ -150,7 +154,6 @@ export const useWallData = () => {
       setMetadata(newMetadata);
       setCloudId(null);
       setGeneratedLink(null);
-      // CORRECTION REMIX : On passe state: { fromRemix: true } pour éviter le reset dans useEffect
       navigate(remixMode === 'holds' ? '/setter' : '/builder', { state: { fromRemix: true } });
   };
 
