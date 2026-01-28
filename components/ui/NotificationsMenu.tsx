@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Heart, MessageSquare, UserPlus, Box, Loader2 } from 'lucide-react';
+import { Bell, Heart, MessageSquare, UserPlus, UserMinus, Box, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../core/NotificationsContext';
 import { UserAvatar } from './UserAvatar';
@@ -33,7 +33,7 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
       }
       setIsOpen(false);
 
-      if (notif.type === 'follow') {
+      if (notif.type === 'follow' || notif.type === 'unfollow') {
           navigate(`/profile/${notif.actor_id}`);
       } else if (notif.resource_id) {
           navigate(`/view/${notif.resource_id}`);
@@ -43,6 +43,7 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
   const getIcon = (type: string) => {
       switch(type) {
           case 'follow': return <UserPlus size={14} className="text-blue-400" />;
+          case 'unfollow': return <UserMinus size={14} className="text-red-500" />;
           case 'new_wall': return <Box size={14} className="text-emerald-400" />;
           case 'like_wall': return <Heart size={14} className="text-red-400" />;
           case 'comment': return <MessageSquare size={14} className="text-orange-400" />;
@@ -53,6 +54,7 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
   const getText = (n: Notification) => {
       switch(n.type) {
           case 'follow': return <span>vous suit désormais.</span>;
+          case 'unfollow': return <span className="text-red-400 font-medium">ne vous suit plus.</span>;
           case 'new_wall': return <span>a publié un nouveau mur : <span className="text-white font-medium">{n.resource_name || "Sans titre"}</span></span>;
           case 'like_wall': return <span>a aimé votre mur <span className="text-white font-medium">{n.resource_name || "Sans titre"}</span></span>;
           case 'comment': return (
