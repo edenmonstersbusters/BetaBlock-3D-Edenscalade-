@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useNavigate, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { WallEditor } from './features/editor/WallEditorPage';
@@ -6,6 +7,8 @@ import { ProfilePage } from './features/profile/ProfilePage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { useHistory } from './hooks/useHistory';
 import { useWallData } from './hooks/useWallData';
+import { useRealtimeNotifications } from './hooks/useRealtimeNotifications';
+import { ToastNotification } from './components/ui/ToastNotification';
 import './types';
 
 export default function App() {
@@ -18,6 +21,9 @@ export default function App() {
   } = useWallData();
   
   const history = useHistory({ config, holds });
+  
+  // Activation des notifications temps réel
+  const { activeToasts, removeToast } = useRealtimeNotifications();
 
   // Props communes pour WallEditor pour réduire la duplication
   const editorProps = {
@@ -28,34 +34,48 @@ export default function App() {
   };
 
   return (
-    <Routes>
-      {/* Route par défaut : La Galerie (Page d'accueil) */}
-      <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
-      
-      {/* Alias pour la galerie */}
-      <Route path="/gallery" element={<GalleryPage onResetState={resetToNew} />} />
+    <>
+      <Routes>
+        {/* Route par défaut : La Galerie (Page d'accueil) */}
+        <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
+        
+        {/* Alias pour la galerie */}
+        <Route path="/gallery" element={<GalleryPage onResetState={resetToNew} />} />
 
-      <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/profile/:userId" element={<ProfilePage />} />
-      <Route path="/projects" element={<ProjectsPage />} />
-      
-      <Route path="/builder" element={
-        <WallEditor mode="BUILD" {...editorProps} />
-      } />
-      
-      <Route path="/setter" element={
-        <WallEditor 
-          mode="SET" {...editorProps}
-          onRemoveAllHolds={() => { history.recordAction({ config, holds }); setHolds([]); }}
-          onChangeAllHoldsColor={(color: string) => { history.recordAction({ config, holds }); setHolds(prev => prev.map(h => ({ ...h, color }))); }}
-        />
-      } />
-      
-      <Route path="/view/:id" element={
-        <WallEditor mode="VIEW" {...editorProps} onRemix={handleRemix} />
-      } />
-      
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/:userId" element={<ProfilePage />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        
+        <Route path="/builder" element={
+          <WallEditor mode="BUILD" {...editorProps} />
+        } />
+        
+        <Route path="/setter" element={
+          <WallEditor 
+            mode="SET" {...editorProps}
+            onRemoveAllHolds={() => { history.recordAction({ config, holds }); setHolds([]); }}
+            onChangeAllHoldsColor={(color: string) => { history.recordAction({ config, holds }); setHolds(prev => prev.map(h => ({ ...h, color }))); }}
+          />
+        } />
+        
+        <Route path="/view/:id" element={
+          <WallEditor mode="VIEW" {...editorProps} onRemix={handleRemix} />
+        } />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+
+      {/* Container pour les Toasts */}
+      <div className="fixed z-[9999] pointer-events-none">
+          {activeToasts.map((notif) => (
+              <div key={notif.id} className="pointer-events-auto">
+                  <ToastNotification 
+                      notification={notif} 
+                      onDismiss={removeToast} 
+                  />
+              </div>
+          ))}
+      </div>
+    </>
   );
 }
