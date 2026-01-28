@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// On retire la config 'edge' pour utiliser le Node.js standard (plus stable pour les appels DB)
-
 // Fonction utilitaire pour échapper les caractères spéciaux XML
 function escapeXml(unsafe: any): string {
   if (typeof unsafe !== 'string') return '';
@@ -41,13 +39,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
-    if (Array.isArray(walls)) {
+    // Si on a des murs, on les liste
+    if (Array.isArray(walls) && walls.length > 0) {
         walls.forEach((wall: any) => {
-            // On utilise updated_at s'il existe, sinon created_at, sinon aujourd'hui
             const dateRaw = wall.updated_at || wall.created_at;
             const lastMod = dateRaw ? dateRaw.split('T')[0] : today;
-            
-            // On inclut /#/ pour que le lien pointe bien vers l'application
             const loc = `${BASE_URL}/#/view/${escapeXml(wall.id)}`;
 
             xml += `
@@ -58,12 +54,21 @@ export default async function handler(request: VercelRequest, response: VercelRe
     <priority>0.7</priority>
   </url>`;
         });
+    } else {
+        // IMPORTANT : Si aucun mur n'est trouvé, on ajoute une URL par défaut (la galerie)
+        // Cela empêche l'erreur "Balise XML manquante" dans la Search Console
+        xml += `
+  <url>
+    <loc>${BASE_URL}/#/gallery</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>`;
     }
 
     xml += `
 </urlset>`;
 
-    // Envoi de la réponse XML correcte
     response.setHeader('Content-Type', 'application/xml');
     response.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
     return response.status(200).send(xml);
@@ -71,9 +76,17 @@ export default async function handler(request: VercelRequest, response: VercelRe
   } catch (error) {
     console.error('Sitemap Generation Error:', error);
     
-    // En cas d'erreur, on renvoie quand même un XML valide (mais vide) pour éviter le 500 chez Google
+    // Fallback robuste : même en cas d'erreur fatale (ex: DB hors ligne),
+    // on renvoie un XML valide avec une URL par défaut pour ne pas fâcher Google.
+    const today = new Date().toISOString().split('T')[0];
     const fallbackXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${BASE_URL}/#/gallery</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
+  </url>
 </urlset>`;
     
     response.setHeader('Content-Type', 'application/xml');
