@@ -6,6 +6,7 @@ import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';
 import { AuthModal } from '../../components/auth/AuthModal';
 import { UserAvatar } from '../../components/ui/UserAvatar';
+import { NotificationsMenu } from '../../components/ui/NotificationsMenu';
 import { Plus, Loader2, Search, Database, LogIn, LogOut, LayoutGrid, Globe, X } from 'lucide-react';
 import { SEO } from '../../components/SEO';
 
@@ -108,6 +109,9 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
           <div className="flex items-center gap-4">
             {user ? (
                 <div className="flex items-center gap-3">
+                    {/* Cloche de notification */}
+                    <NotificationsMenu userId={user.id} />
+
                     <button 
                         onClick={() => navigate('/projects')}
                         className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-white/5 rounded-full text-xs font-bold transition-all text-gray-400 hover:text-white"

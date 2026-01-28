@@ -1,8 +1,10 @@
 
-import React from 'react';
-import { Edit3, Save, Loader2, Calendar } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit3, Save, Loader2, Calendar, UserPlus, UserCheck, Users } from 'lucide-react';
 import { UserAvatar } from '../../../components/ui/UserAvatar';
 import { UserProfile } from '../../../types';
+import { api } from '../../../core/api';
+import { auth } from '../../../core/auth';
 
 interface ProfileHeroProps {
     profile: UserProfile;
@@ -16,12 +18,42 @@ interface ProfileHeroProps {
     onAvatarUpload: (file: File) => void;
     isUploadingAvatar: boolean;
     memberSince: number;
+    onRequireAuth: () => void;
+    onShowFollowers: () => void;
+    onShowFollowing: () => void;
 }
 
 export const ProfileHero: React.FC<ProfileHeroProps> = ({
     profile, isEditing, editData, setEditData, isOwnProfile,
-    onEditToggle, onSave, isSaving, onAvatarUpload, isUploadingAvatar, memberSince
+    onEditToggle, onSave, isSaving, onAvatarUpload, isUploadingAvatar, memberSince,
+    onRequireAuth, onShowFollowers, onShowFollowing
 }) => {
+    const [isFollowing, setIsFollowing] = useState(profile.is_following);
+    const [followersCount, setFollowersCount] = useState(profile.stats?.followers_count || 0);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    const handleFollow = async () => {
+        setFollowLoading(true);
+        const user = await auth.getUser();
+        
+        if (!user) {
+            onRequireAuth();
+            setFollowLoading(false);
+            return;
+        }
+
+        if (isFollowing) {
+            await api.unfollowUser(user.id, profile.id);
+            setIsFollowing(false);
+            setFollowersCount(prev => Math.max(0, prev - 1));
+        } else {
+            await api.followUser(user.id, profile.id);
+            setIsFollowing(true);
+            setFollowersCount(prev => prev + 1);
+        }
+        setFollowLoading(false);
+    };
+
     return (
         <section className="relative flex flex-col md:flex-row items-center md:items-end gap-8 pb-12 border-b border-white/5">
             <div className="absolute -top-20 -left-20 w-80 h-80 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
@@ -58,6 +90,24 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
                     <h1 className="text-5xl font-black tracking-tighter text-white drop-shadow-sm truncate w-full">{profile.display_name}</h1>
                 )}
 
+                <div className="flex items-center gap-6 mt-3 text-sm text-gray-400">
+                    <button 
+                        onClick={onShowFollowers}
+                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer group" 
+                        title="Voir les abonnés"
+                    >
+                        <Users size={14} className="text-gray-500 group-hover:text-blue-400" />
+                        <span className="font-bold text-white group-hover:underline">{followersCount}</span> <span>Abonnés</span>
+                    </button>
+                    <button 
+                        onClick={onShowFollowing}
+                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer group" 
+                        title="Voir les abonnements"
+                    >
+                        <span className="font-bold text-white group-hover:underline">{profile.stats?.following_count || 0}</span> <span>Abonnements</span>
+                    </button>
+                </div>
+
                 <div className="mt-4 text-gray-400 w-full max-w-3xl text-sm leading-relaxed italic">
                     {isEditing ? (
                         <textarea 
@@ -72,14 +122,27 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
                 </div>
             </div>
 
-            <div className="md:self-start pt-4 shrink-0">
-                {isOwnProfile && (
+            <div className="md:self-start pt-4 shrink-0 flex flex-col gap-3">
+                {isOwnProfile ? (
                     <button 
                         onClick={isEditing ? onSave : onEditToggle} 
                         className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-black transition-all shadow-xl active:scale-95 ${isEditing ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20' : 'bg-gray-800 hover:bg-gray-750 border border-white/10'}`}
                     >
                         {isSaving ? <Loader2 className="animate-spin" size={18}/> : (isEditing ? <Save size={18}/> : <Edit3 size={18}/>)}
                         <span>{isEditing ? "Sauvegarder" : "Éditer mon profil"}</span>
+                    </button>
+                ) : (
+                    <button 
+                        onClick={handleFollow}
+                        disabled={followLoading}
+                        className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-black transition-all shadow-xl active:scale-95 ${
+                            isFollowing 
+                            ? 'bg-gray-800 text-gray-300 hover:bg-red-900/20 hover:text-red-400 border border-white/10' 
+                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'
+                        }`}
+                    >
+                        {followLoading ? <Loader2 className="animate-spin" size={18} /> : (isFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />)}
+                        <span>{isFollowing ? "Abonné" : "Suivre"}</span>
                     </button>
                 )}
             </div>

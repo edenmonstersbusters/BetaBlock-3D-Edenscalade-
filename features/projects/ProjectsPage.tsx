@@ -6,6 +6,7 @@ import { auth } from '../../core/auth';
 import { WallCard } from '../gallery/WallCard';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { DeleteProjectModal } from './components/DeleteProjectModal';
+import { NotificationsMenu } from '../../components/ui/NotificationsMenu';
 import { ArrowLeft, Box, Loader2, Plus, Globe, Lock, Trash2, Edit3, Eye, EyeOff } from 'lucide-react';
 
 export const ProjectsPage: React.FC = () => {
@@ -48,7 +49,15 @@ export const ProjectsPage: React.FC = () => {
                 <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
                     <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /><span className="font-bold">Hub Public</span>
                 </button>
-                <div className="flex items-center gap-3"><span className="text-sm font-black italic tracking-tighter text-blue-500">MES MURS</span>{user && <UserAvatar url={user.user_metadata?.avatar_url} name={user.user_metadata?.display_name || user.email} size="sm" />}</div>
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-black italic tracking-tighter text-blue-500">MES MURS</span>
+                    {user && (
+                        <>
+                            <NotificationsMenu userId={user.id} />
+                            <UserAvatar url={user.user_metadata?.avatar_url} name={user.user_metadata?.display_name || user.email} size="sm" />
+                        </>
+                    )}
+                </div>
             </div>
 
             <main className="max-w-7xl mx-auto px-6 py-12">

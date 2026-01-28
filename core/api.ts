@@ -1,5 +1,6 @@
+
 import { supabase } from './supabase';
-import { BetaBlockFile, Comment, UserProfile } from '../types';
+import { BetaBlockFile, Comment, UserProfile, Notification } from '../types';
 
 const handleNetworkError = (err: any) => {
   console.error("Supabase Request Error:", err);
@@ -231,6 +232,7 @@ export const api = {
             .single();
 
         if (error || !profile) {
+            // Fallback pour utilisateur sans profil BDD
             const { data: { user } } = await supabase.auth.getUser();
             if (user?.id === userId) {
                  return {
@@ -238,12 +240,13 @@ export const api = {
                      display_name: user.user_metadata?.display_name || user.email?.split('@')[0],
                      avatar_url: user.user_metadata?.avatar_url,
                      created_at: user.created_at,
-                     stats: { total_walls: 0, total_likes: 0, beta_level: 0 }
+                     stats: { total_walls: 0, total_likes: 0, beta_level: 0, followers_count: 0, following_count: 0 }
                  };
             }
             return null;
         }
 
+        // Récupérer les murs
         const { data: userWalls } = await supabase
             .from('walls')
             .select('id')
@@ -259,6 +262,18 @@ export const api = {
                 .in('wall_id', wallIds);
             totalLikesCount = count || 0;
         }
+
+        // Récupérer les stats sociales (Followers / Following)
+        const { count: followersCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', userId);
+        const { count: followingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId);
+
+        // Vérifier si l'utilisateur courant suit ce profil
+        let isFollowing = false;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser && currentUser.id !== userId) {
+            const { data: followData } = await supabase.from('follows').select('created_at').eq('follower_id', currentUser.id).eq('following_id', userId).maybeSingle();
+            isFollowing = !!followData;
+        }
         
         return {
             ...profile,
@@ -266,8 +281,11 @@ export const api = {
             stats: {
                 total_walls: wallIds.length,
                 total_likes: totalLikesCount, 
-                beta_level: Math.floor((wallIds.length || 0) / 2) + 1
-            }
+                beta_level: Math.floor((wallIds.length || 0) / 2) + 1,
+                followers_count: followersCount || 0,
+                following_count: followingCount || 0
+            },
+            is_following: isFollowing
         };
     } catch (e) {
         return null;
@@ -372,5 +390,103 @@ export const api = {
             return { added: true, error: error ? error.message : null };
         }
       } catch (err: any) { return { added: false, error: handleNetworkError(err) }; }
+  },
+
+  // --- FONCTIONS SOCIALES ---
+
+  async followUser(followerId: string, followingId: string): Promise<{ error: string | null }> {
+    try {
+        const { error } = await supabase.from('follows').insert({ follower_id: followerId, following_id: followingId });
+        if (error) throw error;
+        return { error: null };
+    } catch (err: any) { return { error: handleNetworkError(err) }; }
+  },
+
+  async unfollowUser(followerId: string, followingId: string): Promise<{ error: string | null }> {
+    try {
+        const { error } = await supabase.from('follows').delete().eq('follower_id', followerId).eq('following_id', followingId);
+        if (error) throw error;
+        return { error: null };
+    } catch (err: any) { return { error: handleNetworkError(err) }; }
+  },
+
+  // Récupère les personnes qui suivent userId
+  async getFollowers(userId: string): Promise<UserProfile[]> {
+      try {
+          const { data, error } = await supabase
+            .from('follows')
+            .select('follower_id')
+            .eq('following_id', userId);
+            
+          if (error || !data) return [];
+          
+          const ids = data.map(f => f.follower_id);
+          if (ids.length === 0) return [];
+
+          const { data: profiles } = await supabase.from('profiles').select('*').in('id', ids);
+          return (profiles || []) as UserProfile[];
+      } catch (e) { return []; }
+  },
+
+  // Récupère les personnes que userId suit
+  async getFollowing(userId: string): Promise<UserProfile[]> {
+      try {
+          const { data, error } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', userId);
+            
+          if (error || !data) return [];
+          
+          const ids = data.map(f => f.following_id);
+          if (ids.length === 0) return [];
+
+          const { data: profiles } = await supabase.from('profiles').select('*').in('id', ids);
+          return (profiles || []) as UserProfile[];
+      } catch (e) { return []; }
+  },
+
+  async getNotifications(userId: string): Promise<Notification[]> {
+      try {
+          const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('recipient_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+            
+          if (error) throw error;
+
+          // Enrichir avec les infos de l'acteur (nom, avatar)
+          const enriched = await Promise.all(data.map(async (n: any) => {
+             const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
+             let resourceName = undefined;
+             
+             // Si c'est un mur, on cherche son nom
+             if (n.type === 'new_wall' || n.type === 'comment' || n.type === 'like_wall') {
+                 if (n.resource_id) {
+                    const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
+                    if (wall) resourceName = wall.name;
+                 }
+             }
+
+             return {
+                 ...n,
+                 actor_name: actor?.display_name || "Utilisateur inconnu",
+                 actor_avatar_url: actor?.avatar_url,
+                 resource_name: resourceName
+             };
+          }));
+
+          return enriched;
+      } catch (err) { return []; }
+  },
+  
+  async markNotificationRead(notificationId: string): Promise<void> {
+      await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId);
+  },
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+      await supabase.from('notifications').update({ is_read: true }).eq('recipient_id', userId).eq('is_read', false);
   }
 };

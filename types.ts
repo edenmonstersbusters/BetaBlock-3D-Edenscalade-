@@ -107,7 +107,12 @@ export interface UserProfile {
     total_walls: number;
     total_likes: number;
     beta_level: number;
+    followers_count: number;
+    following_count: number;
   };
+  
+  // State for current user
+  is_following?: boolean;
 }
 
 export interface Comment {
@@ -127,6 +132,19 @@ export interface Comment {
 export interface SocialCounts {
   likes: number;
   comments: number;
+}
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  actor_id: string;
+  actor_name?: string;     // Enrichi
+  actor_avatar_url?: string; // Enrichi
+  type: 'follow' | 'new_wall' | 'comment' | 'like_wall';
+  resource_id?: string;
+  resource_name?: string; // Enrichi si c'est un mur
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface ModalConfig {

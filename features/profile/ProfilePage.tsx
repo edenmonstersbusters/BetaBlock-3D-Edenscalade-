@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../core/api';
@@ -8,6 +9,8 @@ import { ProfileHero } from './components/ProfileHero';
 import { ProfileStats } from './components/ProfileStats';
 import { ProfilePortfolio } from './components/ProfilePortfolio';
 import { SEO } from '../../components/SEO';
+import { AuthModal } from '../../components/auth/AuthModal';
+import { UserListModal } from '../../components/ui/UserListModal';
 
 export const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
@@ -20,6 +23,10 @@ export const ProfilePage: React.FC = () => {
     const [editData, setEditData] = useState<Partial<UserProfile>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    
+    // États pour les listes sociales
+    const [userListModal, setUserListModal] = useState<{ title: string, users: UserProfile[] } | null>(null);
 
     useEffect(() => {
         const loadProfileData = async () => {
@@ -37,8 +44,6 @@ export const ProfilePage: React.FC = () => {
                 setEditData(profileData);
             }
             
-            // FILTRAGE STRICT : On ne montre que les murs PUBLICS sur le profil (Portfolio)
-            // Les murs privés sont gérés via /projects
             const publicWalls = walls ? walls.filter(w => w.is_public) : [];
             setUserWalls(publicWalls);
             
@@ -66,6 +71,18 @@ export const ProfilePage: React.FC = () => {
             setEditData(prev => ({ ...prev, avatar_url: newUrl }));
         }
         setIsUploadingAvatar(false);
+    };
+
+    const openFollowersList = async () => {
+        if (!profile) return;
+        const followers = await api.getFollowers(profile.id);
+        setUserListModal({ title: "Abonnés", users: followers });
+    };
+
+    const openFollowingList = async () => {
+        if (!profile) return;
+        const following = await api.getFollowing(profile.id);
+        setUserListModal({ title: "Abonnements", users: following });
     };
 
     if (loading) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
@@ -105,6 +122,24 @@ export const ProfilePage: React.FC = () => {
                 }}
             />
 
+            {showAuthModal && (
+                <AuthModal 
+                    onClose={() => setShowAuthModal(false)} 
+                    onSuccess={() => {
+                        setShowAuthModal(false);
+                        window.location.reload(); 
+                    }} 
+                />
+            )}
+
+            {userListModal && (
+                <UserListModal 
+                    title={userListModal.title} 
+                    users={userListModal.users} 
+                    onClose={() => setUserListModal(null)} 
+                />
+            )}
+
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-[100]">
                 <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-all group">
                     <div className="p-1.5 rounded-lg bg-gray-900 group-hover:bg-blue-600 transition-colors"><ArrowLeft size={18} /></div>
@@ -119,6 +154,9 @@ export const ProfilePage: React.FC = () => {
                     isOwnProfile={isOwnProfile} onEditToggle={() => setIsEditing(true)} onSave={handleSaveProfile} 
                     isSaving={isSaving} onAvatarUpload={handleAvatarUpload} isUploadingAvatar={isUploadingAvatar} 
                     memberSince={new Date(profile.created_at).getFullYear()}
+                    onRequireAuth={() => setShowAuthModal(true)}
+                    onShowFollowers={openFollowersList}
+                    onShowFollowing={openFollowingList}
                 />
                 <ProfileStats 
                     profile={profile} isEditing={isEditing} editData={editData} 
