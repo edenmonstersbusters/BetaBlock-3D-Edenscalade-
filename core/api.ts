@@ -5,6 +5,7 @@ import { BetaBlockFile, Comment, UserProfile, Notification } from '../types';
 const handleNetworkError = (err: any) => {
   console.error("Supabase Request Error:", err);
   if (err.code === '23503') return "Suppression impossible : ce mur possède des dépendances.";
+  if (err.code === '23502') return "Erreur technique : Donnée obligatoire manquante (Wall Owner missing?).";
   if (err.message === 'Failed to fetch') return "Erreur Réseau : Impossible de joindre Supabase.";
   if (err.code === '42501' || err.message?.includes('security')) return "Action interdite : droits insuffisants.";
   return err.message || "Une erreur inconnue est survenue.";
@@ -375,8 +376,8 @@ export const api = {
           const payload: any = { wall_id: wallId, user_id: userId, author_name: authorName, text: text, parent_id: parentId };
           if (avatarUrl) payload.author_avatar_url = avatarUrl;
           const { error } = await supabase.from('comments').insert(payload);
-          return { error: error ? error.message : null };
-      } catch (err: any) { return { error: err.message }; }
+          return { error: error ? error.message : null }; // Retourner l'erreur originale
+      } catch (err: any) { return { error: handleNetworkError(err) }; }
   },
 
   async toggleCommentLike(commentId: string, userId: string): Promise<{ added: boolean; error: string | null }> {

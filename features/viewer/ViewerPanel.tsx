@@ -85,15 +85,26 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
           return;
       }
 
+      // Optimistic update
       const wasLiked = socialStats.hasLiked;
       setSocialStats(prev => ({
           hasLiked: !wasLiked,
           likes: Math.max(0, prev.likes + (wasLiked ? -1 : 1))
       }));
 
-      await api.toggleWallLike(wallId, user.id);
-      const updated = await api.getWallSocialStatus(wallId, user.id);
-      setSocialStats(updated);
+      const { error } = await api.toggleWallLike(wallId, user.id);
+      
+      if (error) {
+           // Revert
+           setSocialStats(prev => ({
+                hasLiked: wasLiked,
+                likes: Math.max(0, prev.likes + (wasLiked ? 1 : -1))
+           }));
+           setWarning({ x: e.clientX, y: e.clientY, message: "Erreur lors du like." });
+      } else {
+           const updated = await api.getWallSocialStatus(wallId, user.id);
+           setSocialStats(updated);
+      }
   };
 
   const handleAuthorClick = () => {

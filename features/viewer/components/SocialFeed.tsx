@@ -147,7 +147,14 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
       const authorName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || "Anonyme";
       const avatarUrl = currentUser.user_metadata?.avatar_url;
       
-      await api.postComment(wallId, currentUser.id, authorName, inputText, replyTo?.id || null, avatarUrl);
+      const { error } = await api.postComment(wallId, currentUser.id, authorName, inputText, replyTo?.id || null, avatarUrl);
+      
+      if (error) {
+          console.error("Post comment error:", error);
+          setWarning({ x: window.innerWidth / 2, y: window.innerHeight / 2, message: "Erreur lors de l'envoi." });
+          setIsPosting(false);
+          return;
+      }
       
       setInputText('');
       setReplyTo(null);
@@ -182,9 +189,26 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
           return c;
       }));
 
-      await api.toggleCommentLike(commentId, currentUser.id);
-      const data = await api.getComments(wallId, currentUser.id);
-      setComments(data);
+      const { error } = await api.toggleCommentLike(commentId, currentUser.id);
+      if (error) {
+          // Revert optimistic update
+          setComments(prev => prev.map(c => {
+              if (c.id === commentId) {
+                  const revertedLiked = !c.user_has_liked;
+                  return { 
+                      ...c, 
+                      user_has_liked: revertedLiked, 
+                      likes_count: (c.likes_count || 0) + (revertedLiked ? 1 : -1) 
+                  };
+              }
+              return c;
+          }));
+          setWarning({ x: e.clientX, y: e.clientY, message: "Erreur lors du like." });
+      } else {
+          // Sync with server
+          const data = await api.getComments(wallId, currentUser.id);
+          setComments(data);
+      }
   };
 
   return (

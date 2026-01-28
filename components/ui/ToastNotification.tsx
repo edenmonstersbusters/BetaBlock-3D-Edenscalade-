@@ -60,7 +60,12 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
           case 'follow': return "vous suit désormais.";
           case 'new_wall': return <span>a publié <span className="text-white font-bold">{notification.resource_name || "un mur"}</span>.</span>;
           case 'like_wall': return <span>a aimé <span className="text-white font-bold">{notification.resource_name || "votre mur"}</span>.</span>;
-          case 'comment': return <span>a commenté <span className="text-white font-bold">{notification.resource_name || "votre mur"}</span>.</span>;
+          case 'comment': return (
+              <span>
+                  a commenté <span className="text-white font-bold">{notification.resource_name || "votre mur"}</span>
+                  {notification.text_content && <span className="block mt-1 text-gray-300 italic opacity-80">"{notification.text_content}"</span>}
+              </span>
+          );
           default: return "Nouvelle interaction.";
       }
   };

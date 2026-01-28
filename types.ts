@@ -143,6 +143,7 @@ export interface Notification {
   type: 'follow' | 'new_wall' | 'comment' | 'like_wall';
   resource_id?: string;
   resource_name?: string; // Enrichi si c'est un mur
+  text_content?: string; // Enrichi pour les commentaires
   is_read: boolean;
   created_at: string;
 }

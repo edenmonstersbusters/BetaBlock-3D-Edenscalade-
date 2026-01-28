@@ -1,19 +1,36 @@
 
-import React, { useEffect } from 'react';
-import { useNavigate, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { WallEditor } from './features/editor/WallEditorPage';
 import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { useHistory } from './hooks/useHistory';
 import { useWallData } from './hooks/useWallData';
-import { useRealtimeNotifications } from './hooks/useRealtimeNotifications';
+import { NotificationsProvider, useNotifications } from './core/NotificationsContext';
 import { ToastNotification } from './components/ui/ToastNotification';
 import './types';
 
+// Composant interne pour afficher les Toasts (doit être sous le Provider)
+const GlobalToastContainer = () => {
+    const { activeToasts, dismissToast } = useNotifications();
+    
+    return (
+      <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none flex flex-col gap-2 items-end">
+          {activeToasts.map((notif) => (
+              <div key={notif.id} className="pointer-events-auto">
+                  <ToastNotification 
+                      notification={notif} 
+                      onDismiss={dismissToast} 
+                  />
+              </div>
+          ))}
+      </div>
+    );
+};
+
 export default function App() {
   const navigate = useNavigate();
-  const location = useLocation();
   const {
     mode, config, setConfig, holds, setHolds, metadata, setMetadata,
     isLoadingCloud, isSavingCloud, cloudId, generatedLink, user,
@@ -21,11 +38,7 @@ export default function App() {
   } = useWallData();
   
   const history = useHistory({ config, holds });
-  
-  // Activation des notifications temps réel
-  const { activeToasts, removeToast } = useRealtimeNotifications();
 
-  // Props communes pour WallEditor pour réduire la duplication
   const editorProps = {
     user, config, setConfig, holds, setHolds, metadata, setMetadata,
     ...history, onSaveCloud: handleSaveCloud, isSavingCloud,
@@ -34,14 +47,10 @@ export default function App() {
   };
 
   return (
-    <>
+    <NotificationsProvider>
       <Routes>
-        {/* Route par défaut : La Galerie (Page d'accueil) */}
         <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
-        
-        {/* Alias pour la galerie */}
         <Route path="/gallery" element={<GalleryPage onResetState={resetToNew} />} />
-
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/projects" element={<ProjectsPage />} />
@@ -65,17 +74,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* Container pour les Toasts */}
-      <div className="fixed z-[9999] pointer-events-none">
-          {activeToasts.map((notif) => (
-              <div key={notif.id} className="pointer-events-auto">
-                  <ToastNotification 
-                      notification={notif} 
-                      onDismiss={removeToast} 
-                  />
-              </div>
-          ))}
-      </div>
-    </>
+      <GlobalToastContainer />
+    </NotificationsProvider>
   );
 }
