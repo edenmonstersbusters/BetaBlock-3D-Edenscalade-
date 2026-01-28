@@ -3,11 +3,6 @@
   <!-- Sitemap des pages fixes (Accueil, Builder, Profil...) -->
   <sitemap>
     <loc>https://betablock-3d.vercel.app/sitemap-static.xml</loc>
-    <lastmod>2024-03-20</lastmod>
-  </sitemap>
-  
-  <!-- Sitemap dynamique des murs utilisateurs (Généré par Supabase) -->
-  <sitemap>
-    <loc>https://betablock-3d.vercel.app/sitemap-walls.xml</loc>
+    <lastmod>2026-01-28</lastmod>
   </sitemap>
 </sitemapindex>
