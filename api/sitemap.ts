@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
 
 // Fonction utilitaire pour échapper les caractères spéciaux XML
 function escapeXml(unsafe: any): string {
@@ -17,30 +18,33 @@ function escapeXml(unsafe: any): string {
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   const BASE_URL = 'https://betablock-3d.vercel.app';
+  // Configuration Supabase directe pour s'assurer que ça marche côté serveur Vercel
   const SUPABASE_URL = 'https://ezfbjejmhfkpfxbmlwpo.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV6ZmJqZWptaGZrcGZ4Ym1sd3BvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MDg4NjYsImV4cCI6MjA4MzI4NDg2Nn0.RZxFE1gHS4gtznagF9RHFtp-JOFGCFVflO971rr7FcQ';
 
   try {
-    // Récupération des 1000 derniers murs publics
-    const fetchRes = await fetch(`${SUPABASE_URL}/rest/v1/walls?select=id,updated_at,created_at&is_public=eq.true&order=updated_at.desc&limit=1000`, {
-        headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-    });
+    // Initialisation du client officiel (plus robuste que fetch manuel)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    if (!fetchRes.ok) {
-        throw new Error(`Supabase Error: ${fetchRes.statusText}`);
+    // Récupération des murs publics via le SDK
+    const { data: walls, error } = await supabase
+        .from('walls')
+        .select('id, updated_at, created_at')
+        .eq('is_public', true)
+        .order('updated_at', { ascending: false }) // On trie par date de mise à jour si possible
+        .limit(1000);
+
+    if (error) {
+        throw new Error(`Supabase SDK Error: ${error.message}`);
     }
 
-    const walls = await fetchRes.json();
     const today = new Date().toISOString().split('T')[0];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
     // Si on a des murs, on les liste
-    if (Array.isArray(walls) && walls.length > 0) {
+    if (walls && walls.length > 0) {
         walls.forEach((wall: any) => {
             const dateRaw = wall.updated_at || wall.created_at;
             const lastMod = dateRaw ? dateRaw.split('T')[0] : today;
@@ -55,8 +59,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   </url>`;
         });
     } else {
-        // IMPORTANT : Si aucun mur n'est trouvé, on ajoute une URL par défaut (la galerie)
-        // Cela empêche l'erreur "Balise XML manquante" dans la Search Console
+        // Fallback si la liste est vide (pas de mur public ou base vide)
         xml += `
   <url>
     <loc>${BASE_URL}/#/gallery</loc>
@@ -73,11 +76,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
     response.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
     return response.status(200).send(xml);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sitemap Generation Error:', error);
     
-    // Fallback robuste : même en cas d'erreur fatale (ex: DB hors ligne),
-    // on renvoie un XML valide avec une URL par défaut pour ne pas fâcher Google.
+    // En cas d'erreur fatale, on renvoie un XML minimal valide
     const today = new Date().toISOString().split('T')[0];
     const fallbackXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -90,6 +92,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 </urlset>`;
     
     response.setHeader('Content-Type', 'application/xml');
+    // On renvoie 200 même en erreur pour que Google ne rejette pas le fichier
     return response.status(200).send(fallbackXml);
   }
 }
