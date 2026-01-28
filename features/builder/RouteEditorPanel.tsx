@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Box, RotateCw, Scaling, GitFork, Lock } from 'lucide-react';
+import { Box, RotateCw, Scaling, GitFork } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
 import { FileControls } from '../../components/ui/FileControls';
 import { ColorPalette } from '../../components/ui/ColorPalette';
@@ -31,7 +31,6 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [catalogueExpanded, setCatalogueExpanded] = useState(true);
   const [isReplacingMode, setIsReplacingMode] = useState(false);
-  const isHoldsLocked = metadata.remixMode === 'structure';
 
   useEffect(() => {
     fetch(CATALOGUE_URL).then(r => r.json()).then(data => {
@@ -82,9 +81,8 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         {metadata.parentId && (
             <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1"><GitFork size={12} /><span>REMIX {isHoldsLocked ? 'ARCHITECTE' : 'OUVREUR'}</span></div>
+                <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1"><GitFork size={12} /><span>REMIX</span></div>
                 <p className="text-[11px] text-gray-400 leading-tight">Inspiré par <span className="text-white font-bold">{metadata.parentName}</span>.</p>
-                {isHoldsLocked && <div className="mt-2 flex items-center gap-2 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded"><Lock size={10} />PRISES VERROUILLÉES</div>}
             </div>
         )}
 
@@ -92,13 +90,13 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         {anyHoldSelected ? (
           <HoldInspector 
              selectedHolds={placedHolds.filter(h => h && selectedPlacedHoldIds.includes(h.id))}
-             onUpdate={(u) => { if(!isHoldsLocked) onUpdatePlacedHold(selectedPlacedHoldIds, u); }}
-             onRemove={onRemoveMultiple} onDeselect={onDeselect} isLocked={isHoldsLocked}
-             onToggleReplaceMode={() => { if(!isHoldsLocked) { setCatalogueExpanded(true); setIsReplacingMode(true); } }}
+             onUpdate={(u) => { onUpdatePlacedHold(selectedPlacedHoldIds, u); }}
+             onRemove={onRemoveMultiple} onDeselect={onDeselect} isLocked={false}
+             onToggleReplaceMode={() => { setCatalogueExpanded(true); setIsReplacingMode(true); }}
              isReplacingMode={isReplacingMode} onActionStart={onActionStart}
           />
         ) : (
-          <section className={isHoldsLocked ? "opacity-50 pointer-events-none grayscale" : "space-y-4"}>
+          <section className="space-y-4">
                <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Box size={14} /><span>Paramètres de Pose</span></div>
                <div className="bg-gray-800 p-4 rounded-xl space-y-5 border border-gray-700">
                   <ColorPalette selectedColor={holdSettings.color} onSelect={(c) => onUpdateSettings({ color: c })} />
@@ -120,11 +118,11 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         )}
         
         {/* SECTION 3: CATALOGUE */}
-        <div className={isHoldsLocked ? "opacity-50 pointer-events-none grayscale" : ""}>
+        <div>
             <HoldCatalogue 
                library={library} loading={loading} selectedHoldId={selectedHold?.id}
-               onSelectHold={(h) => { if(isHoldsLocked) return; if(anyHoldSelected && isReplacingMode) { onReplaceHold(selectedPlacedHoldIds, h); setIsReplacingMode(false); } else { onSelectHold(h); } }}
-               expanded={catalogueExpanded} onToggleExpand={() => { if(!isHoldsLocked) { setCatalogueExpanded(!catalogueExpanded); if(catalogueExpanded) setIsReplacingMode(false); } }}
+               onSelectHold={(h) => { if(anyHoldSelected && isReplacingMode) { onReplaceHold(selectedPlacedHoldIds, h); setIsReplacingMode(false); } else { onSelectHold(h); } }}
+               expanded={catalogueExpanded} onToggleExpand={() => { setCatalogueExpanded(!catalogueExpanded); if(catalogueExpanded) setIsReplacingMode(false); }}
                isReplacingMode={isReplacingMode}
             />
         </div>
@@ -132,7 +130,7 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         {/* SECTION 4: LISTE DES PRISES POSÉES */}
         <PlacedHoldsList 
             holds={placedHolds} selectedIds={selectedPlacedHoldIds} onSelect={onSelectPlacedHold} 
-            onRemove={onRemoveHold} isLocked={isHoldsLocked || false} onRemoveAll={onRemoveAllHolds} 
+            onRemove={onRemoveHold} isLocked={false} onRemoveAll={onRemoveAllHolds} 
             onGlobalColor={onChangeAllHoldsColor}
         />
         <FileControls onExport={onExport} onImport={onImport} onNew={onNew} />

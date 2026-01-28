@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scene } from '../../core/Scene';
@@ -25,7 +26,7 @@ interface WallEditorProps {
   recordAction: (state: { config: WallConfig; holds: PlacedHold[] }) => void;
   undo: (current: any, apply: any) => void; redo: (current: any, apply: any) => void; canUndo: boolean; canRedo: boolean;
   onSaveCloud: () => Promise<boolean>; isSavingCloud: boolean; generatedLink: string | null;
-  onHome: () => void; onNewWall: () => void; onRemix?: (mode: 'structure' | 'holds') => void;
+  onHome: () => void; onNewWall: () => void; onRemix?: () => void;
   onRemoveAllHolds?: () => void; onChangeAllHoldsColor?: (color: string) => void;
   isLoadingCloud: boolean; cloudId: string | null; screenshotRef: React.MutableRefObject<(() => Promise<string | null>) | null>;
 }
@@ -108,11 +109,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
              
              {/* Onglets de navigation (uniquement hors mode VIEW) */}
              {initialMode !== 'VIEW' && (
-                <SidebarTabs 
-                    activeTab={activeTab} 
-                    onChange={setActiveTab} 
-                    isRemixHoldsLocked={metadata.remixMode === 'structure'} 
-                />
+                <SidebarTabs activeTab={activeTab} onChange={setActiveTab} />
              )}
 
              <div className="flex-1 w-80 overflow-hidden relative">
@@ -131,9 +128,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold} metadata={metadata}
                         holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
                         placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} onRemoveAllHolds={onRemoveAllHolds || (() => {})} onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
-                        selectedPlacedHoldIds={state.selectedPlacedHoldIds} onUpdatePlacedHold={(ids, u) => { if (metadata.remixMode !== 'structure') { const s = new Set(ids); setHolds(h => h.map(x => (x && s.has(x.id)) ? { ...x, ...u } : x)); state.setIsDirty(true); }}}
+                        selectedPlacedHoldIds={state.selectedPlacedHoldIds} onUpdatePlacedHold={(ids, u) => { const s = new Set(ids); setHolds(h => h.map(x => (x && s.has(x.id)) ? { ...x, ...u } : x)); state.setIsDirty(true); }}
                         onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])} onActionStart={logic.saveToHistory} 
-                        onReplaceHold={(ids, def) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => (h && s.has(h.id)) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}}
+                        onReplaceHold={(ids, def) => { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => (h && s.has(h.id)) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}
                         onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)} onExport={() => logic.handleAction('save')} onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest} onHome={() => logic.handleAction('exit')}
                     />
                 )}
@@ -149,7 +146,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                     <button disabled={!canRedo} onClick={logic.performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
                 </div>
             )}
-            <Scene config={config} mode={derivedMode} holds={renderableHolds as any} onPlaceHold={logic.handlePlaceHold} selectedHoldDef={state.selectedHold} holdSettings={state.holdSettings} selectedPlacedHoldIds={state.selectedPlacedHoldIds} onSelectPlacedHold={state.handleSelectPlacedHold} onContextMenu={(t, i, x, y, wx, wy) => state.setContextMenu({ type: t, id: i, x, y, wallX: wx, wallY: wy })} onWallPointerUpdate={(i) => { cursorPosRef.current = i; }} onHoldDrag={(id, x, y, segId) => { if (metadata.remixMode !== 'structure') { setHolds(prev => prev.map(h => (h && h.id === id) ? { ...h, x, y, segmentId: segId } : h)); state.setIsDirty(true); } }} onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef} />
+            <Scene config={config} mode={derivedMode} holds={renderableHolds as any} onPlaceHold={logic.handlePlaceHold} selectedHoldDef={state.selectedHold} holdSettings={state.holdSettings} selectedPlacedHoldIds={state.selectedPlacedHoldIds} onSelectPlacedHold={state.handleSelectPlacedHold} onContextMenu={(t, i, x, y, wx, wy) => state.setContextMenu({ type: t, id: i, x, y, wallX: wx, wallY: wy })} onWallPointerUpdate={(i) => { cursorPosRef.current = i; }} onHoldDrag={(id, x, y, segId) => { setHolds(prev => prev.map(h => (h && h.id === id) ? { ...h, x, y, segmentId: segId } : h)); state.setIsDirty(true); }} onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef} />
         </div>
       </div>
       <ContextMenu 
@@ -157,8 +154,8 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         onCopyHold={() => { const ids = (state.contextMenu?.id && state.selectedPlacedHoldIds.includes(state.contextMenu.id)) ? state.selectedPlacedHoldIds : (state.contextMenu?.id ? [state.contextMenu.id] : []); if (ids.length) state.setClipboard(JSON.parse(JSON.stringify(holds.filter(h => h && ids.includes(h.id))))); }} 
         hasClipboard={state.clipboard.length > 0} onPasteHold={(t) => logic.handlePaste(t)} 
         onDelete={(id, type) => type === 'HOLD' ? logic.removeHoldsAction([id], true) : logic.removeSegmentAction(id)}
-        onRotateHold={(id, d) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, spin: x.spin + d } : x)); }}}
-        onColorHold={(id, c) => { if (metadata.remixMode !== 'structure') { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, color: c } : x)); }}}
+        onRotateHold={(id, d) => { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, spin: x.spin + d } : x)); }}
+        onColorHold={(id, c) => { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, color: c } : x)); }}
         onSegmentUpdate={logic.updateSegmentQuickly}
       />
       <GlobalModal config={state.modal} onClose={() => state.setModal(null)} isSavingCloud={isSavingCloud} generatedLink={generatedLink || `${window.location.origin}/#/view/${cloudId}`} onSaveCloud={wrappedSaveCloud} onDownload={handleDownloadLocal} wallName={metadata.name} onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} />

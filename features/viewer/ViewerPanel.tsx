@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WallConfig, PlacedHold, WallMetadata, UserProfile } from '../../types';
@@ -8,7 +9,6 @@ import { auth } from '../../core/auth';
 import { AuthModal } from '../../components/auth/AuthModal';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { ActionWarning } from '../../components/ui/ActionWarning';
-import { RemixModal } from './components/RemixModal';
 import { SEO } from '../../components/SEO';
 
 interface ViewerPanelProps {
@@ -17,7 +17,7 @@ interface ViewerPanelProps {
   config: WallConfig;
   holds: PlacedHold[];
   onHome: () => void;
-  onRemix: (mode: 'structure' | 'holds') => void;
+  onRemix: () => void; // Plus d'arguments de mode
   onShare: () => void;
   onEdit?: () => void;
 }
@@ -26,7 +26,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
   const navigate = useNavigate();
   const [socialStats, setSocialStats] = useState({ likes: 0, hasLiked: false });
   const [showAuth, setShowAuth] = useState(false);
-  const [showRemixModal, setShowRemixModal] = useState(false);
   const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   
@@ -134,18 +133,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
       
-      {showRemixModal && (
-        <RemixModal 
-            wallName={metadata.name} 
-            authorName={displayName} 
-            onClose={() => setShowRemixModal(false)}
-            onSelect={(mode) => {
-                setShowRemixModal(false);
-                onRemix(mode);
-            }}
-        />
-      )}
-
       {warning && (
         <ActionWarning 
             x={warning.x} 
@@ -272,7 +259,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
             </button>
         )}
         <button 
-            onClick={() => setShowRemixModal(true)} 
+            onClick={onRemix} 
             className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg flex items-center justify-center space-x-2 font-bold transition-all shadow-lg hover:shadow-blue-900/20 transform hover:-translate-y-0.5"
         >
             <GitFork size={18} />

@@ -138,23 +138,26 @@ export const useWallData = () => {
     return false;
   };
 
-  const handleRemix = (remixMode: 'structure' | 'holds') => {
+  // NOUVELLE LOGIQUE REMIX SIMPLIFIÉE
+  const handleRemix = () => {
       const newMetadata: WallMetadata = {
           ...metadata,
           name: `Remix de ${metadata.name}`,
           timestamp: new Date().toISOString(),
-          parentId: cloudId || undefined,
+          parentId: cloudId || undefined, // On garde la référence au parent
           parentName: metadata.name,
           parentAuthorName: metadata.authorName,
-          remixMode: remixMode,
-          authorId: undefined,
+          remixMode: null, // Plus de mode restrictif
+          authorId: undefined, // Reset de l'auteur
           authorName: undefined,
           authorAvatarUrl: undefined
       };
       setMetadata(newMetadata);
-      setCloudId(null);
+      setCloudId(null); // C'est un nouveau mur
       setGeneratedLink(null);
-      navigate(remixMode === 'holds' ? '/setter' : '/builder', { state: { fromRemix: true } });
+      
+      // On redirige toujours vers le builder complet
+      navigate('/builder', { state: { fromRemix: true } });
   };
 
   const resetToNew = () => {
