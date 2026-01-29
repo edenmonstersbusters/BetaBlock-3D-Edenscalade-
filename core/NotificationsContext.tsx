@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from './supabase';
 import { api } from './api';
 import { auth } from './auth';
@@ -21,22 +21,53 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeToasts, setActiveToasts] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  
   const userRef = useRef<string | null>(null);
+  const processedIdsRef = useRef<Set<string>>(new Set());
+  // Anti-doublon logique (ex: même user like le même mur 2 fois en 1 seconde à cause d'un bug DB)
+  const logicalDebounceRef = useRef<Map<string, number>>(new Map());
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const handleNewNotification = async (payload: any) => {
-      console.log('REALTIME PAYLOAD RECEIVED:', payload);
-      const fullNotif = await api.getSingleNotification(payload.new.id);
+      const newId = payload.new.id;
+      const raw = payload.new;
+
+      // 1. Filtrage par ID (doublon technique WebSocket)
+      if (processedIdsRef.current.has(newId)) return;
+
+      // 2. Filtrage logique (Anti-spam / Anti-bug DB)
+      // On crée une clé unique : "acteur-action-cible"
+      const eventKey = `${raw.actor_id}-${raw.type}-${raw.resource_id}`;
+      const now = Date.now();
+      const lastTime = logicalDebounceRef.current.get(eventKey);
+
+      // Si le même événement survient moins de 2 secondes après le précédent, on l'ignore visuellement
+      if (lastTime && (now - lastTime < 2000)) {
+          processedIdsRef.current.add(newId); // On le marque comme "vu" pour ne pas le traiter plus tard
+          return;
+      }
+      
+      logicalDebounceRef.current.set(eventKey, now);
+      processedIdsRef.current.add(newId);
+
+      // 3. Récupération des données
+      const fullNotif = await api.getSingleNotification(newId);
       if (!fullNotif) return;
 
-      setNotifications(prev => [fullNotif, ...prev]);
-      setActiveToasts(prev => [...prev, fullNotif]);
+      setNotifications(prev => {
+          if (prev.some(n => n.id === newId)) return prev;
+          return [fullNotif, ...prev];
+      });
+
+      setActiveToasts(prev => {
+          if (prev.some(n => n.id === newId)) return prev;
+          return [...prev, fullNotif];
+      });
       
-      // Notification système (OS)
       if ('Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
-          new Notification(fullNotif.type === 'unfollow' ? "⚠️ Désabonnement" : "BetaBlock", {
-              body: fullNotif.type === 'unfollow' ? `${fullNotif.actor_name} ne vous suit plus.` : "Nouvelle interaction sur votre mur.",
+          new Notification("BetaBlock", {
+              body: `${fullNotif.actor_name} a interagi avec vous.`,
               icon: fullNotif.actor_avatar_url
           });
       }
@@ -55,13 +86,24 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (user.id === userRef.current) return;
         userRef.current = user.id;
+        
         setLoading(true);
 
         const existingData = await api.getNotifications(user.id);
-        setNotifications(existingData);
+        
+        // Dédoublonnage initial de la liste existante (au cas où la DB est sale)
+        const uniqueData = existingData.filter((notif, index, self) => 
+            index === self.findIndex((t) => (
+                t.id === notif.id
+            ))
+        );
+
+        setNotifications(uniqueData);
+        uniqueData.forEach(n => processedIdsRef.current.add(n.id));
         setLoading(false);
 
-        // ABONNEMENT TEMPS RÉEL
+        if (channel) supabase.removeChannel(channel);
+
         channel = supabase
             .channel(`notifs-${user.id}`)
             .on(
@@ -74,9 +116,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
                 },
                 (payload) => handleNewNotification(payload)
             )
-            .subscribe((status) => {
-                console.log(`REALTIME STATUS for ${user.id}:`, status);
-            });
+            .subscribe();
     };
 
     init();
@@ -84,6 +124,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     const { data: { subscription } } = auth.onAuthStateChange((user) => {
         if (user?.id !== userRef.current) {
             if (channel) supabase.removeChannel(channel);
+            processedIdsRef.current.clear();
+            logicalDebounceRef.current.clear();
             init();
         }
     });
