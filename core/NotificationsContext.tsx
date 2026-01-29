@@ -23,66 +23,23 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(true);
   const userRef = useRef<string | null>(null);
 
-  // Calcul dynamique du nombre de non-lues
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Demander la permission pour les notifs système (Windows/Mac)
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  const triggerSystemNotification = (notif: Notification) => {
-      if (!('Notification' in window)) return;
-      if (Notification.permission !== 'granted') return;
-      if (document.hasFocus()) return; // Pas de notif système si l'utilisateur est déjà sur l'onglet
-
-      let title = "BetaBlock 3D";
-      let body = "Nouvelle interaction";
-
-      switch(notif.type) {
-          case 'follow': 
-            title = "Nouvel abonné !";
-            body = `${notif.actor_name} vous suit désormais.`;
-            break;
-          case 'new_wall':
-            title = "Nouveau mur";
-            body = `${notif.actor_name} a publié "${notif.resource_name || 'un mur'}"`;
-            break;
-          case 'like_wall':
-            title = "J'aime";
-            body = `${notif.actor_name} a aimé votre mur "${notif.resource_name || 'sans nom'}"`;
-            break;
-          case 'comment':
-            title = "Nouveau commentaire";
-            body = `${notif.actor_name} a commenté "${notif.resource_name || 'votre mur'}"`;
-            break;
-      }
-
-      try {
-          const sysNotif = new Notification(title, {
-              body: body,
-              icon: notif.actor_avatar_url || '/favicon.ico',
-              tag: notif.id
-          });
-          sysNotif.onclick = () => { window.focus(); sysNotif.close(); };
-      } catch (e) { console.warn(e); }
-  };
-
   const handleNewNotification = async (payload: any) => {
-      // 1. Récupérer les données enrichies (Avatar, Nom...)
+      console.log('REALTIME PAYLOAD RECEIVED:', payload);
       const fullNotif = await api.getSingleNotification(payload.new.id);
       if (!fullNotif) return;
 
-      // 2. Mettre à jour la liste et le compteur (Badge)
       setNotifications(prev => [fullNotif, ...prev]);
-
-      // 3. Déclencher le Toast In-App
       setActiveToasts(prev => [...prev, fullNotif]);
-
-      // 4. Déclencher la notif système (Ordinateur)
-      triggerSystemNotification(fullNotif);
+      
+      // Notification système (OS)
+      if ('Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
+          new Notification(fullNotif.type === 'unfollow' ? "⚠️ Désabonnement" : "BetaBlock", {
+              body: fullNotif.type === 'unfollow' ? `${fullNotif.actor_name} ne vous suit plus.` : "Nouvelle interaction sur votre mur.",
+              icon: fullNotif.actor_avatar_url
+          });
+      }
   };
 
   useEffect(() => {
@@ -96,18 +53,17 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
             return;
         }
 
-        if (user.id === userRef.current) return; // Déjà initialisé pour cet user
+        if (user.id === userRef.current) return;
         userRef.current = user.id;
         setLoading(true);
 
-        // A. Chargement initial
         const existingData = await api.getNotifications(user.id);
         setNotifications(existingData);
         setLoading(false);
 
-        // B. Souscription Temps Réel
+        // ABONNEMENT TEMPS RÉEL
         channel = supabase
-            .channel('notifications_global')
+            .channel(`notifs-${user.id}`)
             .on(
                 'postgres_changes',
                 {
@@ -118,7 +74,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
                 },
                 (payload) => handleNewNotification(payload)
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`REALTIME STATUS for ${user.id}:`, status);
+            });
     };
 
     init();
@@ -137,7 +95,6 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const markAsRead = async (id: string) => {
-      // Optimistic update
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
       await api.markNotificationRead(id);
   };
@@ -164,8 +121,6 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useNotifications = () => {
   const context = useContext(NotificationsContext);
-  if (!context) {
-    throw new Error('useNotifications must be used within a NotificationsProvider');
-  }
+  if (!context) throw new Error('useNotifications must be used within a NotificationsProvider');
   return context;
 };
