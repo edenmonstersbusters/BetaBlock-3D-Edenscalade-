@@ -60,8 +60,15 @@ export const auth = {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) throw error;
       return user;
-    } catch (e) {
-      // En cas d'erreur réseau (fetch failed) ou pas de session, on reste en mode anonyme
+    } catch (e: any) {
+      // FIX: Si le Refresh Token est invalide (révoqué ou corrompu), 
+      // on force la déconnexion pour nettoyer le localStorage.
+      const msg = (e.message || "").toLowerCase();
+      if (msg.includes("refresh token") || msg.includes("json_token_not_found")) {
+          console.warn("Session corrompue détectée, nettoyage automatique.");
+          await supabase.auth.signOut();
+      }
+      // En cas d'erreur réseau ou pas de session, on reste en mode anonyme
       return null;
     }
   },
