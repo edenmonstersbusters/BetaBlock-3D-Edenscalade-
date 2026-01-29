@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, MessageSquare, UserPlus, UserMinus, Box, AlertTriangle } from 'lucide-react';
+import { X, Heart, MessageSquare, UserPlus, UserMinus, Box, BellRing } from 'lucide-react';
 import { Notification } from '../../types';
 import { UserAvatar } from './UserAvatar';
 import { useNavigate } from 'react-router-dom';
@@ -40,66 +40,69 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
       handleClose();
   };
 
-  // --- RENDU SPÉCIFIQUE UNFOLLOW (GROS VISUEL PUSH) ---
-  if (isUnfollow) {
-      return createPortal(
-          <div className={`fixed inset-x-0 top-10 z-[10000] flex justify-center px-4 pointer-events-none transition-all duration-700 ${
-              isVisible && !isClosing ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'
-          }`}>
-              <div className="pointer-events-auto w-full max-w-md bg-red-600 border-2 border-white shadow-[0_0_50px_rgba(220,38,38,0.8)] rounded-3xl overflow-hidden animate-bounce-short">
-                  <div className="p-1 bg-white/20 animate-pulse" />
-                  <div className="p-6 flex items-center gap-5">
-                      <div className="relative shrink-0 scale-125">
-                          <UserAvatar userId={null} url={notification.actor_avatar_url} name={notification.actor_name} size="md" className="border-2 border-white" />
-                          <div className="absolute -bottom-1 -right-1 bg-white text-red-600 rounded-full p-1 shadow-lg">
-                              <UserMinus size={14} strokeWidth={3} />
-                          </div>
-                      </div>
-                      
-                      <div className="flex-1 min-w-0" onClick={handleClick} role="button">
-                          <h4 className="text-xl font-black text-white leading-tight uppercase tracking-tighter">ALERTE DÉSABONNEMENT</h4>
-                          <p className="text-red-100 font-bold text-sm">
-                              <span className="text-white underline">{notification.actor_name}</span> ne vous suit plus !
-                          </p>
-                      </div>
+  // Icônes et Couleurs par type
+  const getStyle = () => {
+    switch(notification.type) {
+        case 'follow': return { icon: <UserPlus size={16} />, color: 'bg-blue-600', text: "vous suit désormais." };
+        case 'unfollow': return { icon: <UserMinus size={16} />, color: 'bg-rose-600', text: "ne vous suit plus." };
+        case 'like_wall': return { icon: <Heart size={16} />, color: 'bg-red-500', text: "a aimé votre mur." };
+        case 'comment': return { icon: <MessageSquare size={16} />, color: 'bg-emerald-500', text: "a commenté votre mur." };
+        case 'new_wall': return { icon: <Box size={16} />, color: 'bg-purple-600', text: "a publié un nouveau mur." };
+        default: return { icon: <BellRing size={16} />, color: 'bg-gray-700', text: "Nouvelle interaction." };
+    }
+  };
 
-                      <button onClick={handleClose} className="p-2 hover:bg-black/10 rounded-full transition-colors text-white">
-                          <X size={24} />
-                      </button>
-                  </div>
-              </div>
-          </div>,
-          document.body
-      );
-  }
+  const style = getStyle();
 
-  // --- RENDU STANDARD (TOAST CLASSIQUE) ---
   return createPortal(
     <div 
-      className={`fixed top-6 right-6 z-[9999] transition-all duration-500 transform ${
-        isVisible && !isClosing ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-90'
+      className={`fixed top-6 right-6 z-[9999] pointer-events-auto transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform ${
+        isVisible && !isClosing ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-12 opacity-0 scale-90'
       }`}
     >
-      <div className="bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 w-80 shadow-2xl relative overflow-hidden group">
-        <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-[6000ms] ease-linear w-full origin-left" style={{ width: isVisible ? '0%' : '100%' }} />
+      <div className={`
+        relative w-85 bg-gray-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl overflow-hidden group
+        ${isUnfollow ? 'ring-2 ring-rose-500/30' : 'ring-1 ring-white/5'}
+      `}>
+        
+        {/* Barre de progression subtile */}
+        <div 
+            className={`absolute bottom-0 left-0 h-0.5 ${isUnfollow ? 'bg-rose-500' : 'bg-blue-500'} transition-all duration-[6000ms] ease-linear w-full origin-left`} 
+            style={{ width: isVisible ? '0%' : '100%' }} 
+        />
 
-        <div className="flex gap-3 items-start relative z-10">
-            <div className="shrink-0 mt-1 cursor-pointer" onClick={handleClick}>
-                <UserAvatar userId={null} url={notification.actor_avatar_url} name={notification.actor_name} size="sm" />
+        <div className="flex gap-4 items-center relative z-10">
+            {/* Avatar avec badge d'action */}
+            <div className="relative shrink-0 cursor-pointer" onClick={handleClick}>
+                <UserAvatar userId={null} url={notification.actor_avatar_url} name={notification.actor_name} size="sm" className="border border-white/10" />
+                <div className={`absolute -bottom-1 -right-1 rounded-full p-1 text-white shadow-lg ${style.color} animate-in zoom-in duration-500`}>
+                    {style.icon}
+                </div>
             </div>
             
-            <div className="flex-1 cursor-pointer" onClick={handleClick}>
-                <h4 className="text-sm font-bold text-white">{notification.actor_name}</h4>
-                <p className="text-xs text-gray-400 mt-0.5 leading-snug">
-                    {notification.type === 'follow' && "vous suit désormais."}
-                    {notification.type === 'comment' && `a commenté : "${notification.text_content}"`}
-                    {notification.type === 'like_wall' && "a aimé votre mur."}
-                    {notification.type === 'new_wall' && "a publié un nouveau mur."}
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={handleClick}>
+                <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-black text-white truncate">{notification.actor_name}</h4>
+                    {isUnfollow && <span className="text-[9px] px-1.5 py-0.5 bg-rose-500/20 text-rose-400 font-black rounded border border-rose-500/30 uppercase">Perdu</span>}
+                </div>
+                <p className={`text-xs mt-0.5 leading-snug truncate ${isUnfollow ? 'text-rose-200/70' : 'text-gray-400'}`}>
+                    {notification.type === 'comment' && notification.text_content 
+                        ? <span>a dit : <span className="italic">"{notification.text_content}"</span></span>
+                        : style.text
+                    }
                 </p>
             </div>
 
-            <button onClick={handleClose} className="text-gray-500 hover:text-white transition-colors p-1"><X size={14} /></button>
+            <button 
+                onClick={(e) => { e.stopPropagation(); handleClose(); }}
+                className="text-gray-600 hover:text-white transition-colors p-1.5 hover:bg-white/5 rounded-full"
+            >
+                <X size={16} />
+            </button>
         </div>
+
+        {/* Effet visuel au survol */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
       </div>
     </div>,
     document.body
