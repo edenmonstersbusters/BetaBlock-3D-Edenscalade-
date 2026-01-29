@@ -99,7 +99,7 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
       >
         <Bell size={20} className={unreadCount > 0 ? "text-white" : ""} />
         {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-2 border-gray-950 flex items-center justify-center text-[9px] font-black text-white animate-in zoom-in duration-300">
+            <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 bg-blue-600 rounded-full border-2 border-gray-950 flex items-center justify-center text-[9px] font-black text-white animate-in zoom-in duration-300 shadow-[0_0_10px_rgba(37,99,235,0.5)]">
                 {unreadCount > 9 ? '9+' : unreadCount}
             </span>
         )}
@@ -109,12 +109,22 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
         <div className="absolute top-full right-0 mt-3 w-80 sm:w-96 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-in slide-in-from-top-2 duration-200 ring-1 ring-black/50">
             {/* HEADER */}
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-gray-950">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <span className="text-sm font-black text-white uppercase tracking-wider">Notifications</span>
-                    {unreadCount > 0 && <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-lg shadow-blue-900/50">{unreadCount} nouveaux</span>}
+                    {unreadCount > 0 && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-md shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                            </span>
+                            <span className="text-[10px] font-bold text-blue-400 leading-none">
+                                {unreadCount} {unreadCount > 1 ? 'NOUVEAUX' : 'NOUVEAU'}
+                            </span>
+                        </div>
+                    )}
                 </div>
                 {unreadCount > 0 && (
-                    <button onClick={markAllAsRead} className="text-[10px] text-gray-500 hover:text-white font-bold uppercase tracking-widest transition-colors">Tout marquer comme lu</button>
+                    <button onClick={markAllAsRead} className="text-[10px] text-gray-500 hover:text-white font-bold uppercase tracking-widest transition-colors hover:underline decoration-gray-500 underline-offset-4">Tout marquer lu</button>
                 )}
             </div>
             

@@ -17,6 +17,14 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
+export const useNotifications = () => {
+  const context = useContext(NotificationsContext);
+  if (context === undefined) {
+    throw new Error('useNotifications must be used within a NotificationsProvider');
+  }
+  return context;
+};
+
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [activeToasts, setActiveToasts] = useState<AppNotification[]>([]);
@@ -42,8 +50,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       const now = Date.now();
       const lastTime = logicalDebounceRef.current.get(eventKey);
 
-      // Si le même événement survient moins de 2 secondes après le précédent, on l'ignore visuellement
-      if (lastTime && (now - lastTime < 2000)) {
+      // Si le même événement survient moins de 500ms après le précédent, on l'ignore visuellement
+      // (Réduit de 2000ms à 500ms pour autoriser le like rapide de plusieurs items différents tout en bloquant le double-clic)
+      if (lastTime && (now - lastTime < 500)) {
           processedIdsRef.current.add(newId); // On le marque comme "vu" pour ne pas le traiter plus tard
           return;
       }
@@ -159,10 +168,4 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       {children}
     </NotificationsContext.Provider>
   );
-};
-
-export const useNotifications = () => {
-  const context = useContext(NotificationsContext);
-  if (!context) throw new Error('useNotifications must be used within a NotificationsProvider');
-  return context;
 };
