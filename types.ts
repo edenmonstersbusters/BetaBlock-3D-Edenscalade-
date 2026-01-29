@@ -140,7 +140,7 @@ export interface Notification {
   actor_id: string;
   actor_name?: string;     // Enrichi
   actor_avatar_url?: string; // Enrichi
-  type: 'follow' | 'unfollow' | 'new_wall' | 'comment' | 'like_wall';
+  type: 'follow' | 'unfollow' | 'new_wall' | 'comment' | 'like_wall' | 'like_comment';
   resource_id?: string;
   resource_name?: string; // Enrichi si c'est un mur
   text_content?: string; // Enrichi pour les commentaires

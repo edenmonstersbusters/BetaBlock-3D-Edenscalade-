@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, MessageSquare, UserPlus, UserMinus, Box, BellRing } from 'lucide-react';
+import { X, Heart, MessageSquare, UserPlus, UserMinus, Box, BellRing, ThumbsUp } from 'lucide-react';
 import { Notification } from '../../types';
 import { UserAvatar } from './UserAvatar';
 import { useNavigate } from 'react-router-dom';
@@ -43,12 +43,13 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
   // Icônes et Couleurs par type
   const getStyle = () => {
     switch(notification.type) {
-        case 'follow': return { icon: <UserPlus size={16} />, color: 'bg-blue-600', text: "vous suit désormais." };
-        case 'unfollow': return { icon: <UserMinus size={16} />, color: 'bg-rose-600', text: "ne vous suit plus." };
-        case 'like_wall': return { icon: <Heart size={16} />, color: 'bg-red-500', text: "a aimé votre mur." };
-        case 'comment': return { icon: <MessageSquare size={16} />, color: 'bg-emerald-500', text: "a commenté votre mur." };
-        case 'new_wall': return { icon: <Box size={16} />, color: 'bg-purple-600', text: "a publié un nouveau mur." };
-        default: return { icon: <BellRing size={16} />, color: 'bg-gray-700', text: "Nouvelle interaction." };
+        case 'follow': return { icon: <UserPlus size={14} strokeWidth={3} />, color: 'bg-blue-600', text: "vous suit désormais." };
+        case 'unfollow': return { icon: <UserMinus size={14} strokeWidth={3} />, color: 'bg-rose-600', text: "ne vous suit plus." };
+        case 'like_wall': return { icon: <Heart size={14} strokeWidth={3} />, color: 'bg-red-500', text: "a aimé votre mur." };
+        case 'like_comment': return { icon: <ThumbsUp size={14} strokeWidth={3} />, color: 'bg-pink-500', text: "a aimé votre commentaire." };
+        case 'comment': return { icon: <MessageSquare size={14} strokeWidth={3} />, color: 'bg-emerald-500', text: "a commenté votre mur." };
+        case 'new_wall': return { icon: <Box size={14} strokeWidth={3} />, color: 'bg-purple-600', text: "a publié un nouveau mur." };
+        default: return { icon: <BellRing size={14} strokeWidth={3} />, color: 'bg-gray-700', text: "Nouvelle interaction." };
     }
   };
 
@@ -61,8 +62,8 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
       }`}
     >
       <div className={`
-        relative w-85 bg-gray-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl overflow-hidden group
-        ${isUnfollow ? 'ring-2 ring-rose-500/30' : 'ring-1 ring-white/5'}
+        relative w-80 bg-gray-900/95 backdrop-blur-xl border rounded-2xl p-3 shadow-2xl overflow-hidden group
+        ${isUnfollow ? 'border-rose-500/30' : 'border-white/10'}
       `}>
         
         {/* Barre de progression subtile */}
@@ -71,23 +72,24 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
             style={{ width: isVisible ? '0%' : '100%' }} 
         />
 
-        <div className="flex gap-4 items-center relative z-10">
-            {/* Avatar avec badge d'action */}
+        <div className="flex gap-3 items-center relative z-10">
+            {/* FOCUS AVATAR : Seul élément visuel fort */}
             <div className="relative shrink-0 cursor-pointer" onClick={handleClick}>
-                <UserAvatar userId={null} url={notification.actor_avatar_url} name={notification.actor_name} size="sm" className="border border-white/10" />
-                <div className={`absolute -bottom-1 -right-1 rounded-full p-1 text-white shadow-lg ${style.color} animate-in zoom-in duration-500`}>
+                <UserAvatar userId={null} url={notification.actor_avatar_url} name={notification.actor_name} size="md" className="ring-2 ring-gray-800" />
+                {/* Petit badge icône discret par dessus l'avatar */}
+                <div className={`absolute -bottom-1 -right-1 rounded-full p-1 text-white shadow-lg border-2 border-gray-900 ${style.color} flex items-center justify-center`}>
                     {style.icon}
                 </div>
             </div>
             
             <div className="flex-1 min-w-0 cursor-pointer" onClick={handleClick}>
                 <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-black text-white truncate">{notification.actor_name}</h4>
-                    {isUnfollow && <span className="text-[9px] px-1.5 py-0.5 bg-rose-500/20 text-rose-400 font-black rounded border border-rose-500/30 uppercase">Perdu</span>}
+                    <h4 className="text-sm font-bold text-white truncate">{notification.actor_name}</h4>
+                    {isUnfollow && <span className="text-[9px] px-1.5 py-0 bg-rose-500/20 text-rose-400 font-bold rounded uppercase">Unfollow</span>}
                 </div>
                 <p className={`text-xs mt-0.5 leading-snug truncate ${isUnfollow ? 'text-rose-200/70' : 'text-gray-400'}`}>
                     {notification.type === 'comment' && notification.text_content 
-                        ? <span>a dit : <span className="italic">"{notification.text_content}"</span></span>
+                        ? <span className="italic opacity-80">"{notification.text_content}"</span>
                         : style.text
                     }
                 </p>
@@ -95,14 +97,11 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
 
             <button 
                 onClick={(e) => { e.stopPropagation(); handleClose(); }}
-                className="text-gray-600 hover:text-white transition-colors p-1.5 hover:bg-white/5 rounded-full"
+                className="text-gray-600 hover:text-white transition-colors p-1 rounded-full self-start -mr-1 -mt-1"
             >
-                <X size={16} />
+                <X size={14} />
             </button>
         </div>
-
-        {/* Effet visuel au survol */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
       </div>
     </div>,
     document.body
