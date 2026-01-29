@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { BetaBlockFile, Comment, UserProfile, Notification } from '../types';
+import { BetaBlockFile, Comment, UserProfile, AppNotification } from '../types';
 
 const handleNetworkError = (err: any) => {
   console.error("Supabase Request Error:", err);
@@ -447,7 +447,7 @@ export const api = {
       } catch (e) { return []; }
   },
 
-  async getNotifications(userId: string): Promise<Notification[]> {
+  async getNotifications(userId: string): Promise<AppNotification[]> {
       try {
           const { data, error } = await supabase
             .from('notifications')
@@ -483,7 +483,7 @@ export const api = {
       } catch (err) { return []; }
   },
   
-  async getSingleNotification(notificationId: string): Promise<Notification | null> {
+  async getSingleNotification(notificationId: string): Promise<AppNotification | null> {
       try {
           const { data: n, error } = await supabase
             .from('notifications')
@@ -508,7 +508,7 @@ export const api = {
                 actor_name: actor?.display_name || "Utilisateur inconnu",
                 actor_avatar_url: actor?.avatar_url,
                 resource_name: resourceName
-          } as Notification;
+          } as AppNotification;
       } catch (e) { return null; }
   },
 

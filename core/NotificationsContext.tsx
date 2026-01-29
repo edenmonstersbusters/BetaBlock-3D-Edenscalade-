@@ -3,12 +3,12 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { supabase } from './supabase';
 import { api } from './api';
 import { auth } from './auth';
-import { Notification } from '../types';
+import { AppNotification } from '../types';
 
 interface NotificationsContextType {
-  notifications: Notification[];
+  notifications: AppNotification[];
   unreadCount: number;
-  activeToasts: Notification[];
+  activeToasts: AppNotification[];
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   dismissToast: (id: string) => void;
@@ -18,8 +18,8 @@ interface NotificationsContextType {
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeToasts, setActiveToasts] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [activeToasts, setActiveToasts] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   
   const userRef = useRef<string | null>(null);

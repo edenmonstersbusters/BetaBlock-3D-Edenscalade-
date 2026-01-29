@@ -134,7 +134,7 @@ export interface SocialCounts {
   comments: number;
 }
 
-export interface Notification {
+export interface AppNotification {
   id: string;
   recipient_id: string;
   actor_id: string;

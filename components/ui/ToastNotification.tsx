@@ -2,12 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Heart, MessageSquare, UserPlus, UserMinus, Box, BellRing, ThumbsUp } from 'lucide-react';
-import { Notification } from '../../types';
+import { AppNotification } from '../../types';
 import { UserAvatar } from './UserAvatar';
 import { useNavigate } from 'react-router-dom';
 
 interface ToastNotificationProps {
-  notification: Notification;
+  notification: AppNotification;
   onDismiss: (id: string) => void;
   duration?: number;
 }

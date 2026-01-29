@@ -3,10 +3,10 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../core/supabase';
 import { api } from '../core/api';
 import { auth } from '../core/auth';
-import { Notification } from '../types';
+import { AppNotification } from '../types';
 
 export const useRealtimeNotifications = () => {
-  const [activeToasts, setActiveToasts] = useState<Notification[]>([]);
+  const [activeToasts, setActiveToasts] = useState<AppNotification[]>([]);
   const userRef = useRef<any>(null);
 
   // Demander la permission système au montage (si ce n'est pas déjà fait)
@@ -16,7 +16,7 @@ export const useRealtimeNotifications = () => {
     }
   }, []);
 
-  const addToast = (notif: Notification) => {
+  const addToast = (notif: AppNotification) => {
       // Éviter les doublons visuels si on spam
       setActiveToasts(prev => {
           if (prev.some(n => n.id === notif.id)) return prev;
@@ -29,7 +29,7 @@ export const useRealtimeNotifications = () => {
       setActiveToasts(prev => prev.filter(n => n.id !== id));
   };
 
-  const triggerSystemNotification = (notif: Notification) => {
+  const triggerSystemNotification = (notif: AppNotification) => {
       if (!('Notification' in window)) return;
       if (Notification.permission !== 'granted') return;
 

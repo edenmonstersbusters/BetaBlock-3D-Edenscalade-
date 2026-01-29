@@ -4,7 +4,7 @@ import { Bell, Heart, MessageSquare, UserPlus, UserMinus, Box, Loader2 } from 'l
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../core/NotificationsContext';
 import { UserAvatar } from './UserAvatar';
-import { Notification } from '../../types';
+import { AppNotification } from '../../types';
 
 interface NotificationsMenuProps {
   userId: string; // Gardé pour compatibilité props, mais on utilise le contexte
@@ -27,7 +27,7 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleNotificationClick = async (notif: Notification) => {
+  const handleNotificationClick = async (notif: AppNotification) => {
       if (!notif.is_read) {
           await markAsRead(notif.id);
       }
@@ -51,7 +51,7 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
       }
   };
 
-  const getText = (n: Notification) => {
+  const getText = (n: AppNotification) => {
       switch(n.type) {
           case 'follow': return <span>vous suit désormais.</span>;
           case 'unfollow': return <span className="text-red-400 font-medium">ne vous suit plus.</span>;
