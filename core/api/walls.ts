@@ -73,6 +73,8 @@ export const wallsApi = {
        const { data: current, error: fetchError } = await supabase.from('walls').select('data').eq('id', id).single();
        if (fetchError) throw fetchError;
        
+       if (!current || !current.data) throw new Error("Données du mur introuvables");
+
        const newData = { ...current.data };
        if (newData.metadata) {
            newData.metadata.isPublic = isPublic;
@@ -95,8 +97,11 @@ export const wallsApi = {
       // On sélectionne aussi user_id pour le fallback
       const { data: result, error } = await supabase.from('walls').select('data, user_id').eq('id', id).single();
       if (error) throw error;
+      if (!result) throw new Error("Mur introuvable");
 
       let fileData = result.data as BetaBlockFile;
+      if (!fileData || !fileData.metadata) throw new Error("Données corrompues");
+
       const authorId = result.user_id || fileData.metadata.authorId;
 
       if (authorId) {

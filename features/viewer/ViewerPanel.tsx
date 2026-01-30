@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WallConfig, PlacedHold, WallMetadata, UserProfile } from '../../types';
-import { Home, Share2, GitFork, Calendar, Ruler, Layers, Box, Heart, MessageSquare, ArrowUp, Activity, Edit3 } from 'lucide-react';
+import { Share2, GitFork, Calendar, Heart, MessageSquare, Edit3 } from 'lucide-react';
 import { SocialFeed } from './components/SocialFeed';
+import { ViewerHeader } from './components/ViewerHeader';
+import { ViewerStats } from './components/ViewerStats';
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { AuthModal } from '../../components/auth/AuthModal';
@@ -17,7 +19,7 @@ interface ViewerPanelProps {
   config: WallConfig;
   holds: PlacedHold[];
   onHome: () => void;
-  onRemix: () => void; // Plus d'arguments de mode
+  onRemix: () => void; 
   onShare: () => void;
   onEdit?: () => void;
 }
@@ -52,7 +54,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
   useEffect(() => {
       auth.getUser().then(user => {
-          // CONDITION STRICTE : L'utilisateur doit être connecté ET son ID doit correspondre à l'auteur
           if (user && metadata.authorId && user.id === metadata.authorId) {
               setIsOwner(true);
           } else {
@@ -85,7 +86,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
           return;
       }
 
-      // Optimistic update
       const wasLiked = socialStats.hasLiked;
       setSocialStats(prev => ({
           hasLiked: !wasLiked,
@@ -95,7 +95,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
       const { error } = await api.toggleWallLike(wallId, user.id);
       
       if (error) {
-           // Revert
            setSocialStats(prev => ({
                 hasLiked: wasLiked,
                 likes: Math.max(0, prev.likes + (wasLiked ? 1 : -1))
@@ -153,21 +152,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
         />
       )}
 
-      <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-             <button onClick={onHome} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-blue-400 flex-shrink-0 transition-colors" title="Retour à la Galerie">
-                <Home size={20} />
-             </button>
-             <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-bold text-blue-400 truncate block w-full leading-tight" title={metadata.name}>
-                    {metadata.name || "Mur Sans Nom"}
-                </h1>
-                <div className="flex items-center gap-3 text-[10px] text-gray-500 mt-1">
-                    <span className="uppercase tracking-wider">SPECTATEUR</span>
-                </div>
-             </div>
-        </div>
-      </div>
+      <ViewerHeader title={metadata.name} onHome={onHome} />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         
@@ -214,38 +199,14 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 </div>
             </section>
 
-            <section className="space-y-4">
-                <div className="flex items-center space-x-2 text-sm font-medium text-gray-400 uppercase tracking-wider"><Ruler size={14} /><span>Analyse du Mur</span></div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <div className="text-gray-500 text-[10px] uppercase mb-1 flex items-center gap-1"><Box size={10} /> Prises</div>
-                        <div className="text-2xl font-mono text-white">{totalHolds}</div>
-                    </div>
-                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <div className="text-gray-500 text-[10px] uppercase mb-1 flex items-center gap-1"><Layers size={10} /> Pans</div>
-                        <div className="text-2xl font-mono text-white">{validSegments.length}</div>
-                    </div>
-                    
-                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <div className="text-gray-500 text-[10px] uppercase mb-1 flex items-center gap-1"><ArrowUp size={10} /> Hauteur</div>
-                        <div className="text-lg font-mono text-emerald-400">{totalVerticalHeight.toFixed(2)}m</div>
-                    </div>
-
-                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <div className="text-gray-500 text-[10px] uppercase mb-1 flex items-center gap-1"><Activity size={10} /> Linéaire</div>
-                        <div className="text-lg font-mono text-purple-400">{totalClimbingLength.toFixed(2)}m</div>
-                    </div>
-
-                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <div className="text-gray-500 text-[10px] uppercase mb-1">Largeur</div>
-                        <div className="text-lg font-mono text-blue-400">{config.width}m</div>
-                    </div>
-                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <div className="text-gray-500 text-[10px] uppercase mb-1">Max Dévers</div>
-                        <div className="text-lg font-mono text-orange-400">{maxOverhang}°</div>
-                    </div>
-                </div>
-            </section>
+            <ViewerStats 
+                totalHolds={totalHolds} 
+                totalSegments={validSegments.length}
+                totalVerticalHeight={totalVerticalHeight}
+                totalClimbingLength={totalClimbingLength}
+                width={config.width}
+                maxOverhang={maxOverhang}
+            />
 
             <section className="pt-6 border-t border-gray-800">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
@@ -259,7 +220,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
       </div>
 
       <div className="p-4 border-t border-gray-800 bg-gray-950 space-y-3">
-        {/* LE BOUTON EDITER NE S'AFFICHE QUE SI L'UTILISATEUR EST LE CRÉATEUR */}
         {isOwner && (
             <button 
                 onClick={onEdit} 

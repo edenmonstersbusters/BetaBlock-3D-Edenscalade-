@@ -5,9 +5,9 @@ import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { WallCard } from './WallCard';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { UserAvatar } from '../../components/ui/UserAvatar';
-import { NotificationsMenu } from '../../components/ui/NotificationsMenu';
-import { Plus, Loader2, Search, Database, LogIn, LogOut, LayoutGrid, Globe, X } from 'lucide-react';
+import { GalleryHeader } from './components/GalleryHeader';
+import { GalleryHero } from './components/GalleryHero';
+import { Loader2, Search, Database, Globe, X } from 'lucide-react';
 import { SEO } from '../../components/SEO';
 
 interface GalleryPageProps {
@@ -99,77 +99,20 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
             }
         }}
       />
+      
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       
-      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
-          <div className="flex items-center gap-2 group cursor-default">
-             <span className="text-3xl">🧗</span>
-             <div className="text-xl font-black italic tracking-tighter text-blue-500 group-hover:text-blue-400 transition-colors">BetaBlock</div>
-          </div>
-          <div className="flex items-center gap-4">
-            {user ? (
-                <div className="flex items-center gap-3">
-                    {/* Cloche de notification */}
-                    <NotificationsMenu userId={user.id} />
+      <GalleryHeader 
+        user={user} 
+        onLogin={() => setShowAuthModal(true)} 
+        onLogout={() => auth.signOut()} 
+        onNavigate={navigate} 
+      />
 
-                    <button 
-                        onClick={() => navigate('/projects')}
-                        className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-white/5 rounded-full text-xs font-bold transition-all text-gray-400 hover:text-white"
-                    >
-                        <LayoutGrid size={14} />
-                        <span>Mes Murs</span>
-                    </button>
-                    <button 
-                        onClick={() => navigate('/profile')}
-                        className="flex items-center gap-2 p-1 pr-4 bg-gray-900/60 hover:bg-gray-800 border border-white/5 rounded-full transition-all group backdrop-blur-md"
-                    >
-                        <UserAvatar userId={user.id} url={user.user_metadata?.avatar_url} name={user.user_metadata?.display_name || user.email} size="sm" />
-                        <span className="hidden sm:inline-block font-bold text-gray-300 group-hover:text-white truncate max-w-[150px]">
-                            {user.user_metadata?.display_name || user.email?.split('@')[0]}
-                        </span>
-                    </button>
-                    <button onClick={() => auth.signOut()} className="p-2 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-400 rounded-lg transition-colors">
-                        <LogOut size={18} />
-                    </button>
-                </div>
-            ) : (
-                <button 
-                    onClick={() => setShowAuthModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-full text-sm font-bold transition-all"
-                >
-                    <LogIn size={16} />
-                    <span>Connexion</span>
-                </button>
-            )}
-          </div>
-      </div>
-
-      <header className="relative py-24 px-6 border-b border-white/10 overflow-hidden shrink-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-gray-950 to-gray-950 pointer-events-none" />
-        <div className="max-w-7xl mx-auto relative z-10 text-center">
-            <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-6">BetaBlock <span className="text-blue-500">Hub</span></h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">La plateforme communautaire des ouvreurs. Explorez les créations publiques ou gérez vos projets privés.</p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <button 
-                    onClick={() => navigate('/builder')}
-                    className="group flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg rounded-full transition-all shadow-lg shadow-blue-600/20"
-                >
-                    <Plus size={20} />
-                    <span>Créer un Nouveau Mur</span>
-                </button>
-                {user && (
-                    <button 
-                        onClick={() => navigate('/projects')}
-                        className="flex items-center gap-3 px-8 py-4 bg-gray-900 hover:bg-gray-800 text-white font-bold text-lg rounded-full border border-white/10 transition-all"
-                    >
-                        <LayoutGrid size={20} />
-                        <span>Mes Murs Privés</span>
-                    </button>
-                )}
-            </div>
-        </div>
-      </header>
+      <GalleryHero 
+        user={user} 
+        onNavigate={navigate} 
+      />
 
       <main className="max-w-7xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">

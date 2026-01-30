@@ -12,11 +12,13 @@ export const handleNetworkError = (err: any) => {
 
 // Helper pour enrichir une liste d'objets (murs ou commentaires) avec les profils à jour
 export const enrichWithProfiles = async (items: any[], type: 'WALL' | 'COMMENT') => {
-    if (!items || items.length === 0) return items;
+    if (!items || !Array.isArray(items) || items.length === 0) return items || [];
 
     // 1. Collecter les ID uniques
     const userIds = new Set<string>();
     items.forEach(item => {
+        if (!item) return; // GUARD : Skip null items
+        
         if (type === 'WALL') {
             // Priorité à la colonne user_id, fallback sur le JSON metadata
             const authorId = item.user_id || item.data?.metadata?.authorId;
@@ -40,10 +42,12 @@ export const enrichWithProfiles = async (items: any[], type: 'WALL' | 'COMMENT')
 
     // 3. Appliquer les mises à jour
     return items.map(item => {
+        if (!item) return item; // GUARD
+
         if (type === 'WALL') {
             const authorId = item.user_id || item.data?.metadata?.authorId;
             const profile = profileMap.get(authorId);
-            if (profile) {
+            if (profile && item.data && item.data.metadata) {
                 // On écrase les métadonnées snapshot par les données live pour l'affichage
                 item.data.metadata.authorName = profile.display_name;
                 item.data.metadata.authorAvatarUrl = profile.avatar_url;
