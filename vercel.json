@@ -8,10 +8,6 @@
     { "source": "/projects", "destination": "/index.html" },
     { "source": "/profile", "destination": "/index.html" },
     { "source": "/profile/:path*", "destination": "/index.html" },
-    { "source": "/view/:path*", "destination": "/index.html" },
-    
-    { "source": "/sitemap-walls.xml", "destination": "/api/sitemap" },
-    { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/((?!api/|sitemap-walls.xml|_next/static/|_next/image/|favicon.ico|preview-image.jpg).*)", "destination": "/index.html" }
+    { "source": "/view/:path*", "destination": "/index.html" }
   ]
 }
