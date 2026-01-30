@@ -2,12 +2,12 @@
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Sitemap des pages fixes (Accueil, Builder, Profil...) -->
   <sitemap>
-    <loc>https://betablock-3d.vercel.app/sitemap-static.xml</loc>
+    <loc>https://betablock-3d.fr/sitemap-static.xml</loc>
     <lastmod>2026-01-30</lastmod>
   </sitemap>
   
   <!-- Sitemap dynamique des murs (généré par api/sitemap.ts) -->
   <sitemap>
-    <loc>https://betablock-3d.vercel.app/sitemap-walls.xml</loc>
+    <loc>https://betablock-3d.fr/sitemap-walls.xml</loc>
   </sitemap>
 </sitemapindex>
