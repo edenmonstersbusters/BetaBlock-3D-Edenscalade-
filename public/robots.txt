@@ -1,4 +1,5 @@
+
 User-agent: *
 Allow: /
 
-Sitemap: https://betablock-3d.vercel.app/sitemap.xml
+Sitemap: https://betablock-3d.fr/sitemap.xml

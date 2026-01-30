@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
@@ -17,7 +18,7 @@ function escapeXml(unsafe: any): string {
 }
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
-  const BASE_URL = 'https://betablock-3d.vercel.app';
+  const BASE_URL = 'https://betablock-3d.fr';
   const SUPABASE_URL = 'https://ezfbjejmhfkpfxbmlwpo.supabase.co';
   
   // SÉCURITÉ : On récupère la clé secrète depuis les variables d'environnement Vercel

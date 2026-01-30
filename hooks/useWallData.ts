@@ -129,7 +129,7 @@ export const useWallData = () => {
         // Fallback to production domain for shareable links if we are in a blob/sandbox
         const isBlob = window.location.protocol === 'blob:';
         const origin = isBlob 
-          ? 'https://betablock-3d.vercel.app' 
+          ? 'https://betablock-3d.fr' 
           : window.location.origin;
           
         setGeneratedLink(`${origin.replace(/\/$/, '')}/#/view/${cloudId || result.id}`);

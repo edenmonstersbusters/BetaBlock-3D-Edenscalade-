@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { StructuredData } from './StructuredData';
@@ -26,7 +27,7 @@ interface SEOProps {
 export const SEO: React.FC<SEOProps> = ({ 
   title, 
   description = "Créez, modélisez et partagez vos murs d'escalade en 3D. L'outil ultime pour les ouvreurs et les passionnés.", 
-  image = "https://betablock-3d.vercel.app/preview-image.jpg", 
+  image = "https://betablock-3d.fr/preview-image.jpg", 
   url,
   type = 'website',
   author,
@@ -40,7 +41,7 @@ export const SEO: React.FC<SEOProps> = ({
   
   // Use production URL as base if in a blob environment
   const isBlob = window.location.protocol === 'blob:';
-  const fallbackOrigin = 'https://betablock-3d.vercel.app';
+  const fallbackOrigin = 'https://betablock-3d.fr';
   
   const currentUrl = url || (isBlob 
     ? fallbackOrigin + (window.location.hash || '')
@@ -105,7 +106,7 @@ export const SEO: React.FC<SEOProps> = ({
                         // Construction d'URL compatible HashRouter pour Google
                         item: b.url.startsWith('http') 
                               ? b.url 
-                              : `https://betablock-3d.vercel.app/#${b.url.startsWith('/') ? '' : '/'}${b.url}`
+                              : `https://betablock-3d.fr/#${b.url.startsWith('/') ? '' : '/'}${b.url}`
                     }))
                 }}
             />

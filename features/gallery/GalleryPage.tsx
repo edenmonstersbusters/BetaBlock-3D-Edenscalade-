@@ -90,10 +90,10 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
             type: 'WebSite',
             data: {
                 name: 'BetaBlock 3D',
-                url: 'https://betablock-3d.vercel.app/',
+                url: 'https://betablock-3d.fr/',
                 potentialAction: {
                     '@type': 'SearchAction',
-                    target: 'https://betablock-3d.vercel.app/?q={search_term_string}',
+                    target: 'https://betablock-3d.fr/?q={search_term_string}',
                     'query-input': 'required name=search_term_string'
                 }
             }
