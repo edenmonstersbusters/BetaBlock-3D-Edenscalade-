@@ -1,106 +1,100 @@
 
 # 🗺️ Structure du Projet BetaBlock 3D
 
-Ce document recense l'intégralité des fichiers du projet, leur rôle, et leur volumétrie approximative. Il sert de carte pour la maintenance et le développement.
+Ce document recense l'intégralité des fichiers du projet, leur rôle, et leur volumétrie (audit v1.5). Il sert de carte pour la maintenance et identifie les zones de refactoring prioritaire.
 
-**Dernière mise à jour :** v1.4 (Refonte Profil & Documentation précise)
-**Total Fichiers :** ~40 fichiers
-**État Global :** Application React/Three.js avec routing, backend Supabase, IA Gemini et architecture modulaire.
-
----
-
-## 📂 Racine (Configuration & Entrée)
-
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `index.html` | 45 | Point d'entrée HTML. Styles globaux et ImportMap. |
-| `index.tsx` | 35 | Point d'entrée React. Router et Montage. |
-| `App.tsx` | **229** | **App Shell.** Routing, Auth Listener, et chargement initial des données de mur. |
-| `types.ts` | 85 | Définitions TypeScript globales. |
-| `metadata.json` | 10 | Métadonnées de l'application et permissions. |
-| `PROJECT_STRUCTURE.md` | N/A | Ce fichier. |
+**État Global :** Application React/Three.js avec architecture modulaire.
+**Dette Technique Identifiée :** Le fichier `core/api.ts` est monolithique et doit être découpé.
 
 ---
 
-## 📂 features/ (Fonctionnalités Métier)
+## 🚨 Fichiers Critiques (> 200 lignes ou complexes)
 
-### 🏗️ editor/ (Cœur de l'application)
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `WallEditorPage.tsx` | **230** | **Vue Principale.** Orchestrateur de l'éditeur (Layout, Sidebar, Scene). |
-| `hooks/useEditorState.ts` | 45 | **Hook d'État.** Variables locales UI (modales, sélections). |
-| `hooks/useEditorLogic.ts` | **240** | **Hook Métier.** Logique complexe (Undo, Paste, Import, API Calls wrappers). |
+Ces fichiers sont les cibles prioritaires pour le découpage (Refactoring "SANS CODE" Plan).
 
-### 🏗️ builder/ (Panneaux Édition)
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `EditorPanel.tsx` | **115** | Panneau Structure (Gauche). Dimensions et segments. |
-| `RouteEditorPanel.tsx` | **235** | Panneau Ouverture (Gauche). Catalogue, Inspecteur, Liste. |
-| `components/SegmentManager.tsx` | 55 | Liste des segments (sliders). |
-| `components/HoldCatalogue.tsx` | **120** | Grille des modèles 3D avec prévisualisation. |
-| `components/HoldInspector.tsx` | 75 | Propriétés de la prise sélectionnée. |
-
-### 🖼️ gallery/ (Hub Public)
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `GalleryPage.tsx` | **155** | Page d'accueil. Grille, Recherche, Header. |
-| `WallCard.tsx` | 85 | Composant UI : Carte d'un mur. |
-
-### 👁️ viewer/ (Mode Spectateur)
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `ViewerPanel.tsx` | **185** | Panneau Lecture Seule. Stats, Auteur Live, Social. |
-| `components/SocialFeed.tsx` | **195** | Système de commentaires récursif. |
-| `components/RemixModal.tsx` | 80 | Choix du mode de remix. |
-
-### 👤 profile/ (Utilisateur)
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `ProfilePage.tsx` | **315** | Page Profil. Carte Grimpeur, Edition, Stats (Refonte UI). |
-| `components/GymSearchSelector.tsx` | **105** | Recherche de salle via Google Gemini API. |
-
-### 📁 projects/ (Dashboard Privé)
-| Fichier | Lignes | Description |
-| :--- | :---: | :--- |
-| `ProjectsPage.tsx` | **230** | Gestion des murs (Privé/Public, Suppression sécurisée). |
+| Fichier | Lignes | Statut | Action Requise |
+| :--- | :---: | :---: | :--- |
+| **`core/api.ts`** | **~335** | 🔴 **CRITIQUE** | **À diviser d'urgence.** Contient toute la logique backend (Murs, Users, Social). |
+| `features/viewer/components/SocialFeed.tsx` | ~200 | 🟠 LOURD | Séparer logique de tri (Tree) et UI (`CommentItem`). |
+| `components/ui/GlobalModal.tsx` | ~190 | 🟠 DENSE | Trop de responsabilités (Save, Share, Alert, Confirm). |
+| `features/viewer/ViewerPanel.tsx` | ~186 | 🟠 DENSE | Extraire les sous-sections (Header, Stats). |
 
 ---
 
-## 📂 core/ (Noyau Logique & 3D)
+## 📂 Core (Noyau)
 
 | Fichier | Lignes | Description |
 | :--- | :---: | :--- |
-| `Scene.tsx` | **165** | Canvas R3F. Caméra, Lumières, DragControls. |
-| `WallMesh.tsx` | **150** | Génération du mesh du mur et textures. |
-| `HoldModel.tsx` | 90 | Composant 3D d'une prise (GLTF). |
-| `DragController.tsx` | 65 | Logique de déplacement sur surface 3D. |
-| `ScreenshotHandler.tsx` | 55 | Capture d'écran du canvas. |
-| `api.ts` | **185** | **API Layer.** CRUD Supabase + Enrichissement Profils Live. |
-| `auth.ts` | 75 | Wrapper Auth Supabase. |
-| `supabase.ts` | 15 | Client Supabase. |
+| `Scene.tsx` | 175 | Canvas R3F, Lumières, Contrôles caméra. (Stable) |
+| `WallMesh.tsx` | 150 | Génération procédurale du mesh et textures. |
+| `NotificationsContext.tsx` | 132 | Logique globale des notifs temps réel. |
+| `auth.ts` | 70 | Wrapper Auth Supabase (SignIn/Up/Out). |
+| `HoldModel.tsx` | 100 | Composant 3D d'une prise (GLTF + Draco). |
+| `DragController.tsx` | 60 | Logique de déplacement des prises (Raycasting). |
+| `ScreenshotHandler.tsx` | 55 | Capture d'écran du canvas (Vue ISO). |
+| `supabase.ts` | 15 | Initialisation Client Supabase. |
 
 ---
 
-## 📂 components/ (UI Réutilisable)
+## 📂 Features (Fonctionnalités)
 
+### 🏗️ Builder (Éditeur)
 | Fichier | Lignes | Description |
 | :--- | :---: | :--- |
-| `ui/GlobalModal.tsx` | **185** | Modale polyvalente (Save, Share, Alert). |
-| `ui/ContextMenu.tsx` | **100** | Menu clic-droit. |
-| `ui/LoadingOverlay.tsx` | 20 | Loader plein écran. |
-| `ui/FileControls.tsx` | 45 | Boutons fichiers. |
-| `ui/ColorPalette.tsx` | 40 | Sélecteur couleurs. |
-| `ui/UserAvatar.tsx` | 70 | Avatar avec fallback dégradé. |
-| `ui/ActionWarning.tsx` | 30 | Toast notification curseur. |
-| `auth/AuthModal.tsx` | **115** | Login / Register. |
+| `RouteEditorPanel.tsx` | 140 | Panneau "Ouverture" (Catalogue, Liste, Inspecteur). |
+| `WallEditorPage.tsx` | 130 | Orchestrateur principal de l'éditeur. |
+| `components/HoldCatalogue.tsx` | 120 | Grille des prises & Preview. |
+| `EditorPanel.tsx` | 110 | Panneau "Structure" (Dimensions). |
+| `hooks/useEditorLogic.ts` | 100 | Logique métier (Undo, Paste, API). |
+| `components/HoldInspector.tsx` | 75 | Édition des propriétés d'une prise. |
+| `components/PlacedHoldsList.tsx` | 50 | Liste des prises posées. |
+| `components/SegmentManager.tsx` | 50 | Gestion des pans (Hauteur/Angle). |
+
+### 🖼️ Gallery & Viewer
+| Fichier | Lignes | Description |
+| :--- | :---: | :--- |
+| `GalleryPage.tsx` | 165 | Page d'accueil, Recherche, Grille. |
+| `WallCard.tsx` | 90 | UI Carte d'un mur. |
+| `ViewerPanel.tsx` | 186 | (Voir section critique). |
+| `components/SocialFeed.tsx` | 200 | (Voir section critique). |
+
+### 👤 Profile & Social
+| Fichier | Lignes | Description |
+| :--- | :---: | :--- |
+| `ProfilePage.tsx` | 120 | Page Profil (Héros, Stats, Portfolio). |
+| `components/ProfileHero.tsx` | 110 | En-tête profil (Avatar, Bio, Follow). |
+| `components/GymSearchSelector.tsx` | 130 | Recherche de salle (Nominatim API). |
+| `components/ProfileStats.tsx` | 90 | Statistiques grimpeur. |
+
+### 📁 Projects
+| Fichier | Lignes | Description |
+| :--- | :---: | :--- |
+| `ProjectsPage.tsx` | 100 | Gestionnaire de murs privés/publics. |
+| `components/DeleteProjectModal.tsx` | 75 | Modale de suppression sécurisée. |
 
 ---
 
-## 📂 hooks/ & utils/ (Helpers)
+## 📂 Components UI (Partagés)
 
 | Fichier | Lignes | Description |
 | :--- | :---: | :--- |
-| `hooks/useHistory.ts` | 55 | Hook Undo/Redo générique. |
-| `hooks/useKeyboardShortcuts.ts` | 50 | Gestion clavier. |
-| `utils/geometry.ts` | 60 | Maths 3D/2D. |
-| `utils/validation.ts` | 25 | Validation JSON. |
+| `NotificationsMenu.tsx` | 165 | Dropdown des notifications (UI complexe). |
+| `ToastNotification.tsx` | 120 | Toasts animés (Portals). |
+| `auth/AuthModal.tsx` | 115 | Login / Register Modal. |
+| `ContextMenu.tsx` | 85 | Menu clic-droit (Copier/Coller/Supprimer). |
+| `UserAvatar.tsx` | 75 | Avatar avec gestion upload & fallback. |
+| `UserListModal.tsx` | 60 | Liste Followers/Following. |
+
+---
+
+## 📂 Utils & Hooks
+
+| Fichier | Lignes | Description |
+| :--- | :---: | :--- |
+| `hooks/useWallData.ts` | 120 | Chargement/Sauvegarde des données mur. |
+| `hooks/useRealtimeNotifications.ts`| 90 | Gestion WebSocket & Notifications Système. |
+| `types.ts` | 90 | Types TypeScript globaux. |
+| `utils/geometry.ts` | 65 | Maths 3D (Coordonnées locales/monde). |
+| `hooks/useHistory.ts` | 55 | Undo/Redo Engine. |
+| `hooks/useKeyboardShortcuts.ts` | 50 | Gestion Raccourcis Clavier. |
+
