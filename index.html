@@ -33,7 +33,6 @@
     <meta property="og:url" content="https://betablock-3d.vercel.app/">
     <meta property="og:title" content="BetaBlock 3D - Climbing Wall Engine">
     <meta property="og:description" content="Create your own 3d climbing walls in 3 clicks.">
-    <meta property="og:image" content="https://betablock-3d.vercel.app/preview-image.jpg">
     <meta property="og:locale" content="fr_FR">
 
     <style>
@@ -79,7 +78,21 @@
 </script>
 </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Ce contenu sera écrasé par React, mais Google le lira avant que le JS se lance -->
+    <header><h1>BetaBlock 3D - Climbing Wall Engine</h1></header>
+    <main>
+      <p>Le meilleur outil 3D pour l'ouverture de voies d'escalade...</p>
+      <ul>
+        <li>Modélisation des murs</li>
+        <li>Pose des prises d'escalade</li>
+        <li>Partage des murs</li>
+        <li>Galerie communautaire</li>
+        <li>Commenter et liker les murs</li>
+        <li>Profils personnalisables</li>
+      </ul>
+    </main>
+    </div>
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>
