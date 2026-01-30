@@ -8,7 +8,7 @@
     { "source": "/projects", "destination": "/index.html" },
     { "source": "/profile", "destination": "/index.html" },
     { "source": "/profile/:path*", "destination": "/index.html" },
-    { "source": "/view/:path*", "destination": "/index.html" }
+    { "source": "/view/:path*", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
