@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LogOut, LayoutGrid, LogIn } from 'lucide-react';
+import { LogOut, LayoutGrid, LogIn, Settings } from 'lucide-react';
 import { NotificationsMenu } from '../../../components/ui/NotificationsMenu';
 import { UserAvatar } from '../../../components/ui/UserAvatar';
 
@@ -39,6 +39,15 @@ export const GalleryHeader: React.FC<GalleryHeaderProps> = ({ user, onLogin, onL
                                 {user.user_metadata?.display_name || user.email?.split('@')[0]}
                             </span>
                         </button>
+                        
+                        <button 
+                            onClick={() => onNavigate('/settings')}
+                            className="p-2 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors border border-white/5"
+                            title="Paramètres"
+                        >
+                            <Settings size={18} />
+                        </button>
+
                         <button onClick={onLogout} className="p-2 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-400 rounded-lg transition-colors">
                             <LogOut size={18} />
                         </button>

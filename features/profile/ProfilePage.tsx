@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../core/api';
 import { auth } from '../../core/auth';
 import { UserProfile } from '../../types';
-import { ArrowLeft, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Loader2, UserX } from 'lucide-react';
 import { ProfileHero } from './components/ProfileHero';
 import { ProfileStats } from './components/ProfileStats';
 import { ProfilePortfolio } from './components/ProfilePortfolio';
@@ -89,6 +89,28 @@ export const ProfilePage: React.FC = () => {
     if (!profile) return null;
 
     const isOwnProfile = !userId || userId === currentUser?.id;
+
+    // Si l'utilisateur est marqué comme supprimé
+    if (profile.is_deleted) {
+        return (
+            <div className="min-h-screen bg-gray-950 text-white font-sans flex flex-col items-center pt-24">
+                <SEO title="Utilisateur Supprimé" />
+                <div className="p-6 bg-gray-900 border border-gray-800 rounded-3xl text-center max-w-lg">
+                    <UserX size={48} className="mx-auto mb-4 text-gray-600" />
+                    <h1 className="text-2xl font-black text-gray-400 mb-2">Utilisateur Introuvable</h1>
+                    <p className="text-gray-500 mb-6">Ce profil a été supprimé par son propriétaire. Ses créations restent cependant visibles pour la communauté.</p>
+                    <ProfilePortfolio 
+                        walls={userWalls} 
+                        isOwnProfile={false} 
+                        authorName="Utilisateur Supprimé" 
+                        onWallClick={(id) => navigate(`/view/${id}`)} 
+                        onCreateClick={() => {}} 
+                    />
+                </div>
+                <button onClick={() => navigate('/')} className="mt-8 text-blue-500 hover:underline">Retour à l'accueil</button>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-950 text-white font-sans selection:bg-blue-500/30">

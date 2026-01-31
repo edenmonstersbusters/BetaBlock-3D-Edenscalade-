@@ -5,11 +5,14 @@ import { WallEditor } from './features/editor/WallEditorPage';
 import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
+import { SettingsPage } from './features/settings/SettingsPage';
+import { AuthCallbackPage } from './features/auth/AuthCallbackPage'; // Nouvelle Import
 import { useHistory } from './hooks/useHistory';
 import { useWallData } from './hooks/useWallData';
 import { NotificationsProvider, useNotifications } from './core/NotificationsContext';
 import { ToastNotification } from './components/ui/ToastNotification';
 import { AuthModal } from './components/auth/AuthModal';
+import { auth } from './core/auth';
 import './types';
 
 // Composant interne pour afficher les Toasts
@@ -42,16 +45,29 @@ export default function App() {
   
   const history = useHistory({ config, holds });
 
-  // Détection des routes d'authentification directes
+  // 1. Détection des routes d'auth
   useEffect(() => {
     if (location.pathname === '/login' || location.pathname === '/signup') {
         setShowAuthFromRoute(true);
     }
   }, [location.pathname]);
 
+  // 2. Gestion Globale des Reset Password / Confirmation Email
+  // Note: auth.onAuthStateChange capture les événements, mais AuthCallbackPage gère l'affichage initial
+  useEffect(() => {
+    const { data: { subscription } } = auth.onAuthStateChange((eventUser, event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+            // Redirection gérée par AuthCallbackPage, mais sécurité supplémentaire ici
+            if (!location.pathname.includes('/settings')) {
+                navigate('/settings?type=recovery');
+            }
+        }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate, location.pathname]);
+
   const handleAuthClose = () => {
       setShowAuthFromRoute(false);
-      // On retourne à l'accueil ou la galerie si on était sur une page d'auth pure
       if (location.pathname === '/login' || location.pathname === '/signup') {
           navigate('/');
       }
@@ -67,17 +83,19 @@ export default function App() {
   return (
     <NotificationsProvider>
       <Routes>
-        {/* Routes du Sitemap Static */}
         <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
         <Route path="/gallery" element={<GalleryPage onResetState={resetToNew} />} />
         
-        {/* Nouvelles routes d'authentification */}
         <Route path="/login" element={<GalleryPage onResetState={resetToNew} />} />
         <Route path="/signup" element={<GalleryPage onResetState={resetToNew} />} />
+
+        {/* Route dédiée aux retours d'emails */}
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         
         <Route path="/builder" element={
           <WallEditor mode="BUILD" {...editorProps} />
@@ -95,7 +113,6 @@ export default function App() {
           <WallEditor mode="VIEW" {...editorProps} onRemix={handleRemix} />
         } />
         
-        {/* Redirection fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

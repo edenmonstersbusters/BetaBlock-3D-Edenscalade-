@@ -13,7 +13,9 @@ export const auth = {
         options: {
           data: {
             display_name: displayName || email.split('@')[0], // Pseudo ou partie locale de l'email par défaut
-          }
+          },
+          // MODIFICATION ICI : On redirige vers la page de callback dédiée avec le type signup
+          emailRedirectTo: `${window.location.origin}/auth/callback?type=signup` 
         }
       });
       return { data, error };
@@ -52,8 +54,79 @@ export const auth = {
   },
 
   /**
+   * Met à jour l'email de l'utilisateur.
+   */
+  async updateEmail(newEmail: string) {
+    try {
+        const { data, error } = await supabase.auth.updateUser({ 
+            email: newEmail 
+        }, {
+            emailRedirectTo: `${window.location.origin}/auth/callback?type=email_change`
+        });
+        return { data, error };
+    } catch (e: any) {
+        return { data: null, error: e.message };
+    }
+  },
+
+  /**
+   * Met à jour le mot de passe.
+   */
+  async updatePassword(newPassword: string) {
+    try {
+        const { data, error } = await supabase.auth.updateUser({ 
+            password: newPassword 
+        });
+        return { data, error };
+    } catch (e: any) {
+        return { data: null, error: e.message };
+    }
+  },
+
+  /**
+   * Envoie un email de réinitialisation de mot de passe.
+   */
+  async resetPasswordForEmail(email: string) {
+      try {
+          const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+          });
+          return { data, error };
+      } catch (e: any) {
+          return { data: null, error: e.message };
+      }
+  },
+
+  /**
+   * Soft Delete : Marque le profil comme supprimé sans détruire les murs.
+   */
+  async softDeleteAccount(userId: string) {
+      try {
+          // 1. On anonymise le profil dans public.profiles
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ 
+                display_name: 'Utilisateur Supprimé',
+                avatar_url: null,
+                bio: null,
+                location: null,
+                is_deleted: true 
+            })
+            .eq('id', userId);
+
+          if (profileError) throw profileError;
+
+          // 2. On déconnecte l'utilisateur
+          await this.signOut();
+          
+          return { error: null };
+      } catch (e: any) {
+          return { error: e.message };
+      }
+  },
+
+  /**
    * Récupère l'utilisateur courant de manière sécurisée.
-   * Si le réseau échoue, renvoie null au lieu de throw.
    */
   async getUser() {
     try {
@@ -61,14 +134,11 @@ export const auth = {
       if (error) throw error;
       return user;
     } catch (e: any) {
-      // FIX: Si le Refresh Token est invalide (révoqué ou corrompu), 
-      // on force la déconnexion pour nettoyer le localStorage.
       const msg = (e.message || "").toLowerCase();
       if (msg.includes("refresh token") || msg.includes("json_token_not_found")) {
           console.warn("Session corrompue détectée, nettoyage automatique.");
           await supabase.auth.signOut();
       }
-      // En cas d'erreur réseau ou pas de session, on reste en mode anonyme
       return null;
     }
   },
@@ -76,9 +146,9 @@ export const auth = {
   /**
    * Écoute les changements d'état (login/logout).
    */
-  onAuthStateChange(callback: (user: any) => void) {
-    return supabase.auth.onAuthStateChange((_event, session) => {
-      callback(session?.user || null);
+  onAuthStateChange(callback: (user: any, event: string) => void) {
+    return supabase.auth.onAuthStateChange((event, session) => {
+      callback(session?.user || null, event);
     });
   }
 };

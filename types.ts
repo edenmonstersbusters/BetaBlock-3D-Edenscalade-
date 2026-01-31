@@ -101,6 +101,7 @@ export interface UserProfile {
   climbing_style?: string;
   
   created_at: string;
+  is_deleted?: boolean; // Soft delete flag
   
   // Computed stats
   stats?: {
