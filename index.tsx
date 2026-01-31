@@ -5,7 +5,6 @@ import { BrowserRouter, HashRouter, MemoryRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import './types';
-import './core/i18n'; // Initialisation i18n
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

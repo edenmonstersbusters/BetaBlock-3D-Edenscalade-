@@ -12,7 +12,6 @@ import { AuthModal } from '../../components/auth/AuthModal';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { ActionWarning } from '../../components/ui/ActionWarning';
 import { SEO } from '../../components/SEO';
-import { useTranslation } from 'react-i18next';
 
 interface ViewerPanelProps {
   wallId: string;
@@ -27,7 +26,6 @@ interface ViewerPanelProps {
 
 export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, config, holds, onHome, onRemix, onShare, onEdit }) => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const [socialStats, setSocialStats] = useState({ likes: 0, hasLiked: false });
   const [showAuth, setShowAuth] = useState(false);
   const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
@@ -38,7 +36,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
   const displayAvatarUrl = authorProfile?.avatar_url || metadata.authorAvatarUrl;
   const displayName = authorProfile?.display_name || metadata.authorName || "Anonyme";
 
-  const dateStr = new Date(metadata.timestamp).toLocaleDateString(undefined, {
+  const dateStr = new Date(metadata.timestamp).toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric'
   });
 
@@ -53,14 +51,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
     const rad = (s.angle * Math.PI) / 180;
     return acc + (s.height * Math.cos(rad));
   }, 0);
-
-  // Description SEO générée dynamiquement et traduite
-  const seoDescription = t('seo.viewer_description', {
-    author: displayName,
-    count: totalHolds,
-    height: totalVerticalHeight.toFixed(1),
-    difficulty: maxOverhang > 30 ? t('seo.difficulty_expert') : t('seo.difficulty_intermediate')
-  });
 
   useEffect(() => {
       auth.getUser().then(user => {
@@ -126,15 +116,15 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden relative">
       <SEO 
         title={metadata.name || "Mur Sans Nom"} 
-        description={seoDescription}
+        description={`Découvrez ce mur d'escalade 3D créé par ${displayName}. ${totalHolds} prises, ${totalVerticalHeight.toFixed(1)}m de haut. Difficulté estimée : ${maxOverhang > 30 ? 'Expert' : 'Intermédiaire'}.`}
         image={metadata.thumbnail}
         author={displayName}
         publishedTime={metadata.timestamp}
         type="article"
         breadcrumbs={[
-            { name: t('seo.breadcrumb_home'), url: '/' },
-            { name: t('seo.breadcrumb_gallery'), url: '/' },
-            { name: metadata.name || t('seo.breadcrumb_wall'), url: `/view/${wallId}` }
+            { name: 'Accueil', url: '/' },
+            { name: 'Galerie', url: '/' },
+            { name: metadata.name || 'Mur', url: `/view/${wallId}` }
         ]}
         schema={{
             type: '3DModel',
@@ -181,10 +171,10 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 <section className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
                         <GitFork size={12} />
-                        <span>{t('viewer.remix_project')}</span>
+                        <span>PROJET REMIXÉ</span>
                     </div>
                     <p className="text-xs text-gray-300 leading-tight">
-                        {t('viewer.inspired_by')} <span className="text-white font-bold">{metadata.parentName}</span>.
+                        Inspiré par <span className="text-white font-bold">{metadata.parentName}</span> de <span className="text-blue-400 font-bold">{metadata.parentAuthorName}</span>.
                     </p>
                 </section>
             )}
@@ -196,14 +186,14 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 <div className="flex items-center gap-3 text-sm text-gray-300">
                     <UserAvatar userId={metadata.authorId} url={displayAvatarUrl} name={displayName} size="md" />
                     <div className="min-w-0 flex-1">
-                        <span className="block text-xs text-gray-500 uppercase">{t('viewer.created_by')}</span>
+                        <span className="block text-xs text-gray-500 uppercase">Créé par</span>
                         <span className="font-bold text-white truncate block group-hover/author:underline group-hover/author:text-blue-400 transition-colors">{displayName}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-300">
                     <div className="p-2 bg-gray-700 rounded-full flex-shrink-0"><Calendar size={16} /></div>
                     <div>
-                        <span className="block text-xs text-gray-500 uppercase">{t('viewer.date')}</span>
+                        <span className="block text-xs text-gray-500 uppercase">Date</span>
                         <span className="font-medium">{dateStr}</span>
                     </div>
                 </div>
@@ -221,7 +211,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
             <section className="pt-6 border-t border-gray-800">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
                     <MessageSquare size={12} />
-                    <span>{t('viewer.comments_beta')}</span>
+                    <span>Commentaires & Bétas</span>
                 </div>
                 <SocialFeed wallId={wallId} onRequestAuth={() => setShowAuth(true)} />
             </section>
@@ -236,7 +226,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center space-x-2 font-bold transition-all shadow-lg hover:shadow-blue-900/20 transform hover:-translate-y-0.5"
             >
                 <Edit3 size={18} />
-                <span>{t('viewer.edit_my_wall')}</span>
+                <span>Modifier mon mur</span>
             </button>
         )}
         <button 
@@ -244,14 +234,14 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
             className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg flex items-center justify-center space-x-2 font-bold transition-all shadow-lg hover:shadow-blue-900/20 transform hover:-translate-y-0.5"
         >
             <GitFork size={18} />
-            <span>{t('viewer.remix_this_wall')}</span>
+            <span>Remixer ce mur</span>
         </button>
         <button 
             onClick={onShare} 
             className="w-full py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center justify-center space-x-2 font-medium transition-colors border border-gray-700"
         >
             <Share2 size={16} />
-            <span>{t('viewer.share')}</span>
+            <span>Partager</span>
         </button>
       </div>
     </div>
