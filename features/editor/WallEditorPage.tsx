@@ -47,11 +47,12 @@ export const WallEditor: React.FC<WallEditorProps> = ({
   const derivedMode: AppMode = initialMode === 'VIEW' ? 'VIEW' : (activeTab === 'structure' ? 'BUILD' : 'SET');
 
   const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref pour l'input fichier caché (Ctrl+O)
   const state = useEditorState();
   
   const logic = useEditorLogic({
     mode: derivedMode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
-    undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef
+    undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef, fileInputRef
   });
 
   // Timer d'initialisation pour éviter l'écran noir/vide au démarrage
@@ -159,6 +160,20 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         onRotateHold={(id, d) => { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, spin: x.spin + d } : x)); }}
         onColorHold={(id, c) => { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, color: c } : x)); }}
         onSegmentUpdate={logic.updateSegmentQuickly}
+      />
+      {/* Input caché pour le raccourci Ctrl+O */}
+      <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept=".json" 
+          onChange={(e) => { 
+              const file = e.target.files?.[0]; 
+              if (file) {
+                  logic.handleImportFile(file);
+                  e.target.value = '';
+              }
+          }} 
       />
       <GlobalModal config={state.modal} onClose={() => state.setModal(null)} isSavingCloud={isSavingCloud} generatedLink={generatedLink || `${window.location.origin}/#/view/${cloudId}`} onSaveCloud={wrappedSaveCloud} onDownload={handleDownloadLocal} wallName={metadata.name} onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} />
     </div>

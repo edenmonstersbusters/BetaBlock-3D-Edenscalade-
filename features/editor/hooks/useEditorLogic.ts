@@ -1,5 +1,5 @@
 
-import React, { useCallback, Dispatch, SetStateAction } from 'react';
+import React, { useCallback, Dispatch, SetStateAction, MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { calculateLocalCoords } from '../../../utils/geometry';
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';
@@ -16,11 +16,12 @@ interface UseEditorLogicProps {
   state: any; 
   onHome: () => void; onNewWall: () => void;
   cursorPosRef: React.MutableRefObject<{ x: number, y: number, segmentId: string } | null>;
+  fileInputRef: MutableRefObject<HTMLInputElement | null>;
 }
 
 export const useEditorLogic = ({
   mode, config, setConfig, holds, setHolds, metadata, setMetadata, user,
-  undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef
+  undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef, fileInputRef
 }: UseEditorLogicProps) => {
 
   const applyHistoryState = useCallback((hState: any) => {
@@ -117,7 +118,6 @@ export const useEditorLogic = ({
       setConfig(prev => ({ ...prev, segments: prev.segments.map(s => (s && s.id === id) ? { ...s, height: Math.max(0.5, (updates.height !== undefined ? seg.height + updates.height : seg.height)), angle: Math.min(85, Math.max(-15, (updates.angle !== undefined ? seg.angle + updates.angle : seg.angle))) } : s) }));
   };
 
-  // --- NOUVELLES FONCTIONS RÉPARÉES ---
   const handleRemoveAllHolds = useCallback(() => {
     if (mode === 'VIEW') return;
     state.setModal({
@@ -142,13 +142,16 @@ export const useEditorLogic = ({
   useKeyboardShortcuts({
     undo: performUndo, redo: performRedo, selectAll: () => state.setSelectedPlacedHoldIds(holds.filter(h => h && h.id).map(h => h.id)),
     copy: () => { if (state.selectedPlacedHoldIds.length > 0) state.setClipboard(JSON.parse(JSON.stringify(holds.filter(h => h && state.selectedPlacedHoldIds.includes(h.id))))); },
-    paste: () => handlePaste(), save: () => actions.handleAction('save'), open: () => {}, deleteAction: () => removeHoldsAction(state.selectedPlacedHoldIds)
-  }, [performUndo, performRedo, state.selectedPlacedHoldIds, removeHoldsAction, state.clipboard, mode, holds, config, metadata.remixMode, user, handlePaste, actions]);
+    paste: () => handlePaste(), 
+    save: () => actions.handleAction('save'), 
+    open: () => fileInputRef.current?.click(), // Connexion du raccourci Ctrl+O
+    deleteAction: () => removeHoldsAction(state.selectedPlacedHoldIds)
+  }, [performUndo, performRedo, state.selectedPlacedHoldIds, removeHoldsAction, state.clipboard, mode, holds, config, metadata.remixMode, user, handlePaste, actions, fileInputRef]);
 
   return { 
     performUndo, performRedo, saveToHistory, handlePlaceHold, handlePaste, 
     removeHoldsAction, removeSegmentAction, updateSegmentQuickly, 
-    handleRemoveAllHolds, handleChangeAllHoldsColor, // Export des nouvelles fonctions
+    handleRemoveAllHolds, handleChangeAllHoldsColor, 
     ...actions 
   };
 };
