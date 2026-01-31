@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ArrowLeft, Edit2, Save, Globe } from 'lucide-react';
 import { WallMetadata, AppMode } from '../../../types';
@@ -24,7 +25,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             <div className="flex items-center gap-4 justify-start">
                 <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group">
                     <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-xl">🧗</span>
+                    <img src="https://i.ibb.co/zTvzzrFM/apple-touch-icon.png" alt="Logo" className="w-6 h-6 object-contain" />
                     <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline group-hover:text-blue-400 transition-colors">BetaBlock</span>
                 </button>
             </div>
