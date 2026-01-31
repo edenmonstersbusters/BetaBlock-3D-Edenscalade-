@@ -16,23 +16,24 @@ const isBlob = window.location.protocol === 'blob:';
 const isProduction = window.location.hostname === 'betablock-3d.fr' || window.location.hostname === 'www.betablock-3d.fr';
 
 /**
- * LOGIQUE DE REDIRECTION INTELLIGENTE (Fix 404 / Deep Linking)
- * 
- * Si un utilisateur accède à une URL "propre" (ex: /gallery) dans un environnement 
- * qui ne supporte pas le rafraîchissement côté serveur (AI Studio, Localhost...), 
- * on le redirige vers la version "hashée" correspondante (/#/gallery).
+ * LOGIQUE DE ROUTAGE ET REDIRECTION UNIFIÉE
  */
-if (!isProduction && !isBlob && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+if (isProduction) {
+    // EN PRODUCTION : On veut des URLs propres.
+    // Si l'utilisateur arrive avec un "#", on le redirige vers l'URL propre.
+    if (window.location.hash.startsWith('#/')) {
+        const cleanPath = window.location.hash.substring(2); // Enlever "#/"
+        window.location.replace(window.location.origin + '/' + cleanPath);
+    }
+} else if (!isBlob && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+    // EN PREVIEW/DEV : On force le "#" pour éviter les 404 au refresh (car pas de config serveur)
     const targetPath = window.location.pathname;
     const targetSearch = window.location.search;
-    // On utilise replace pour ne pas polluer l'historique de navigation
     window.location.replace(window.location.origin + '/#' + targetPath + targetSearch);
 }
 
-// 3. Choix Stratégique du Routeur
+// 3. Choix du Routeur
 const Router = isBlob ? MemoryRouter : (isProduction ? BrowserRouter : HashRouter);
-
-// Pour MemoryRouter uniquement (Sandboxes strictes)
 const initialEntry = isBlob ? (window.location.hash.slice(1) || '/') : undefined;
 
 const root = ReactDOM.createRoot(rootElement);

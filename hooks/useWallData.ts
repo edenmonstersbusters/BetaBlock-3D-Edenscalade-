@@ -56,15 +56,13 @@ export const useWallData = () => {
         const { data } = await api.getWall(id);
         if (data) {
             setConfig(data.config);
-            setHolds(Array.isArray(data.holds) ? data.holds.filter(h => h && h.id) : []); // Filtrage de sécurité
+            setHolds(Array.isArray(data.holds) ? data.holds.filter(h => h && h.id) : []);
             setMetadata(data.metadata);
             setMode(targetMode);
         }
         setIsLoadingCloud(false);
     };
 
-    // La logique de détection d'ID fonctionne avec BrowserRouter ET HashRouter
-    // car useLocation normalise le pathname.
     if (path.startsWith('/view/')) {
         const id = path.split('/').pop();
         if (id) loadWallData(id, 'VIEW');
@@ -129,17 +127,14 @@ export const useWallData = () => {
     setIsSavingCloud(false);
     if (!result.error) {
         const targetId = cloudId || result.id;
-        
-        // LOGIQUE HYBRIDE DE GÉNÉRATION DE LIEN
         const isProduction = window.location.hostname === 'betablock-3d.fr';
         
         let shareUrl = '';
         if (isProduction) {
-            // URL Propre en production
             shareUrl = `https://betablock-3d.fr/view/${targetId}`;
         } else {
-            // URL Hash pour preview/dev (compatible blob)
             const origin = window.location.protocol === 'blob:' ? 'https://betablock-3d.fr' : window.location.origin;
+            // En preview on garde le hash pour éviter les erreurs de refresh
             shareUrl = `${origin.replace(/\/$/, '')}/#/view/${targetId}`;
         }
           
@@ -165,7 +160,6 @@ export const useWallData = () => {
       setMetadata(newMetadata);
       setCloudId(null);
       setGeneratedLink(null);
-      
       navigate('/builder', { state: { fromRemix: true } });
   };
 

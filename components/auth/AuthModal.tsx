@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { auth } from '../../core/auth';
@@ -6,10 +7,11 @@ import { X, Mail, Lock, LogIn, UserPlus, Loader2, AlertCircle, User } from 'luci
 interface AuthModalProps {
   onClose: () => void;
   onSuccess: () => void;
+  isSignUpDefault?: boolean;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
+export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess, isSignUpDefault = false }) => {
+  const [isSignUp, setIsSignUp] = useState(isSignUpDefault);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
