@@ -3,12 +3,14 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://betablock-3d.fr/</loc>
-    <changefreq>hourly</changefreq>
+    <lastmod>2026-02-01</lastmod>
+    <changefreq>dayly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://betablock-3d.fr/gallery</loc>
-    <changefreq>hourly</changefreq>
+    <lastmod>2026-02-01</lastmod>
+    <changefreq>dayly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
@@ -23,22 +25,22 @@
   </url>
   <url>
     <loc>https://betablock-3d.fr/builder</loc>
-    <changefreq>hourly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.89</priority>
   </url>
   <url>
     <loc>https://betablock-3d.fr/setter</loc>
-    <changefreq>hourly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.88</priority>
   </url>
   <url>
     <loc>https://betablock-3d.fr/projects</loc>
-    <changefreq>hourly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://betablock-3d.fr/profile</loc>
-    <changefreq>hourly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
 </urlset>

@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-// Fonction utilitaire pour échapper les caractères spéciaux XML
+// Utilitaire pour échapper les caractères XML
 function escapeXml(unsafe: any): string {
   if (typeof unsafe !== 'string') return '';
   return unsafe.replace(/[<>&'"]/g, (c) => {
@@ -20,59 +20,97 @@ function escapeXml(unsafe: any): string {
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   const BASE_URL = 'https://betablock-3d.fr';
   const SUPABASE_URL = 'https://ezfbjejmhfkpfxbmlwpo.supabase.co';
-  
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   try {
     if (!SERVICE_KEY) {
-        console.warn("ATTENTION : SUPABASE_SERVICE_ROLE_KEY manquante dans Vercel.");
-        throw new Error("Configuration serveur incomplète");
+        throw new Error("Clé SERVICE_ROLE manquante. Configurez la variable d'environnement sur Vercel.");
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    const { data: walls, error } = await supabase
-        .from('walls')
-        .select('id, updated_at, created_at')
-        .eq('is_public', true)
-        .order('updated_at', { ascending: false })
-        .limit(1000);
+    // 1. Récupération Parallèle des Données
+    const [wallsResult, profilesResult] = await Promise.all([
+        supabase.from('walls').select('id, updated_at').eq('is_public', true).limit(5000),
+        supabase.from('profiles').select('id, created_at').limit(2000)
+    ]);
 
-    if (error) {
-        throw new Error(`Supabase Error: ${error.message}`);
-    }
+    if (wallsResult.error) throw wallsResult.error;
+    if (profilesResult.error) throw profilesResult.error;
 
+    const walls = wallsResult.data || [];
+    const profiles = profilesResult.data || [];
     const today = new Date().toISOString().split('T')[0];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
-    // 1. URL de la Galerie (On retire le /#/ pour la version Prod)
-    xml += `
+    // --- A. PAGES STATIQUES ---
+    const staticPages = [
+        { path: '', priority: '1.0', freq: 'daily' },
+        { path: '/gallery', priority: '1.0', freq: 'daily' },
+        { path: '/builder', priority: '0.9', freq: 'weekly' },
+        { path: '/setter', priority: '0.8', freq: 'weekly' },
+        { path: '/projects', priority: '0.7', freq: 'daily' },
+        { path: '/profile', priority: '0.7', freq: 'daily' },
+        { path: '/login', priority: '0.5', freq: 'monthly' },
+        { path: '/signup', priority: '0.5', freq: 'monthly' },
+    ];
+
+    staticPages.forEach(p => {
+        xml += `
   <url>
-    <loc>${BASE_URL}/gallery</loc>
+    <loc>${BASE_URL}${p.path}</loc>
     <lastmod>${today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
+    <changefreq>${p.freq}</changefreq>
+    <priority>${p.priority}</priority>
   </url>`;
+    });
 
-    // 2. URLs des murs dynamiques (Format propre /view/ID)
-    if (walls && walls.length > 0) {
-        walls.forEach((wall: any) => {
-            const dateRaw = wall.updated_at || wall.created_at;
-            const lastMod = dateRaw ? dateRaw.split('T')[0] : today;
-            // UPDATE: Suppression du hash /#/ pour compatibilité BrowserRouter
-            const loc = `${BASE_URL}/view/${escapeXml(wall.id)}`;
+    // --- B. MURS DYNAMIQUES (Triplé d'URLs) ---
+    walls.forEach((wall: any) => {
+        const lastMod = (wall.updated_at || today).split('T')[0];
+        const id = escapeXml(wall.id);
 
-            xml += `
+        // 1. La Vue (Priorité maximale pour ce mur)
+        xml += `
   <url>
-    <loc>${loc}</loc>
+    <loc>${BASE_URL}/view/${id}</loc>
     <lastmod>${lastMod}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>`;
-        });
-    }
+
+        // 2. Le Builder (Pour permettre l'édition/remix direct)
+        xml += `
+  <url>
+    <loc>${BASE_URL}/builder?id=${id}</loc>
+    <lastmod>${lastMod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>`;
+
+        // 3. Le Setter (Mode ouverture)
+        xml += `
+  <url>
+    <loc>${BASE_URL}/setter?id=${id}</loc>
+    <lastmod>${lastMod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>`;
+    });
+
+    // --- C. PROFILS UTILISATEURS ---
+    profiles.forEach((profile: any) => {
+        const lastMod = (profile.created_at || today).split('T')[0];
+        xml += `
+  <url>
+    <loc>${BASE_URL}/profile/${escapeXml(profile.id)}</loc>
+    <lastmod>${lastMod}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>`;
+    });
 
     xml += `
 </urlset>`;
@@ -82,20 +120,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return response.status(200).send(xml);
 
   } catch (error: any) {
-    console.error('Sitemap Generation Error:', error);
-    
-    const today = new Date().toISOString().split('T')[0];
-    const fallbackXml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${BASE_URL}/gallery</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.5</priority>
-  </url>
-</urlset>`;
-    
-    response.setHeader('Content-Type', 'application/xml');
-    return response.status(200).send(fallbackXml);
+    console.error('Sitemap Error:', error);
+    return response.status(500).send(`Error generating sitemap: ${error.message}`);
   }
 }
