@@ -14,10 +14,34 @@ interface GalleryHeaderProps {
 export const GalleryHeader: React.FC<GalleryHeaderProps> = ({ user, onLogin, onLogout, onNavigate }) => {
     return (
         <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
-            <div className="flex items-center gap-2 group cursor-default">
-                <img src="https://i.ibb.co/zTvzzrFM/apple-touch-icon.png" alt="Logo BetaBlock" className="w-8 h-8 object-contain" />
-                <div className="text-xl font-black italic tracking-tighter text-blue-500 group-hover:text-blue-400 transition-colors">BetaBlock</div>
+            <style>{`
+                @keyframes soft-float {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-1.5px); }
+                }
+                @keyframes shimmer {
+                    0% { left: -150%; }
+                    100% { left: 150%; }
+                }
+                .animate-soft-float {
+                    animation: soft-float 4s ease-in-out infinite;
+                }
+            `}</style>
+            
+            <div onClick={() => onNavigate('/')} className="flex items-center gap-2 group cursor-pointer relative overflow-hidden p-2 rounded-xl transition-all">
+                {/* Shimmer Flash Effect */}
+                <div className="absolute top-0 -inset-full h-full w-1/2 z-20 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:animate-[shimmer_0.8s_ease-in-out] pointer-events-none" />
+                
+                <img 
+                    src="https://i.ibb.co/zTvzzrFM/apple-touch-icon.png" 
+                    alt="Logo BetaBlock" 
+                    className="w-8 h-8 object-contain animate-soft-float transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" 
+                />
+                <div className="text-xl font-black italic tracking-tighter text-blue-500 animate-soft-float [animation-delay:0.5s] transition-all duration-500 group-hover:text-blue-400 group-hover:scale-105 origin-left">
+                    BetaBlock
+                </div>
             </div>
+            
             <div className="flex items-center gap-4">
                 {user ? (
                     <div className="flex items-center gap-3">

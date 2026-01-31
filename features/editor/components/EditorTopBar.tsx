@@ -22,11 +22,36 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
     return (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3 bg-gray-900 border-b border-white/5 z-[110] relative shrink-0">
+            <style>{`
+                @keyframes soft-float {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-1.5px); }
+                }
+                @keyframes shimmer {
+                    0% { left: -150%; }
+                    100% { left: 150%; }
+                }
+                .animate-soft-float {
+                    animation: soft-float 4s ease-in-out infinite;
+                }
+            `}</style>
+            
             <div className="flex items-center gap-4 justify-start">
-                <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group">
+                <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group relative overflow-hidden">
+                    {/* Shimmer Flash Effect */}
+                    <div className="absolute top-0 -inset-full h-full w-1/2 z-20 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:animate-[shimmer_0.8s_ease-in-out] pointer-events-none" />
+                    
                     <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                    <img src="https://i.ibb.co/zTvzzrFM/apple-touch-icon.png" alt="Logo" className="w-6 h-6 object-contain" />
-                    <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline group-hover:text-blue-400 transition-colors">BetaBlock</span>
+                    
+                    <img 
+                        src="https://i.ibb.co/zTvzzrFM/apple-touch-icon.png" 
+                        alt="Logo" 
+                        className="w-6 h-6 object-contain animate-soft-float transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" 
+                    />
+                    
+                    <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline animate-soft-float [animation-delay:0.5s] transition-all duration-500 group-hover:text-blue-400 group-hover:scale-105 origin-left">
+                        BetaBlock
+                    </span>
                 </button>
             </div>
             <div className="flex flex-col items-center justify-center min-w-0 px-4">
