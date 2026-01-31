@@ -117,11 +117,38 @@ export const useEditorLogic = ({
       setConfig(prev => ({ ...prev, segments: prev.segments.map(s => (s && s.id === id) ? { ...s, height: Math.max(0.5, (updates.height !== undefined ? seg.height + updates.height : seg.height)), angle: Math.min(85, Math.max(-15, (updates.angle !== undefined ? seg.angle + updates.angle : seg.angle))) } : s) }));
   };
 
+  // --- NOUVELLES FONCTIONS RÉPARÉES ---
+  const handleRemoveAllHolds = useCallback(() => {
+    if (mode === 'VIEW') return;
+    state.setModal({
+        title: "Vider le mur",
+        message: "Attention, vous allez supprimer toutes les prises posées. Cette action est irréversible (sauf annulation immédiate).",
+        confirmText: "Tout supprimer",
+        isAlert: true,
+        onConfirm: () => {
+            saveToHistory();
+            setHolds([]);
+            state.setSelectedPlacedHoldIds([]);
+        }
+    });
+  }, [mode, saveToHistory, setHolds, state]);
+
+  const handleChangeAllHoldsColor = useCallback((color: string) => {
+    if (mode === 'VIEW') return;
+    saveToHistory();
+    setHolds(prev => prev.map(h => ({ ...h, color: color })));
+  }, [mode, saveToHistory, setHolds]);
+
   useKeyboardShortcuts({
     undo: performUndo, redo: performRedo, selectAll: () => state.setSelectedPlacedHoldIds(holds.filter(h => h && h.id).map(h => h.id)),
     copy: () => { if (state.selectedPlacedHoldIds.length > 0) state.setClipboard(JSON.parse(JSON.stringify(holds.filter(h => h && state.selectedPlacedHoldIds.includes(h.id))))); },
     paste: () => handlePaste(), save: () => actions.handleAction('save'), open: () => {}, deleteAction: () => removeHoldsAction(state.selectedPlacedHoldIds)
   }, [performUndo, performRedo, state.selectedPlacedHoldIds, removeHoldsAction, state.clipboard, mode, holds, config, metadata.remixMode, user, handlePaste, actions]);
 
-  return { performUndo, performRedo, saveToHistory, handlePlaceHold, handlePaste, removeHoldsAction, removeSegmentAction, updateSegmentQuickly, ...actions };
+  return { 
+    performUndo, performRedo, saveToHistory, handlePlaceHold, handlePaste, 
+    removeHoldsAction, removeSegmentAction, updateSegmentQuickly, 
+    handleRemoveAllHolds, handleChangeAllHoldsColor, // Export des nouvelles fonctions
+    ...actions 
+  };
 };

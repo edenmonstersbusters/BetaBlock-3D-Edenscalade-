@@ -127,7 +127,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         onBack={() => setActiveTab('structure')} 
                         selectedHold={state.selectedHold} onSelectHold={state.setSelectedHold} metadata={metadata}
                         holdSettings={state.holdSettings} onUpdateSettings={(s:any) => state.setHoldSettings(prev => ({ ...prev, ...s }))}
-                        placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} onRemoveAllHolds={onRemoveAllHolds || (() => {})} onChangeAllHoldsColor={onChangeAllHoldsColor || (() => {})} 
+                        placedHolds={holds} onRemoveHold={(id) => logic.removeHoldsAction([id], true)} 
+                        onRemoveAllHolds={logic.handleRemoveAllHolds} 
+                        onChangeAllHoldsColor={logic.handleChangeAllHoldsColor} 
                         selectedPlacedHoldIds={state.selectedPlacedHoldIds} onUpdatePlacedHold={(ids, u) => { const s = new Set(ids); setHolds(h => h.map(x => (x && s.has(x.id)) ? { ...x, ...u } : x)); state.setIsDirty(true); }}
                         onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])} onActionStart={logic.saveToHistory} 
                         onReplaceHold={(ids, def) => { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => (h && s.has(h.id)) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}

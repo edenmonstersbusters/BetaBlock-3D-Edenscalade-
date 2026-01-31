@@ -23,26 +23,40 @@ export const useEditorActions = ({
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const json = JSON.parse(e.target?.result as string);
+          if (!e.target?.result) throw new Error("Fichier vide");
+          const json = JSON.parse(e.target.result as string);
           const validated = validateBetaBlockJson(json);
           
           if (validated) {
             saveToHistory();
+            
+            // SECURITY CHECK: Integrity Check
+            // On vérifie que toutes les prises référencent un segment qui existe vraiment dans la nouvelle config
+            const validSegmentIds = new Set(validated.config.segments.map(s => s.id));
+            
+            // On filtre les prises orphelines qui feraient crasher le renderer 3D
+            const cleanHolds = validated.holds.filter(h => h && h.id && validSegmentIds.has(h.segmentId));
+            
+            if (cleanHolds.length < validated.holds.length) {
+                console.warn(`Nettoyage: ${validated.holds.length - cleanHolds.length} prises orphelines supprimées lors de l'import.`);
+            }
+
             setConfig(validated.config);
-            setHolds(validated.holds);
+            setHolds(cleanHolds);
             setMetadata((prev: WallMetadata) => ({
                 ...validated.metadata,
                 // Nouveau propriétaire si importé par un autre
                 authorId: validated.metadata.authorId === user?.id ? user.id : undefined
             }));
+            
             state.setIsDirty(true);
             state.setModal({ title: "Succès", message: "Fichier chargé avec succès.", isAlert: true });
           } else {
-            state.setModal({ title: "Erreur", message: "Fichier invalide ou corrompu.", isAlert: true });
+            state.setModal({ title: "Erreur", message: "Structure du fichier invalide ou corrompue.", isAlert: true });
           }
         } catch (err) {
-          console.error(err);
-          state.setModal({ title: "Erreur", message: "Impossible de lire le fichier.", isAlert: true });
+          console.error("Import Error:", err);
+          state.setModal({ title: "Erreur Critique", message: "Impossible de lire le fichier JSON.", isAlert: true });
         }
       };
       reader.readAsText(file);
