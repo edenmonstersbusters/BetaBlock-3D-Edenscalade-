@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Sitemap dynamique des murs (généré par api/sitemap.ts) -->
+  <sitemap>
+    <loc>https://betablock-3d.fr/sitemap-walls.xml</loc>
+  </sitemap>
+
   <!-- Sitemap des pages fixes (Accueil, Builder, Profil...) -->
   <sitemap>
     <loc>https://betablock-3d.fr/sitemap-static.xml</loc>
     <lastmod>2026-01-31</lastmod>
-  </sitemap>
-  
-  <!-- Sitemap dynamique des murs (généré par api/sitemap.ts) -->
-  <sitemap>
-    <loc>https://betablock-3d.fr/sitemap-walls.xml</loc>
   </sitemap>
 </sitemapindex>
