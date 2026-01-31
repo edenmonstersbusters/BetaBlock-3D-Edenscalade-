@@ -1,3 +1,4 @@
+
 {
   "redirects": [
     {
@@ -15,12 +16,6 @@
   "rewrites": [
     { "source": "/sitemap-walls.xml", "destination": "/api/sitemap" },
     { "source": "/api/:match*", "destination": "/api/:match*" },
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/builder", "destination": "/index.html" },
-    { "source": "/setter", "destination": "/index.html" },
-    { "source": "/projects", "destination": "/index.html" },
-    { "source": "/profile", "destination": "/index.html" },
-    { "source": "/profile/:path*", "destination": "/index.html" },
-    { "source": "/view/:path*", "destination": "/index.html" }
+    { "source": "/((?!api/|sitemap|robots|_next|static|favicon).*)", "destination": "/index.html" }
   ]
 }
