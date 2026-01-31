@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth } from '../../core/auth';
-import { api } from '../../core/api';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { NotificationsMenu } from '../../components/ui/NotificationsMenu';
-import { ArrowLeft, Lock, Mail, AlertTriangle, Save, Loader2, CheckCircle, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Lock, Mail, AlertTriangle, Save, Loader2, CheckCircle, ShieldAlert, Send } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -26,13 +24,16 @@ export const SettingsPage: React.FC = () => {
     const [deleteStep, setDeleteStep] = useState(0); // 0: Idle, 1: Warning, 2: Final
     const [deleteKeyword, setDeleteKeyword] = useState('');
 
+    const isRecoveryMode = searchParams.get('type') === 'recovery';
+
     useEffect(() => {
         const init = async () => {
             const u = await auth.getUser();
             if (!u) {
-                // Si on arrive depuis un lien de reset password sans être connecté (cas rare avec Supabase qui auto-connecte), on redirige pas tout de suite
-                if (searchParams.get('type') === 'recovery') {
-                    // On laisse faire, l'utilisateur est sensé être connecté par le lien magique
+                // Si on arrive depuis un lien de reset password sans être connecté
+                // Supabase gère la session via le hash url, on laisse un petit délai
+                if (isRecoveryMode) {
+                    // On attend que le AuthCallbackPage ou le listener ait fait son job
                 } else {
                     navigate('/login');
                     return;
@@ -44,11 +45,17 @@ export const SettingsPage: React.FC = () => {
         };
         init();
 
-        // Gestion du Recovery Mode
-        if (searchParams.get('type') === 'recovery') {
-            setMessage({ type: 'success', text: "Mode récupération activé. Veuillez définir votre nouveau mot de passe." });
+        if (isRecoveryMode) {
+            setMessage({ type: 'success', text: "Identité vérifiée. Vous pouvez maintenant définir votre nouveau mot de passe." });
         }
-    }, [navigate, searchParams]);
+    }, [navigate, isRecoveryMode]);
+
+    // Helper pour extraire le message d'erreur proprement
+    const getErrorMessage = (error: any): string => {
+        if (typeof error === 'string') return error;
+        if (error?.message) return error.message;
+        return "Une erreur inconnue est survenue.";
+    };
 
     const handleUpdateEmail = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -57,14 +64,33 @@ export const SettingsPage: React.FC = () => {
 
         const { error } = await auth.updateEmail(email);
         if (error) {
-            setMessage({ type: 'error', text: error });
+            setMessage({ type: 'error', text: getErrorMessage(error) });
         } else {
-            setMessage({ type: 'success', text: "Un email de confirmation a été envoyé à la nouvelle adresse et à l'ancienne." });
+            setMessage({ type: 'success', text: "Un email de confirmation a été envoyé à la nouvelle adresse. Le changement sera effectif après validation du lien." });
         }
         setIsSaving(false);
     };
 
-    const handleUpdatePassword = async (e: React.FormEvent) => {
+    // Cas 1 : Demande de reset (Si pas en mode recovery)
+    const handleRequestPasswordReset = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user?.email) return;
+        
+        setIsSaving(true);
+        setMessage(null);
+
+        const { error } = await auth.resetPasswordForEmail(user.email);
+        
+        if (error) {
+            setMessage({ type: 'error', text: getErrorMessage(error) });
+        } else {
+            setMessage({ type: 'success', text: "Un lien de réinitialisation sécurisé a été envoyé à votre adresse email." });
+        }
+        setIsSaving(false);
+    };
+
+    // Cas 2 : Définition du mot de passe (Si en mode recovery)
+    const handleSetNewPassword = async (e: React.FormEvent) => {
         e.preventDefault();
         if (password !== confirmPassword) {
             setMessage({ type: 'error', text: "Les mots de passe ne correspondent pas." });
@@ -80,11 +106,13 @@ export const SettingsPage: React.FC = () => {
 
         const { error } = await auth.updatePassword(password);
         if (error) {
-            setMessage({ type: 'error', text: error });
+            setMessage({ type: 'error', text: getErrorMessage(error) });
         } else {
             setMessage({ type: 'success', text: "Mot de passe mis à jour avec succès." });
             setPassword('');
             setConfirmPassword('');
+            // On nettoie l'URL
+            navigate('/settings', { replace: true });
         }
         setIsSaving(false);
     };
@@ -96,7 +124,7 @@ export const SettingsPage: React.FC = () => {
         const { error } = await auth.softDeleteAccount(user.id);
         
         if (error) {
-            setMessage({ type: 'error', text: "Erreur lors de la suppression : " + error });
+            setMessage({ type: 'error', text: "Erreur lors de la suppression : " + getErrorMessage(error) });
             setIsSaving(false);
         } else {
             navigate('/');
@@ -129,7 +157,7 @@ export const SettingsPage: React.FC = () => {
                 </header>
 
                 {message && (
-                    <div className={`p-4 rounded-xl flex items-center gap-3 ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                    <div className={`p-4 rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                         {message.type === 'success' ? <CheckCircle size={20}/> : <AlertTriangle size={20}/>}
                         <span className="font-medium text-sm">{message.text}</span>
                     </div>
@@ -151,6 +179,12 @@ export const SettingsPage: React.FC = () => {
                                 className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
                             />
                         </div>
+                        <div className="flex items-start gap-3 p-3 bg-blue-900/10 rounded-lg">
+                            <CheckCircle size={16} className="text-blue-400 shrink-0 mt-0.5"/>
+                            <p className="text-xs text-blue-300">
+                                Pour des raisons de sécurité, un email de confirmation sera envoyé à votre nouvelle adresse. Le changement ne sera effectif qu'après validation.
+                            </p>
+                        </div>
                         <button type="submit" disabled={isSaving || email === user?.email} className="px-6 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
                             {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                             <span>Mettre à jour l'email</span>
@@ -164,32 +198,47 @@ export const SettingsPage: React.FC = () => {
                         <Lock size={20} />
                         <h2 className="text-lg font-bold uppercase tracking-wider">Mot de passe</h2>
                     </div>
-                    <form onSubmit={handleUpdatePassword} className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nouveau mot de passe</label>
-                            <input 
-                                type="password" 
-                                value={password} 
-                                onChange={e => setPassword(e.target.value)}
-                                className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none"
-                                placeholder="••••••••"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Confirmer le mot de passe</label>
-                            <input 
-                                type="password" 
-                                value={confirmPassword} 
-                                onChange={e => setConfirmPassword(e.target.value)}
-                                className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none"
-                                placeholder="••••••••"
-                            />
-                        </div>
-                        <button type="submit" disabled={isSaving || !password} className="px-6 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
-                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                            <span>Changer le mot de passe</span>
-                        </button>
-                    </form>
+                    
+                    <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-4">
+                        {isRecoveryMode ? (
+                            <form onSubmit={handleSetNewPassword} className="space-y-4 animate-in fade-in">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nouveau mot de passe</label>
+                                    <input 
+                                        type="password" 
+                                        value={password} 
+                                        onChange={e => setPassword(e.target.value)}
+                                        className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Confirmer le mot de passe</label>
+                                    <input 
+                                        type="password" 
+                                        value={confirmPassword} 
+                                        onChange={e => setConfirmPassword(e.target.value)}
+                                        className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                                <button type="submit" disabled={isSaving || !password} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg font-bold text-sm transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20">
+                                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    <span>Enregistrer le nouveau mot de passe</span>
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="space-y-4">
+                                <p className="text-sm text-gray-400">
+                                    Pour garantir la sécurité de votre compte, la modification du mot de passe nécessite une vérification par email.
+                                </p>
+                                <button onClick={handleRequestPasswordReset} disabled={isSaving} className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold text-sm transition-colors flex items-center gap-2 border border-white/5">
+                                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                    <span>Envoyer un email de modification</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </section>
 
                 {/* Danger Zone */}
