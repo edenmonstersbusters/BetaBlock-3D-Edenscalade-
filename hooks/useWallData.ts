@@ -63,6 +63,8 @@ export const useWallData = () => {
         setIsLoadingCloud(false);
     };
 
+    // La logique de détection d'ID fonctionne avec BrowserRouter ET HashRouter
+    // car useLocation normalise le pathname.
     if (path.startsWith('/view/')) {
         const id = path.split('/').pop();
         if (id) loadWallData(id, 'VIEW');
@@ -126,37 +128,44 @@ export const useWallData = () => {
     
     setIsSavingCloud(false);
     if (!result.error) {
-        // Fallback to production domain for shareable links if we are in a blob/sandbox
-        const isBlob = window.location.protocol === 'blob:';
-        const origin = isBlob 
-          ? 'https://betablock-3d.fr' 
-          : window.location.origin;
+        const targetId = cloudId || result.id;
+        
+        // LOGIQUE HYBRIDE DE GÉNÉRATION DE LIEN
+        const isProduction = window.location.hostname === 'betablock-3d.fr';
+        
+        let shareUrl = '';
+        if (isProduction) {
+            // URL Propre en production
+            shareUrl = `https://betablock-3d.fr/view/${targetId}`;
+        } else {
+            // URL Hash pour preview/dev (compatible blob)
+            const origin = window.location.protocol === 'blob:' ? 'https://betablock-3d.fr' : window.location.origin;
+            shareUrl = `${origin.replace(/\/$/, '')}/#/view/${targetId}`;
+        }
           
-        setGeneratedLink(`${origin.replace(/\/$/, '')}/#/view/${cloudId || result.id}`);
+        setGeneratedLink(shareUrl);
         return true;
     }
     return false;
   };
 
-  // NOUVELLE LOGIQUE REMIX SIMPLIFIÉE
   const handleRemix = () => {
       const newMetadata: WallMetadata = {
           ...metadata,
           name: `Remix de ${metadata.name}`,
           timestamp: new Date().toISOString(),
-          parentId: cloudId || undefined, // On garde la référence au parent
+          parentId: cloudId || undefined,
           parentName: metadata.name,
           parentAuthorName: metadata.authorName,
-          remixMode: null, // Plus de mode restrictif
-          authorId: undefined, // Reset de l'auteur
+          remixMode: null,
+          authorId: undefined,
           authorName: undefined,
           authorAvatarUrl: undefined
       };
       setMetadata(newMetadata);
-      setCloudId(null); // C'est un nouveau mur
+      setCloudId(null);
       setGeneratedLink(null);
       
-      // On redirige toujours vers le builder complet
       navigate('/builder', { state: { fromRemix: true } });
   };
 

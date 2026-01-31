@@ -39,13 +39,27 @@ export const SEO: React.FC<SEOProps> = ({
   const siteTitle = "BetaBlock 3D";
   const fullTitle = `${title} | ${siteTitle}`;
   
-  // Use production URL as base if in a blob environment
-  const isBlob = window.location.protocol === 'blob:';
-  const fallbackOrigin = 'https://betablock-3d.fr';
+  // LOGIQUE URL CANONIQUE
+  // On force l'URL canonique vers le domaine de prod avec des chemins propres (sans #)
+  // Cela permet à Google d'indexer correctement même si le crawler arrive sur une version hashée.
+  const prodBase = 'https://betablock-3d.fr';
   
-  const currentUrl = url || (isBlob 
-    ? fallbackOrigin + (window.location.hash || '')
-    : window.location.href.split('#')[0].split('?')[0]);
+  // On nettoie l'URL courante pour enlever le hash éventuel
+  // ex: /#/view/123 -> /view/123
+  let cleanPath = '';
+  if (url) {
+      cleanPath = url.replace(prodBase, '').replace('#/', '').replace('#', '');
+  } else {
+      const hashPath = window.location.hash.replace('#', '');
+      const path = window.location.pathname;
+      cleanPath = hashPath.length > 1 ? hashPath : path;
+  }
+  
+  // Normalisation
+  if (!cleanPath.startsWith('/')) cleanPath = '/' + cleanPath;
+  if (cleanPath === '/') cleanPath = ''; // Root
+
+  const canonicalUrl = `${prodBase}${cleanPath}`;
 
   // Détection simple de la langue (par défaut FR)
   const lang = typeof navigator !== 'undefined' && navigator.language.startsWith('en') ? 'en' : 'fr';
@@ -58,18 +72,18 @@ export const SEO: React.FC<SEOProps> = ({
         {/* Standard Metadata */}
         <title>{fullTitle}</title>
         <meta name="description" content={description} />
-        <link rel="canonical" href={currentUrl} />
+        <link rel="canonical" href={canonicalUrl} />
         <meta name="robots" content="index, follow, max-image-preview:large" />
         {author && <meta name="author" content={author} />}
 
         {/* Internationalization Hints */}
-        <link rel="alternate" href={currentUrl} hrefLang="x-default" />
-        <link rel="alternate" href={currentUrl} hrefLang={lang} />
+        <link rel="alternate" href={canonicalUrl} hrefLang="x-default" />
+        <link rel="alternate" href={canonicalUrl} hrefLang={lang} />
 
         {/* Open Graph / Facebook / LinkedIn */}
         <meta property="og:locale" content={lang === 'fr' ? 'fr_FR' : 'en_US'} />
         <meta property="og:type" content={type} />
-        <meta property="og:url" content={currentUrl} />
+        <meta property="og:url" content={canonicalUrl} />
         <meta property="og:title" content={fullTitle} />
         <meta property="og:description" content={description} />
         <meta property="og:image" content={image} />
@@ -103,10 +117,8 @@ export const SEO: React.FC<SEOProps> = ({
                         '@type': 'ListItem',
                         position: i + 1,
                         name: b.name,
-                        // Construction d'URL compatible HashRouter pour Google
-                        item: b.url.startsWith('http') 
-                              ? b.url 
-                              : `https://betablock-3d.fr/#${b.url.startsWith('/') ? '' : '/'}${b.url}`
+                        // Les breadcrumbs doivent aussi pointer vers les URLs propres
+                        item: `${prodBase}${b.url.startsWith('/') ? '' : '/'}${b.url.replace('#/', '')}`
                     }))
                 }}
             />
