@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "betablock-3d.vercel.app"
+        }
+      ],
+      "destination": "https://betablock-3d.fr/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/sitemap-walls.xml", "destination": "/api/sitemap" },
     { "source": "/api/:match*", "destination": "/api/:match*" },
