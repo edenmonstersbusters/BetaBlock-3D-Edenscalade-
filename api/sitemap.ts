@@ -31,7 +31,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     // 1. Récupération Parallèle des Données
     const [wallsResult, profilesResult] = await Promise.all([
-        supabase.from('walls').select('id, updated_at').eq('is_public', true).limit(5000),
+        supabase.from('walls').select('id, created_at').eq('is_public', true).limit(5000),
         supabase.from('profiles').select('id, created_at').limit(2000)
     ]);
 
@@ -69,7 +69,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     // --- B. MURS DYNAMIQUES (Triplé d'URLs) ---
     walls.forEach((wall: any) => {
-        const lastMod = (wall.updated_at || today).split('T')[0];
+        const lastMod = (wall.created_at || today).split('T')[0];
         const id = escapeXml(wall.id);
 
         // 1. La Vue (Priorité maximale pour ce mur)
