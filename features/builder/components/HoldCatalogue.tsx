@@ -28,7 +28,7 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
     }
     const interval = setInterval(() => {
       setPreviewIndex((prev) => (prev % 4) + 1);
-    }, 2000); // Défilement ralenti à 2 secondes pour plus de clarté
+    }, 1500); // Défilement ralenti à 1.5 secondes
     return () => clearInterval(interval);
   }, [hoveredHoldId]);
 
@@ -93,7 +93,7 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
                         <img 
                           src={getThumbnailUrl(hold.filename, currentImgIndex)} 
                           alt={hold.name}
-                          className="w-full h-full object-contain p-2 transition-transform duration-700 ease-out group-hover:scale-110"
+                          className="w-full h-full object-contain p-2 transition-transform duration-700 ease-out scale-[1.5] group-hover:scale-[1.8]"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/111/444?text=?';
                           }}
