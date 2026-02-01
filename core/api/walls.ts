@@ -95,7 +95,7 @@ export const wallsApi = {
   async getWall(id: string): Promise<{ data: BetaBlockFile | null; error: string | null }> {
     try {
       // On sélectionne aussi user_id pour le fallback
-      const { data: result, error } = await supabase.from('walls').select('data, user_id').eq('id', id).single();
+      const { data: result, error } = await supabase.from('walls').select('data, user_id, updated_at').eq('id', id).single();
       if (error) throw error;
       if (!result) throw new Error("Mur introuvable");
 
@@ -125,7 +125,7 @@ export const wallsApi = {
 
   async getWallsList(userId?: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
-      let query = supabase.from('walls').select('id, name, created_at, data, user_id').eq('is_public', true);
+      let query = supabase.from('walls').select('id, name, created_at, updated_at, data, user_id').eq('is_public', true);
       if (userId) {
           // On cherche par colonne OU par JSON pour la compatibilité
           query = query.or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`);
@@ -144,9 +144,9 @@ export const wallsApi = {
   async getUserProjects(userId: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const { data, error } = await supabase.from('walls')
-        .select('id, name, created_at, data, is_public, user_id')
+        .select('id, name, created_at, updated_at, data, is_public, user_id')
         .or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false }); // Tri par date de mise à jour pour les projets persos
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');
@@ -160,7 +160,7 @@ export const wallsApi = {
   async searchWalls(query: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const searchTerm = `%${query}%`;
-      const { data, error } = await supabase.from('walls').select('id, name, created_at, data, user_id').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await supabase.from('walls').select('id, name, created_at, updated_at, data, user_id').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');
