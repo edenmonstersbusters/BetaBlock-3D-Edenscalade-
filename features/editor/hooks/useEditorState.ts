@@ -6,7 +6,7 @@ export const useEditorState = () => {
   // Sélection & Outils
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
   const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
-  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#ff8800' });
+  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#111111' });
   
   // Interface
   const [modal, setModal] = useState<ModalConfig | null>(null);
