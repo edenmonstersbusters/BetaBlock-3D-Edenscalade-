@@ -1,7 +1,7 @@
 
 import React, { Suspense, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Center, Environment, Html } from '@react-three/drei';
+import { OrbitControls, Center, Html } from '@react-three/drei';
 import { Eye, Ruler, Loader2 } from 'lucide-react';
 import { HoldModel } from '../../../core/HoldModel';
 import { HoldDefinition } from '../../../types';
@@ -50,10 +50,9 @@ export const HoldPreview: React.FC<HoldPreviewProps> = ({ hold, settings }) => {
 
               <div className="absolute inset-0">
                   <Canvas camera={{ position: [0, 0, 0.4], fov: 45 }}>
-                      <ambientLight intensity={0.6} />
+                      <ambientLight intensity={0.8} />
                       <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
-                      <pointLight position={[-10, -10, -10]} intensity={0.5} />
-                      <Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr" />
+                      <pointLight position={[-10, -10, -10]} intensity={0.8} />
                       <Suspense fallback={<Html center><Loader2 className="animate-spin text-blue-500" size={32} /></Html>}>
                           <Center>
                               <HoldModel 

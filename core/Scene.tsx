@@ -1,7 +1,7 @@
 
 import React, { useState, Suspense, useEffect, useRef } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
@@ -141,7 +141,13 @@ export const Scene: React.FC<SceneProps> = ({
   return (
     <Canvas 
       shadows 
-      gl={{ preserveDrawingBuffer: true }}
+      dpr={[1, 2]} // Ratio de pixels dynamique pour la netteté sur écrans Retina
+      gl={{ 
+        preserveDrawingBuffer: true,
+        antialias: true, // Lissage des bords
+        alpha: true,     // Fond transparent correct
+        powerPreference: "high-performance" // Force GPU
+      }}
       camera={{ position: [8, 5, 12], fov: 40 }}
       onPointerLeave={() => {
         onWallPointerUpdate?.(null);
@@ -151,7 +157,8 @@ export const Scene: React.FC<SceneProps> = ({
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        gl.toneMappingExposure = 1.2;
+        gl.toneMapping = THREE.ACESFilmicToneMapping; // Meilleure gestion des couleurs/lumières
+        gl.toneMappingExposure = 1.0;
       }}
     >
       <color attach="background" args={['#0a0a0a']} />
@@ -176,9 +183,34 @@ export const Scene: React.FC<SceneProps> = ({
         orbitRef={orbitRef}
       />
       
-      <ambientLight intensity={1.0} />
-      <directionalLight position={[5, 10, 5]} intensity={0.3} castShadow shadow-mapSize={[1024, 1024]} />
-      <hemisphereLight intensity={0.2} color="#ffffff" groundColor="#000000" />
+      {/* --- ÉCLAIRAGE STUDIO (3 POINTS + BOUNCE) --- */}
+      
+      {/* 1. Ambient Light : Base lumineuse forte pour des couleurs vibrantes */}
+      <ambientLight intensity={1.5} />
+
+      {/* 2. Key Light (Principal) : Définit la forme et crée les ombres principales */}
+      <directionalLight 
+        position={[10, 10, 10]} 
+        intensity={2.0} 
+        castShadow 
+        shadow-mapSize={[2048, 2048]} 
+        shadow-bias={-0.0001}
+      />
+
+      {/* 3. Fill Light (Remplissage) : Adoucit les ombres du côté opposé */}
+      <directionalLight 
+        position={[-10, 5, -10]} 
+        intensity={1.2} 
+      />
+
+      {/* 4. Bounce Light (Rebond) : Éclaire le DESSOUS des prises (crucial pour les dévers) */}
+      <directionalLight 
+        position={[0, -10, 0]} 
+        intensity={0.8} 
+        color="#eef" // Légèrement bleuté pour simuler le reflet du sol/ciel
+      />
+
+      {/* --- FIN ÉCLAIRAGE --- */}
 
       <group position={[0, 0, 0]}>
         <WallMesh 
@@ -258,9 +290,9 @@ export const Scene: React.FC<SceneProps> = ({
         )}
       </group>
 
-      <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#222" sectionColor="#333" infiniteGrid />
-      <ContactShadows opacity={0.4} scale={20} blur={2} far={10} resolution={512} color="#000000" />
-      <Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr" />
+      <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#333" sectionColor="#444" infiniteGrid fadeDistance={20} />
+      <ContactShadows opacity={0.6} scale={20} blur={2.5} far={4} resolution={512} color="#000000" />
+      {/* Environment supprimé pour éviter l'erreur de chargement HDRI */}
     </Canvas>
   );
 };

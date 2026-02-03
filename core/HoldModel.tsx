@@ -76,15 +76,19 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         const mesh = child as THREE.Mesh;
         mesh.geometry.computeVertexNormals();
         
+        // AMÉLIORATION DU MATÉRIAU
         mesh.material = new THREE.MeshStandardMaterial({
           color: new THREE.Color(color || '#ff8800'), 
-          roughness: 1.0, 
-          metalness: 0.0, 
+          roughness: 0.7, // Réduit de 1.0 à 0.7 pour permettre des reflets spéculaires (volume)
+          metalness: 0.1, // Légère touche métallique pour accrocher la lumière
           flatShading: false,
           transparent: opacity < 1 || isSelected,
           opacity: isSelected ? 0.7 : opacity,
           side: THREE.DoubleSide,
         });
+        
+        // FORCE UPDATE pour garantir que la lumière est bien recalculée
+        mesh.material.needsUpdate = true;
         
         if (preview || isSelected) {
            (mesh.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(isSelected ? '#3b82f6' : (color || '#ff8800'));
