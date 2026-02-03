@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth } from '../../core/auth';
@@ -121,7 +122,7 @@ export const SettingsPage: React.FC = () => {
         if (deleteKeyword !== 'SUPPRIMER') return;
         
         setIsSaving(true);
-        const { error } = await auth.softDeleteAccount(user.id);
+        const { error } = await auth.deleteAccount(); // Appel de la nouvelle fonction Hard Delete
         
         if (error) {
             setMessage({ type: 'error', text: "Erreur lors de la suppression : " + getErrorMessage(error) });
@@ -253,7 +254,7 @@ export const SettingsPage: React.FC = () => {
                             <div>
                                 <h3 className="font-bold text-red-200">Supprimer mon compte</h3>
                                 <p className="text-xs text-red-400/70 mt-1 max-w-sm">
-                                    Cette action rendra votre profil anonyme ("Utilisateur Supprimé"). Vos murs resteront visibles par la communauté mais ne vous seront plus attribués nominativement.
+                                    Cette action est irréversible. Toutes vos données (murs, likes, commentaires) seront supprimées de nos serveurs.
                                 </p>
                             </div>
                             <button onClick={() => setDeleteStep(1)} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold text-xs transition-colors">
@@ -264,8 +265,8 @@ export const SettingsPage: React.FC = () => {
                         <div className="bg-red-950 border border-red-500 rounded-2xl p-6 animate-in zoom-in-95 duration-200">
                             <h3 className="font-bold text-white text-lg mb-2">Êtes-vous absolument sûr ?</h3>
                             <p className="text-sm text-gray-300 mb-6">
-                                Pour confirmer la suppression définitive de votre profil, veuillez taper <strong>SUPPRIMER</strong> ci-dessous.
-                                <br/><span className="text-xs opacity-50">Vos créations ne seront PAS effacées de la base de données.</span>
+                                Pour confirmer la suppression définitive de votre compte et de tout votre contenu, veuillez taper <strong>SUPPRIMER</strong> ci-dessous.
+                                <br/><span className="text-xs text-red-400 font-bold">Tout sera effacé instantanément.</span>
                             </p>
                             
                             <input 

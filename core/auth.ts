@@ -98,25 +98,16 @@ export const auth = {
   },
 
   /**
-   * Soft Delete : Marque le profil comme supprimé sans détruire les murs.
+   * Hard Delete : Supprime définitivement l'utilisateur et toutes ses données (via Cascade SQL).
    */
-  async softDeleteAccount(userId: string) {
+  async deleteAccount() {
       try {
-          // 1. On anonymise le profil dans public.profiles
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({ 
-                display_name: 'Utilisateur Supprimé',
-                avatar_url: null,
-                bio: null,
-                location: null,
-                is_deleted: true 
-            })
-            .eq('id', userId);
+          // Appel de la fonction RPC 'delete_user_account' définie dans Supabase
+          const { error } = await supabase.rpc('delete_user_account');
 
-          if (profileError) throw profileError;
+          if (error) throw error;
 
-          // 2. On déconnecte l'utilisateur
+          // Déconnexion locale
           await this.signOut();
           
           return { error: null };
