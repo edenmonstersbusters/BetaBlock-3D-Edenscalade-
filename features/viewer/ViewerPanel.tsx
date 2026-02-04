@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WallConfig, PlacedHold, WallMetadata, UserProfile } from '../../types';
-import { Share2, GitFork, Calendar, Heart, MessageSquare, Edit3 } from 'lucide-react';
+import { Share2, GitFork, Calendar, Heart, MessageSquare, Edit3, Tag, AlignLeft, Hash, Trophy, ChevronRight } from 'lucide-react';
 import { SocialFeed } from './components/SocialFeed';
 import { ViewerHeader } from './components/ViewerHeader';
 import { ViewerStats } from './components/ViewerStats';
@@ -116,29 +116,11 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
     <div className="flex flex-col h-full bg-gray-900 text-white border-r border-gray-800 w-80 shadow-xl z-10 overflow-hidden relative">
       <SEO 
         title={metadata.name || "Mur Sans Nom"} 
-        description={`Découvrez ce mur d'escalade 3D créé par ${displayName}. ${totalHolds} prises, ${totalVerticalHeight.toFixed(1)}m de haut. Difficulté estimée : ${maxOverhang > 30 ? 'Expert' : 'Intermédiaire'}.`}
+        description={metadata.description || `Découvrez ce mur d'escalade 3D créé par ${displayName}. ${totalHolds} prises, ${totalVerticalHeight.toFixed(1)}m de haut.`}
         image={metadata.thumbnail}
         author={displayName}
         publishedTime={metadata.timestamp}
         type="article"
-        breadcrumbs={[
-            { name: 'Accueil', url: '/' },
-            { name: 'Galerie', url: '/' },
-            { name: metadata.name || 'Mur', url: `/view/${wallId}` }
-        ]}
-        schema={{
-            type: '3DModel',
-            data: {
-                name: metadata.name,
-                author: { '@type': 'Person', name: displayName },
-                image: metadata.thumbnail,
-                dateCreated: metadata.timestamp,
-                description: `Mur d'escalade 3D avec ${totalHolds} prises.`,
-                isAccessibleForFree: true,
-                material: "Wood, Resin",
-                fileFormat: "application/json"
-            }
-        }}
       />
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
@@ -156,17 +138,44 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         
-        <div className="flex items-center">
+        {/* GRADES & LIKE */}
+        <div className="flex gap-2">
+            <div className="flex-1 grid grid-cols-2 gap-2">
+                <div className="bg-emerald-600/20 border border-emerald-500/30 rounded-xl p-2 text-center shadow-lg">
+                    <span className="block text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-0.5">GRADE FR</span>
+                    <span className="text-base font-black text-white">{metadata.gradeFr || '6a'}</span>
+                </div>
+                <div className="bg-blue-600/20 border border-blue-500/30 rounded-xl p-2 text-center shadow-lg">
+                    <span className="block text-[8px] font-black text-blue-500 uppercase tracking-widest mb-0.5">V-SCALE</span>
+                    <span className="text-base font-black text-white">{metadata.gradeV || 'V3'}</span>
+                </div>
+            </div>
             <button 
                 onClick={(e) => handleLikeWall(e)}
-                className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-bold text-sm transition-all ${socialStats.hasLiked ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700'}`}
+                className={`px-4 rounded-xl font-bold text-sm transition-all flex flex-col items-center justify-center min-w-[64px] border ${socialStats.hasLiked ? 'bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : 'bg-gray-800 hover:bg-gray-750 text-gray-300 border-gray-700'}`}
             >
                 <Heart size={18} fill={socialStats.hasLiked ? "currentColor" : "none"} className={socialStats.hasLiked ? "animate-bounce-short" : ""} />
-                <span>{socialStats.likes} {socialStats.likes > 1 ? 'Likes' : 'Like'}</span>
+                <span className="text-[10px] font-black mt-0.5">{socialStats.likes}</span>
             </button>
         </div>
 
+        {/* TYPE BADGE */}
+        <div className="flex items-center gap-2 px-1">
+            {metadata.climbingType === 'boulder' ? (
+                <div className="flex-1 flex items-center gap-2 py-2 px-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 shadow-sm">
+                    <Hash size={14} strokeWidth={3} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.1em]">Catégorie : BLOC</span>
+                </div>
+            ) : (
+                <div className="flex-1 flex items-center gap-2 py-2 px-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400 shadow-sm">
+                    <Trophy size={14} strokeWidth={3} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.1em]">Catégorie : VOIE</span>
+                </div>
+            )}
+        </div>
+
         <div className="space-y-6">
+            {/* REMIX INFO */}
             {metadata.parentId && (
                 <section className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
@@ -179,22 +188,56 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                 </section>
             )}
 
+            {/* DESCRIPTION */}
+            {metadata.description && (
+                <section className="space-y-2">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">
+                        <AlignLeft size={12} />
+                        <span>Le Projet</span>
+                    </div>
+                    <div className="bg-gray-800/30 border border-white/5 rounded-2xl p-4 shadow-inner">
+                        <p className="text-sm text-gray-300 leading-relaxed italic whitespace-pre-wrap font-medium">
+                            "{metadata.description}"
+                        </p>
+                    </div>
+                </section>
+            )}
+
+            {/* STYLES */}
+            {metadata.styles && metadata.styles.length > 0 && (
+                <section className="space-y-3">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">
+                        <Tag size={12} />
+                        <span>Styles & Caractéristiques</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {metadata.styles.map(style => (
+                            <span key={style} className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-400 rounded-full text-[10px] font-bold uppercase tracking-tighter hover:text-white hover:border-gray-500 transition-colors cursor-default">
+                                {style}
+                            </span>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* AUTHOR & DATE */}
             <section 
-                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3 cursor-pointer hover:bg-gray-800 transition-colors group/author"
+                className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50 space-y-4 cursor-pointer hover:bg-gray-800 transition-all group/author hover:shadow-lg"
                 onClick={handleAuthorClick}
             >
                 <div className="flex items-center gap-3 text-sm text-gray-300">
                     <UserAvatar userId={metadata.authorId} url={displayAvatarUrl} name={displayName} size="md" />
                     <div className="min-w-0 flex-1">
-                        <span className="block text-xs text-gray-500 uppercase">Créé par</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-black">Route Setter</span>
                         <span className="font-bold text-white truncate block group-hover/author:underline group-hover/author:text-blue-400 transition-colors">{displayName}</span>
                     </div>
+                    <ChevronRight size={14} className="text-gray-600 group-hover/author:text-blue-400 transition-colors" />
                 </div>
-                <div className="flex items-center gap-3 text-sm text-gray-300">
-                    <div className="p-2 bg-gray-700 rounded-full flex-shrink-0"><Calendar size={16} /></div>
+                <div className="flex items-center gap-3 text-sm text-gray-300 pt-2 border-t border-white/5">
+                    <div className="p-2 bg-gray-700/50 rounded-lg flex-shrink-0"><Calendar size={14} /></div>
                     <div>
-                        <span className="block text-xs text-gray-500 uppercase">Date</span>
-                        <span className="font-medium">{dateStr}</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-black">Publication</span>
+                        <span className="font-medium text-xs text-gray-400">{dateStr}</span>
                     </div>
                 </div>
             </section>
