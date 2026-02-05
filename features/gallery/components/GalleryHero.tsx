@@ -12,7 +12,7 @@ export const GalleryHero: React.FC<GalleryHeroProps> = ({ user, onNavigate }) =>
         <header className="relative py-24 px-6 border-b border-white/10 overflow-hidden shrink-0">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-gray-950 to-gray-950 pointer-events-none" />
             <div className="max-w-7xl mx-auto relative z-10 text-center">
-                <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-6">BetaBlock <span className="text-blue-500">Hub</span></h1>
+                <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-6">BetaBlock <span className="text-blue-500">Galerie</span></h1>
                 <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">La plateforme communautaire des ouvreurs. Explorez les créations publiques ou gérez vos projets privés.</p>
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

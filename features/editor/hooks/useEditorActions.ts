@@ -90,7 +90,7 @@ export const useEditorActions = ({
       setMetadata((prev: WallMetadata) => ({ ...prev, isPublic: type === 'publish' }));
       
       state.setModal({ 
-          title: type === 'publish' ? "Publier dans le Hub" : "Enregistrer le projet", 
+          title: type === 'publish' ? "Publier dans la Galerie" : "Enregistrer le projet", 
           message: type === 'publish' ? "Votre mur sera visible par toute la communauté." : "Le projet sera sauvegardé dans votre espace privé.",
           isSaveDialog: true 
       });

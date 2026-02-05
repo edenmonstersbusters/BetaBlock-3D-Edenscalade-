@@ -47,7 +47,7 @@ export const ProjectsPage: React.FC = () => {
         <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar">
             <div className="p-6 flex items-center justify-between border-b border-white/5 bg-gray-950/50 backdrop-blur-xl sticky top-0 z-50">
                 <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
-                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /><span className="font-bold">Hub Public</span>
+                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /><span className="font-bold">Galerie</span>
                 </button>
                 <div className="flex items-center gap-3">
                     <span className="text-sm font-black italic tracking-tighter text-blue-500">MES MURS</span>

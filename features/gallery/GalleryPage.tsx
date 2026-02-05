@@ -81,7 +81,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
   return (
     <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
       <SEO 
-        title="Hub Communautaire" 
+        title="Galerie" 
         description="Explorez des milliers de murs d'escalade 3D créés par la communauté. Rejoignez les ouvreurs et partagez vos créations." 
         breadcrumbs={[
             { name: 'Accueil', url: '/' }
