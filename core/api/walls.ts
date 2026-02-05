@@ -25,12 +25,7 @@ export const wallsApi = {
         .from('walls')
         .insert([{ 
             name: data.metadata.name, 
-            description: data.metadata.description || null,
-            climbing_type: data.metadata.climbingType || 'boulder',
-            grade_fr: data.metadata.gradeFr || '6a',
-            grade_v: data.metadata.gradeV || 'V3',
-            styles: data.metadata.styles || [],
-            user_id: user.id, 
+            user_id: user.id, // SÉCURITÉ : Enregistrement explicite dans la colonne
             data: enrichedData,
             is_public: data.metadata.isPublic || false,
             parent_id: data.metadata.parentId || null
@@ -51,12 +46,7 @@ export const wallsApi = {
         .from('walls')
         .update({ 
             name: data.metadata.name, 
-            description: data.metadata.description || null,
-            climbing_type: data.metadata.climbingType || 'boulder',
-            grade_fr: data.metadata.gradeFr || '6a',
-            grade_v: data.metadata.gradeV || 'V3',
-            styles: data.metadata.styles || [],
-            user_id: user?.id,
+            user_id: user?.id, // Mise à jour de sécurité de la colonne
             data: data,
             is_public: data.metadata.isPublic || false
         })
@@ -104,6 +94,7 @@ export const wallsApi = {
 
   async getWall(id: string): Promise<{ data: BetaBlockFile | null; error: string | null }> {
     try {
+      // On sélectionne aussi user_id pour le fallback
       const { data: result, error } = await supabase.from('walls').select('data, user_id, updated_at').eq('id', id).single();
       if (error) throw error;
       if (!result) throw new Error("Mur introuvable");
@@ -132,19 +123,14 @@ export const wallsApi = {
     }
   },
 
-  async getWallsList(filters?: any): Promise<{ data: any[] | null; error: string | null }> {
+  async getWallsList(userId?: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
-      let query = supabase.from('walls').select('id, name, created_at, updated_at, data, user_id, climbing_type, grade_fr, grade_v, styles').eq('is_public', true);
-      
-      if (filters) {
-          if (filters.climbingType) query = query.eq('climbing_type', filters.climbingType);
-          if (filters.gradeFr) query = query.eq('grade_fr', filters.gradeFr);
-          if (filters.styles && filters.styles.length > 0) {
-              query = query.contains('styles', filters.styles);
-          }
+      let query = supabase.from('walls').select('id, name, created_at, updated_at, data, user_id').eq('is_public', true);
+      if (userId) {
+          // On cherche par colonne OU par JSON pour la compatibilité
+          query = query.or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`);
       }
-
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(100);
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');
@@ -158,9 +144,9 @@ export const wallsApi = {
   async getUserProjects(userId: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const { data, error } = await supabase.from('walls')
-        .select('id, name, created_at, updated_at, data, is_public, user_id, climbing_type, grade_fr, grade_v, styles')
+        .select('id, name, created_at, updated_at, data, is_public, user_id')
         .or(`user_id.eq.${userId},data->metadata->>authorId.eq.${userId}`)
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false }); // Tri par date de mise à jour pour les projets persos
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');
@@ -174,7 +160,7 @@ export const wallsApi = {
   async searchWalls(query: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const searchTerm = `%${query}%`;
-      const { data, error } = await supabase.from('walls').select('id, name, created_at, updated_at, data, user_id, climbing_type, grade_fr, grade_v, styles').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await supabase.from('walls').select('id, name, created_at, updated_at, data, user_id').eq('is_public', true).or(`name.ilike.${searchTerm},data->metadata->>authorName.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(50);
       
       if (error) throw error;
       const enriched = await enrichWithProfiles(data || [], 'WALL');

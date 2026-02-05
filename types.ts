@@ -25,11 +25,6 @@ declare global {
 
 export interface WallMetadata {
   name: string;
-  description?: string;
-  climbingType?: 'boulder' | 'sport';
-  gradeFr?: string;
-  gradeV?: string;
-  styles?: string[];
   timestamp: string;
   appVersion: string;
   thumbnail?: string;
@@ -91,6 +86,8 @@ export interface UserProfile {
   display_name: string;
   email?: string;
   avatar_url?: string;
+  
+  // New SQL Fields
   bio?: string;
   location?: string;
   home_gym?: {
@@ -99,11 +96,14 @@ export interface UserProfile {
     address?: string;
     country?: string;
     uri?: string;
-  } | null;
+  } | null; // JSONB in SQL
   climbing_grade?: string;
   climbing_style?: string;
+  
   created_at: string;
-  is_deleted?: boolean;
+  is_deleted?: boolean; // Soft delete flag
+  
+  // Computed stats
   stats?: {
     total_walls: number;
     total_likes: number;
@@ -111,6 +111,8 @@ export interface UserProfile {
     followers_count: number;
     following_count: number;
   };
+  
+  // State for current user
   is_following?: boolean;
 }
 
@@ -137,12 +139,12 @@ export interface AppNotification {
   id: string;
   recipient_id: string;
   actor_id: string;
-  actor_name?: string;
-  actor_avatar_url?: string;
+  actor_name?: string;     // Enrichi
+  actor_avatar_url?: string; // Enrichi
   type: 'follow' | 'unfollow' | 'new_wall' | 'comment' | 'like_wall' | 'like_comment';
   resource_id?: string;
-  resource_name?: string;
-  text_content?: string;
+  resource_name?: string; // Enrichi si c'est un mur
+  text_content?: string; // Enrichi pour les commentaires
   is_read: boolean;
   created_at: string;
 }
