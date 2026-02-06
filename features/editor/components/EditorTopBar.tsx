@@ -6,7 +6,7 @@ import { WallMetadata, AppMode } from '../../../types';
 interface EditorTopBarProps {
     mode: AppMode;
     metadata: WallMetadata;
-    setMetadata: (m: any) => void; // Using any for partial update wrapper
+    setMetadata: (m: any) => void; 
     isDirty: boolean;
     isEditingName: boolean;
     setIsEditingName: (b: boolean) => void;
@@ -38,7 +38,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             
             <div className="flex items-center gap-4 justify-start">
                 <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group relative overflow-hidden">
-                    {/* Shimmer Flash Effect */}
                     <div className="absolute top-0 -inset-full h-full w-1/2 z-20 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:animate-[shimmer_0.8s_ease-in-out] pointer-events-none" />
                     
                     <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
@@ -75,15 +74,15 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
                   </div>
                 )}
                 <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
-                    {mode === 'BUILD' ? 'Mode Structure' : 'Mode Ouverture'}
+                    {mode === 'BUILD' ? 'Configuration Structure' : 'Placement des Prises'}
                     {isDirty && <span className="ml-2 text-blue-400 font-black">•</span>}
                 </span>
             </div>
             <div className="flex items-center gap-2 justify-end">
                 <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-xl text-xs font-bold transition-all border border-gray-700 hover:border-gray-600">
-                    <Save size={14} /> <span className="hidden sm:inline">Sauvegarder</span>
+                    <Save size={14} /> <span className="hidden sm:inline">Enregistrer</span>
                 </button>
-                <button onClick={onPublish} className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-600/20">
+                <button onClick={onPublish} className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl text-xs font-black transition-all shadow-lg">
                     <Globe size={14} /> <span>PUBLIER</span>
                 </button>
             </div>

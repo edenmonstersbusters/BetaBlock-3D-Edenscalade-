@@ -9,7 +9,7 @@ interface BreadcrumbItem {
 }
 
 interface SEOProps {
-  title: string;
+  title: string; // Ex: "Galerie", "Atelier", "Profil de Marc"
   description?: string;
   image?: string;
   url?: string;
@@ -26,8 +26,8 @@ interface SEOProps {
 
 export const SEO: React.FC<SEOProps> = ({ 
   title, 
-  description = "Créez, modélisez et partagez vos murs d'escalade en 3D. L'outil ultime pour les ouvreurs et les passionnés.", 
-  image = "https://betablock-3d.fr/preview-image.jpg", 
+  description = "Concevez, visualisez et partagez vos murs d'escalade en 3D. L'outil de route setting ultime pour les grimpeurs et les ouvreurs.", 
+  image = "https://i.ibb.co/Wpc05q7K/Betablock.png", 
   url,
   type = 'website',
   author,
@@ -37,51 +37,46 @@ export const SEO: React.FC<SEOProps> = ({
   schema
 }) => {
   const siteTitle = "BetaBlock 3D";
-  const fullTitle = `${title} | ${siteTitle}`;
+  // Format du titre : "Nom de Page | BetaBlock 3D" ou juste "BetaBlock 3D" si c'est l'accueil
+  const fullTitle = title === "Accueil" ? siteTitle : `${title} | ${siteTitle}`;
   
-  // LOGIQUE URL CANONIQUE
-  // On force l'URL canonique vers le domaine de prod avec des chemins propres (sans #)
-  // Cela permet à Google d'indexer correctement même si le crawler arrive sur une version hashée.
   const prodBase = 'https://betablock-3d.fr';
   
-  // On nettoie l'URL courante pour enlever le hash éventuel
-  // ex: /#/view/123 -> /view/123
+  // LOGIQUE CANONIQUE ROBUSTE
   let cleanPath = '';
   if (url) {
       cleanPath = url.replace(prodBase, '').replace('#/', '').replace('#', '');
   } else {
       const hashPath = window.location.hash.replace('#', '');
       const path = window.location.pathname;
+      // On privilégie le chemin du hash s'il existe (pour le routage client)
       cleanPath = hashPath.length > 1 ? hashPath : path;
   }
   
-  // Normalisation
   if (!cleanPath.startsWith('/')) cleanPath = '/' + cleanPath;
-  if (cleanPath === '/') cleanPath = ''; // Root
+  if (cleanPath === '/' || cleanPath === '/index.html') cleanPath = '';
 
   const canonicalUrl = `${prodBase}${cleanPath}`;
-
-  // Détection simple de la langue (par défaut FR)
-  const lang = typeof navigator !== 'undefined' && navigator.language.startsWith('en') ? 'en' : 'fr';
+  const lang = "fr"; // On force le FR pour le SEO localisé France d'abord
 
   return (
     <>
         <Helmet>
         <html lang={lang} />
         
-        {/* Standard Metadata */}
+        {/* Métadonnées Primaires */}
         <title>{fullTitle}</title>
         <meta name="description" content={description} />
         <link rel="canonical" href={canonicalUrl} />
         <meta name="robots" content="index, follow, max-image-preview:large" />
         {author && <meta name="author" content={author} />}
 
-        {/* Internationalization Hints */}
+        {/* Internationalisation */}
         <link rel="alternate" href={canonicalUrl} hrefLang="x-default" />
-        <link rel="alternate" href={canonicalUrl} hrefLang={lang} />
+        <link rel="alternate" href={canonicalUrl} hrefLang="fr" />
 
-        {/* Open Graph / Facebook / LinkedIn */}
-        <meta property="og:locale" content={lang === 'fr' ? 'fr_FR' : 'en_US'} />
+        {/* Open Graph */}
+        <meta property="og:locale" content="fr_FR" />
         <meta property="og:type" content={type} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:title" content={fullTitle} />
@@ -92,23 +87,20 @@ export const SEO: React.FC<SEOProps> = ({
         {publishedTime && <meta property="article:published_time" content={publishedTime} />}
         {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
 
-        {/* Twitter / X */}
+        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@BetaBlock3D" />
         <meta name="twitter:title" content={fullTitle} />
         <meta name="twitter:description" content={description} />
         <meta name="twitter:image" content={image} />
-        <meta name="twitter:creator" content="@BetaBlock3D" />
         </Helmet>
 
-        {/* Injection JSON-LD si fourni, sinon Application par défaut */}
         {schema ? (
             <StructuredData type={schema.type} data={schema.data} />
         ) : (
             <StructuredData type="SoftwareApplication" data={{}} />
         )}
 
-        {/* Injection JSON-LD pour les Breadcrumbs (Sitelinks) */}
         {breadcrumbs && (
             <StructuredData 
                 type="BreadcrumbList" 
@@ -117,7 +109,6 @@ export const SEO: React.FC<SEOProps> = ({
                         '@type': 'ListItem',
                         position: i + 1,
                         name: b.name,
-                        // Les breadcrumbs doivent aussi pointer vers les URLs propres
                         item: `${prodBase}${b.url.startsWith('/') ? '' : '/'}${b.url.replace('#/', '')}`
                     }))
                 }}

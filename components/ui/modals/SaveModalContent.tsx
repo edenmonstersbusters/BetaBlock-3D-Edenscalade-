@@ -51,7 +51,7 @@ export const SaveModalContent: React.FC<SaveModalContentProps> = ({
               </div>
               <div className="text-left">
                 <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">Sauvegarde Cloud</h3>
-                <p className="text-xs text-gray-400">Publier sur le Hub communautaire.</p>
+                <p className="text-xs text-gray-400">Publier dans la Galerie publique.</p>
               </div>
            </button>
 
@@ -75,7 +75,7 @@ export const SaveModalContent: React.FC<SaveModalContentProps> = ({
                 <Check size={32} />
               </div>
               <h3 className="text-lg font-bold text-white mb-1">Sauvegarde réussie !</h3>
-              <p className="text-xs text-emerald-400">Votre mur est en sécurité dans le cloud.</p>
+              <p className="text-xs text-emerald-400">Votre mur est en sécurité dans la galerie.</p>
             </div>
             
             <div>
