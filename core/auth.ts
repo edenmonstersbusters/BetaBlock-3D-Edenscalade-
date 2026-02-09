@@ -4,9 +4,11 @@ import { supabase } from './supabase';
 export const auth = {
   /**
    * Inscrit un nouvel utilisateur avec un pseudo optionnel.
+   * Modifié pour connexion directe (sans validation email).
    */
   async signUp(email: string, password: string, displayName?: string) {
     try {
+      // 1. Tentative d'inscription
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -14,10 +16,22 @@ export const auth = {
           data: {
             display_name: displayName || email.split('@')[0], // Pseudo ou partie locale de l'email par défaut
           },
-          // MODIFICATION ICI : On redirige vers la page de callback dédiée avec le type signup
-          emailRedirectTo: `${window.location.origin}/auth/callback?type=signup` 
+          // SUPPRESSION de emailRedirectTo car plus de validation requise
         }
       });
+
+      if (error) throw error;
+
+      // 2. GARANTIE DE CONNEXION : Si l'inscription n'a pas renvoyé de session active
+      // (parfois le cas selon la config Supabase), on force une connexion immédiate.
+      if (data && !data.session) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          return { data: signInData, error: signInError };
+      }
+
       return { data, error };
     } catch (e: any) {
       console.warn("Auth SignUp Error (Offline?):", e);
