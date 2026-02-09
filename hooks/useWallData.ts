@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../core/api';
 import { auth } from '../core/auth';
-import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../types';
+import { WallConfig, AppMode, PlacedHold, WallMetadata, WallSegment } from '../types';
 
 const APP_VERSION = "1.1";
 
@@ -21,6 +21,94 @@ const INITIAL_METADATA: WallMetadata = {
     timestamp: new Date().toISOString(),
     appVersion: APP_VERSION,
     remixMode: null
+};
+
+// --- MOTEUR DE TEMPLATES URL ---
+const applyUrlTemplate = (searchParams: URLSearchParams): WallConfig | null => {
+    let hasTemplate = false;
+    let newConfig: WallConfig = JSON.parse(JSON.stringify(INITIAL_CONFIG));
+
+    // 1. Presets (Configurations pré-définies)
+    const preset = searchParams.get('preset');
+    if (preset) {
+        hasTemplate = true;
+        switch (preset.toLowerCase()) {
+            case 'moonboard': // Style MoonBoard (standard 2024: 40°)
+                newConfig.width = 3.15;
+                newConfig.segments = [{ id: crypto.randomUUID(), height: 3.6, angle: 40 }];
+                break;
+            case 'kilter': // Style Kilter (Ajustable, défaut 30°)
+                newConfig.width = 3.66; // 12x12
+                newConfig.segments = [{ id: crypto.randomUUID(), height: 3.66, angle: 30 }];
+                break;
+            case 'spraywall': // Grand Pan Classique
+                newConfig.width = 4.0;
+                newConfig.segments = [{ id: crypto.randomUUID(), height: 3.5, angle: 35 }];
+                break;
+            case 'comp': // Mur de Compétition (Vertical + Dévers + Toit)
+                newConfig.width = 5.0;
+                newConfig.segments = [
+                    { id: crypto.randomUUID(), height: 1.5, angle: 0 },
+                    { id: crypto.randomUUID(), height: 2.5, angle: 25 },
+                    { id: crypto.randomUUID(), height: 1.0, angle: 45 }
+                ];
+                break;
+        }
+    }
+
+    // 2. Paramètres Unitaires (écrasent les presets)
+    const width = parseFloat(searchParams.get('width') || '');
+    if (!isNaN(width) && width > 0) {
+        newConfig.width = Math.min(20, Math.max(1, width));
+        hasTemplate = true;
+    }
+
+    const angle = parseFloat(searchParams.get('angle') || '');
+    const height = parseFloat(searchParams.get('height') || '');
+    
+    // Si Angle ou Hauteur spécifié, on réinitialise à 1 seul segment (mode simple)
+    if (!isNaN(angle) || !isNaN(height)) {
+        hasTemplate = true;
+        newConfig.segments = [{
+            id: crypto.randomUUID(),
+            height: !isNaN(height) && height > 0 ? height : 3.0,
+            angle: !isNaN(angle) ? angle : 0
+        }];
+    }
+
+    // 3. Syntaxe Complexe Multi-Segments
+    // Format: ?s=height,angle;height,angle
+    // Exemple: ?s=2,0;1.5,30 (2m à 0°, puis 1.5m à 30°)
+    const segmentsParam = searchParams.get('s');
+    if (segmentsParam) {
+        try {
+            const segDefs = segmentsParam.split(';');
+            const newSegments: WallSegment[] = [];
+            
+            segDefs.forEach(def => {
+                const [hStr, aStr] = def.split(',');
+                const h = parseFloat(hStr);
+                const a = parseFloat(aStr);
+                
+                if (!isNaN(h) && !isNaN(a)) {
+                    newSegments.push({
+                        id: crypto.randomUUID(),
+                        height: Math.max(0.5, Math.min(10, h)),
+                        angle: Math.max(-20, Math.min(90, a))
+                    });
+                }
+            });
+
+            if (newSegments.length > 0) {
+                newConfig.segments = newSegments;
+                hasTemplate = true;
+            }
+        } catch (e) {
+            console.warn("Erreur parsing segments URL", e);
+        }
+    }
+
+    return hasTemplate ? newConfig : null;
 };
 
 export const useWallData = () => {
@@ -71,8 +159,22 @@ export const useWallData = () => {
             loadWallData(queryId, 'BUILD');
         } else {
             const state = location.state as { fromRemix?: boolean } | null;
-            if (!state?.fromRemix) {
-                resetLocalState();
+            
+            // PRIORITY CHECK: URL Templates (Point 3)
+            // Si pas d'ID et pas de Remix, on vérifie si l'URL contient un template
+            if (!state?.fromRemix && !queryId) {
+                const templateConfig = applyUrlTemplate(searchParams);
+                if (templateConfig) {
+                    resetLocalState();
+                    setConfig(templateConfig);
+                    // On peut aussi définir un nom par défaut basé sur le template
+                    const presetName = searchParams.get('preset');
+                    if (presetName) {
+                        setMetadata(prev => ({ ...prev, name: `Projet ${presetName.charAt(0).toUpperCase() + presetName.slice(1)}` }));
+                    }
+                } else {
+                    resetLocalState();
+                }
                 setMode('BUILD');
             }
         }
