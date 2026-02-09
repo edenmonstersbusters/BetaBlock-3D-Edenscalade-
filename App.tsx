@@ -6,7 +6,8 @@ import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
-import { AuthCallbackPage } from './features/auth/AuthCallbackPage'; // Nouvelle Import
+import { AuthCallbackPage } from './features/auth/AuthCallbackPage'; 
+import { OnboardingWizard } from './features/onboarding/OnboardingWizard'; // Nouvelle Importation
 import { useHistory } from './hooks/useHistory';
 import { useWallData } from './hooks/useWallData';
 import { NotificationsProvider, useNotifications } from './core/NotificationsContext';
@@ -36,6 +37,8 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showAuthFromRoute, setShowAuthFromRoute] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const {
     mode, config, setConfig, holds, setHolds, metadata, setMetadata,
@@ -45,24 +48,36 @@ export default function App() {
   
   const history = useHistory({ config, holds });
 
-  // 1. Détection des routes d'auth
+  // 1. Détection Auth & Routes
   useEffect(() => {
-    if (location.pathname === '/login' || location.pathname === '/signup') {
-        setShowAuthFromRoute(true);
-    }
-  }, [location.pathname]);
+    // Initial fetch
+    auth.getUser().then(u => {
+        setCurrentUser(u);
+        setShowOnboarding(!!u); // On tente d'afficher l'onboarding si user connecté (le composant vérifiera lui-même s'il doit s'afficher)
+    });
 
-  // 2. Gestion Globale des Reset Password / Confirmation Email
-  // Note: auth.onAuthStateChange capture les événements, mais AuthCallbackPage gère l'affichage initial
-  useEffect(() => {
     const { data: { subscription } } = auth.onAuthStateChange((eventUser, event) => {
+        setCurrentUser(eventUser);
+        if (event === 'SIGNED_IN') {
+             setShowOnboarding(true);
+        }
+        if (event === 'SIGNED_OUT') {
+             setShowOnboarding(false);
+        }
+        
         if (event === 'PASSWORD_RECOVERY') {
-            // Redirection gérée par AuthCallbackPage, mais sécurité supplémentaire ici
             if (!location.pathname.includes('/settings')) {
                 navigate('/settings?type=recovery');
             }
         }
     });
+
+    if (location.pathname === '/login' || location.pathname === '/signup') {
+        setShowAuthFromRoute(true);
+    } else {
+        setShowAuthFromRoute(false);
+    }
+
     return () => subscription.unsubscribe();
   }, [navigate, location.pathname]);
 
@@ -82,6 +97,14 @@ export default function App() {
 
   return (
     <NotificationsProvider>
+      {/* ONBOARDING WIZARD : S'affiche par dessus tout si nécessaire */}
+      {showOnboarding && currentUser && (
+          <OnboardingWizard 
+              user={currentUser} 
+              onComplete={() => setShowOnboarding(false)} 
+          />
+      )}
+
       <Routes>
         <Route path="/" element={<GalleryPage onResetState={resetToNew} />} />
         <Route path="/gallery" element={<GalleryPage onResetState={resetToNew} />} />

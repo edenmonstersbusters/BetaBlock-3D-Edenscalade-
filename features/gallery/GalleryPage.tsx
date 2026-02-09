@@ -79,7 +79,7 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
   const validWalls = walls.filter(w => w && w.id);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
+    <div className="min-h-screen bg-gray-950 text-white font-sans overflow-y-auto custom-scrollbar flex flex-col relative">
       <SEO 
         title="Galerie" 
         description="Explorez des milliers de murs d'escalade 3D créés par la communauté. Rejoignez les ouvreurs et partagez vos créations." 
@@ -102,94 +102,96 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({ onResetState }) => {
       
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onSuccess={() => setShowAuthModal(false)} />}
       
-      <GalleryHeader 
-        user={user} 
-        onLogin={() => setShowAuthModal(true)} 
-        onLogout={() => auth.signOut()} 
-        onNavigate={navigate} 
-      />
+      <div className="relative z-10 flex flex-col min-h-screen">
+          <GalleryHeader 
+            user={user} 
+            onLogin={() => setShowAuthModal(true)} 
+            onLogout={() => auth.signOut()} 
+            onNavigate={navigate} 
+          />
 
-      <GalleryHero 
-        user={user} 
-        onNavigate={navigate} 
-      />
+          <GalleryHero 
+            user={user} 
+            onNavigate={navigate} 
+          />
 
-      <main className="max-w-7xl mx-auto px-6 py-12 flex-1 w-full">
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-            <div className="flex items-center gap-3 text-2xl font-black text-white tracking-tight self-start md:self-auto">
-                <Globe className="text-blue-500" size={24} />
-                <span>Galerie</span>
+          <main className="max-w-7xl mx-auto px-6 py-12 flex-1 w-full backdrop-blur-sm bg-gray-950/30 rounded-t-3xl border-t border-white/5 shadow-2xl">
+            <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+                <div className="flex items-center gap-3 text-2xl font-black text-white tracking-tight self-start md:self-auto">
+                    <Globe className="text-blue-500" size={24} />
+                    <span>Galerie</span>
+                </div>
+
+                <form onSubmit={handleSearch} className="relative w-full md:w-64 group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={14} />
+                    <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            if (e.target.value === '') resetSearch();
+                        }}
+                        placeholder="Rechercher..." 
+                        className="w-full bg-gray-900/80 border border-white/10 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:bg-gray-800 outline-none transition-all shadow-inner"
+                    />
+                    {searchQuery && (
+                        <button 
+                            type="button"
+                            onClick={resetSearch}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
+                </form>
             </div>
 
-            <form onSubmit={handleSearch} className="relative w-full md:w-64 group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={14} />
-                <input 
-                    type="text" 
-                    value={searchQuery}
-                    onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        if (e.target.value === '') resetSearch();
-                    }}
-                    placeholder="Rechercher..." 
-                    className="w-full bg-gray-900 border border-white/10 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:bg-gray-800 outline-none transition-all"
-                />
-                {searchQuery && (
-                    <button 
-                        type="button"
-                        onClick={resetSearch}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                    >
-                        <X size={14} />
-                    </button>
-                )}
-            </form>
-        </div>
-
-        {loading ? (
-            <div className="flex flex-col items-center justify-center h-64"><Loader2 size={48} className="animate-spin text-blue-500" /></div>
-        ) : (
-            <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {validWalls.map(wall => (
-                        <WallCard 
-                            key={wall.id} id={wall.id} name={wall.name} createdAt={wall.created_at} 
-                            thumbnail={wall.data?.metadata?.thumbnail} 
-                            authorId={wall.data?.metadata?.authorId}
-                            authorName={wall.data?.metadata?.authorName}
-                            authorAvatarUrl={wall.data?.metadata?.authorAvatarUrl}
-                            onClick={() => navigate(`/view/${wall.id}`)}
-                            isRemix={!!wall.data?.metadata?.parentId}
-                            parentName={wall.data?.metadata?.parentName}
-                        />
-                    ))}
-                </div>
-                
-                {validWalls.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20 text-gray-500 border border-dashed border-gray-800 rounded-xl bg-gray-900/50">
-                        <Search size={32} className="mb-2 opacity-50"/>
-                        <p>{isSearching ? `Aucun résultat pour "${searchQuery}"` : "Aucun mur public disponible."}</p>
-                        {isSearching && (
-                            <button onClick={resetSearch} className="mt-4 text-sm text-blue-400 hover:underline">
-                                Tout afficher
-                            </button>
-                        )}
+            {loading ? (
+                <div className="flex flex-col items-center justify-center h-64"><Loader2 size={48} className="animate-spin text-blue-500" /></div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {validWalls.map(wall => (
+                            <WallCard 
+                                key={wall.id} id={wall.id} name={wall.name} createdAt={wall.created_at} 
+                                thumbnail={wall.data?.metadata?.thumbnail} 
+                                authorId={wall.data?.metadata?.authorId}
+                                authorName={wall.data?.metadata?.authorName}
+                                authorAvatarUrl={wall.data?.metadata?.authorAvatarUrl}
+                                onClick={() => navigate(`/view/${wall.id}`)}
+                                isRemix={!!wall.data?.metadata?.parentId}
+                                parentName={wall.data?.metadata?.parentName}
+                            />
+                        ))}
                     </div>
-                )}
-            </>
-        )}
-      </main>
+                    
+                    {validWalls.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-500 border border-dashed border-gray-800 rounded-xl bg-gray-900/50">
+                            <Search size={32} className="mb-2 opacity-50"/>
+                            <p>{isSearching ? `Aucun résultat pour "${searchQuery}"` : "Aucun mur public disponible."}</p>
+                            {isSearching && (
+                                <button onClick={resetSearch} className="mt-4 text-sm text-blue-400 hover:underline">
+                                    Tout afficher
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
+          </main>
 
-       <footer className="border-t border-white/5 bg-gray-950 py-12 mt-auto">
-          <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-gray-500 text-sm">
-              <div className="flex items-center gap-2">
-                  <Database size={16} />
-                  <span className="font-mono">v1.1 Stable</span>
+           <footer className="border-t border-white/5 bg-gray-950 py-12 mt-auto relative z-10">
+              <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-gray-500 text-sm">
+                  <div className="flex items-center gap-2">
+                      <Database size={16} />
+                      <span className="font-mono">v1.1 Stable</span>
+                  </div>
+                  <div className="font-mono opacity-50">
+                      © 2026 BetaBlock. Open Source Climbing Engine.
+                  </div>
               </div>
-              <div className="font-mono opacity-50">
-                  © 2026 BetaBlock. Open Source Climbing Engine.
-              </div>
-          </div>
-      </footer>
+          </footer>
+      </div>
     </div>
   );
 };

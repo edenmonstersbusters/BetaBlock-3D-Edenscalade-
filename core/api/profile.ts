@@ -74,21 +74,45 @@ export const profileApi = {
   },
 
   async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<void> {
-      const metaDataUpdates: any = {};
-      
-      if (updates.display_name !== undefined) metaDataUpdates.display_name = updates.display_name;
-      if (updates.avatar_url !== undefined) metaDataUpdates.avatar_url = updates.avatar_url;
-      if (updates.bio !== undefined) metaDataUpdates.bio = updates.bio;
-      if (updates.location !== undefined) metaDataUpdates.location = updates.location;
-      if (updates.home_gym !== undefined) metaDataUpdates.home_gym = updates.home_gym;
-      if (updates.climbing_grade !== undefined) metaDataUpdates.climbing_grade = updates.climbing_grade;
-      if (updates.climbing_style !== undefined) metaDataUpdates.climbing_style = updates.climbing_style;
+      // 1. Mise à jour des Métadonnées Auth (Display Name, Avatar)
+      // Nécessaire car Supabase Auth est souvent utilisé comme source de vérité rapide côté client
+      const authUpdates: any = {};
+      if (updates.display_name !== undefined) authUpdates.display_name = updates.display_name;
+      if (updates.avatar_url !== undefined) authUpdates.avatar_url = updates.avatar_url;
 
-      const { error } = await supabase.auth.updateUser({
-          data: metaDataUpdates
-      });
-      
-      if (error) throw error;
+      if (Object.keys(authUpdates).length > 0) {
+          const { error: authError } = await supabase.auth.updateUser({
+              data: authUpdates
+          });
+          if (authError) throw authError;
+      }
+
+      // 2. Mise à jour de la Table Profiles (Données persistantes & Analytiques)
+      const tableUpdates: any = {};
+      // Champs existants
+      if (updates.display_name !== undefined) tableUpdates.display_name = updates.display_name;
+      if (updates.avatar_url !== undefined) tableUpdates.avatar_url = updates.avatar_url;
+      if (updates.bio !== undefined) tableUpdates.bio = updates.bio;
+      if (updates.location !== undefined) tableUpdates.location = updates.location;
+      if (updates.home_gym !== undefined) tableUpdates.home_gym = updates.home_gym;
+      if (updates.climbing_grade !== undefined) tableUpdates.climbing_grade = updates.climbing_grade;
+      if (updates.climbing_style !== undefined) tableUpdates.climbing_style = updates.climbing_style;
+
+      // Nouveaux Champs Onboarding (JSONB ou colonnes dédiées selon votre schéma, ici on suppose colonnes)
+      if (updates.onboarding_completed !== undefined) tableUpdates.onboarding_completed = updates.onboarding_completed;
+      if (updates.acquisition_source !== undefined) tableUpdates.acquisition_source = updates.acquisition_source;
+      if (updates.usage_goal !== undefined) tableUpdates.usage_goal = updates.usage_goal;
+      if (updates.tutorials_seen !== undefined) tableUpdates.tutorials_seen = updates.tutorials_seen;
+
+      if (Object.keys(tableUpdates).length > 0) {
+          // On utilise upsert pour créer le profil s'il n'existe pas encore
+          // CORRECTION: Suppression de updated_at car la colonne n'existe pas dans le schéma actuel
+          const { error: dbError } = await supabase
+              .from('profiles')
+              .upsert({ id: userId, ...tableUpdates });
+          
+          if (dbError) throw dbError;
+      }
   },
 
   async uploadAvatar(file: File): Promise<string | null> {

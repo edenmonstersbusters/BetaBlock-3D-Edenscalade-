@@ -18,6 +18,7 @@ declare global {
         spotLight: any;
         primitive: any;
         color: any;
+        fog: any;
       }
     }
   }
@@ -87,7 +88,7 @@ export interface UserProfile {
   email?: string;
   avatar_url?: string;
   
-  // New SQL Fields
+  // SQL Fields & Onboarding Data
   bio?: string;
   location?: string;
   home_gym?: {
@@ -96,12 +97,18 @@ export interface UserProfile {
     address?: string;
     country?: string;
     uri?: string;
-  } | null; // JSONB in SQL
+  } | null;
   climbing_grade?: string;
   climbing_style?: string;
   
+  // Onboarding & Analytics
+  onboarding_completed?: boolean;
+  acquisition_source?: string; // "Google", "Instagram", "Friend"...
+  usage_goal?: string; // "Homewall", "Commercial", "Fun"...
+  tutorials_seen?: string[]; // Liste des IDs de tutos vus ['builder_basics', 'advanced_holds']
+  
   created_at: string;
-  is_deleted?: boolean; // Soft delete flag
+  is_deleted?: boolean;
   
   // Computed stats
   stats?: {
@@ -139,12 +146,12 @@ export interface AppNotification {
   id: string;
   recipient_id: string;
   actor_id: string;
-  actor_name?: string;     // Enrichi
-  actor_avatar_url?: string; // Enrichi
+  actor_name?: string;     
+  actor_avatar_url?: string; 
   type: 'follow' | 'unfollow' | 'new_wall' | 'comment' | 'like_wall' | 'like_comment';
   resource_id?: string;
-  resource_name?: string; // Enrichi si c'est un mur
-  text_content?: string; // Enrichi pour les commentaires
+  resource_name?: string; 
+  text_content?: string; 
   is_read: boolean;
   created_at: string;
 }
