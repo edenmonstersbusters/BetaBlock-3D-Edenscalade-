@@ -2,11 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { WallEditor } from './features/editor/WallEditorPage';
+import { EmbedViewerPage } from './features/embed/EmbedViewerPage';
 import { GalleryPage } from './features/gallery/GalleryPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
-import { AuthCallbackPage } from './features/auth/AuthCallbackPage'; // Nouvelle Import
+import { AuthCallbackPage } from './features/auth/AuthCallbackPage'; 
 import { useHistory } from './hooks/useHistory';
 import { useWallData } from './hooks/useWallData';
 import { NotificationsProvider, useNotifications } from './core/NotificationsContext';
@@ -53,11 +54,9 @@ export default function App() {
   }, [location.pathname]);
 
   // 2. Gestion Globale des Reset Password / Confirmation Email
-  // Note: auth.onAuthStateChange capture les événements, mais AuthCallbackPage gère l'affichage initial
   useEffect(() => {
     const { data: { subscription } } = auth.onAuthStateChange((eventUser, event) => {
         if (event === 'PASSWORD_RECOVERY') {
-            // Redirection gérée par AuthCallbackPage, mais sécurité supplémentaire ici
             if (!location.pathname.includes('/settings')) {
                 navigate('/settings?type=recovery');
             }
@@ -96,6 +95,10 @@ export default function App() {
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        
+        {/* Routes Embed (Intégration externe) */}
+        <Route path="/embed/:id" element={<EmbedViewerPage type="wall" />} />
+        <Route path="/embed/hold/:id" element={<EmbedViewerPage type="hold" />} />
         
         <Route path="/builder" element={
           <WallEditor mode="BUILD" {...editorProps} />
