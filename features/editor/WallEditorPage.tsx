@@ -5,6 +5,7 @@ import { Scene } from '../../core/Scene';
 import { resolveHoldWorldData } from '../../utils/geometry';
 import { useEditorState } from './hooks/useEditorState';
 import { useEditorLogic } from './hooks/useEditorLogic';
+import { useAutoSave } from '../../hooks/useAutoSave';
 import { EditorPanel } from '../builder/EditorPanel';
 import { RouteEditorPanel } from '../builder/RouteEditorPanel';
 import { ViewerPanel } from '../viewer/ViewerPanel';
@@ -17,6 +18,7 @@ import { AuthModal } from '../../components/auth/AuthModal';
 import { Undo2, Redo2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../../types';
 import { SEO } from '../../components/SEO';
+import { api } from '../../core/api';
 
 interface WallEditorProps {
   mode: AppMode; user: any;
@@ -40,14 +42,12 @@ export const WallEditor: React.FC<WallEditorProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
   
-  // Gestion des onglets : détermine si on affiche "Structure" ou "Prises"
   const [activeTab, setActiveTab] = useState<'structure' | 'holds'>(initialMode === 'SET' ? 'holds' : 'structure');
   
-  // Calcul du mode effectif (Derived Mode)
   const derivedMode: AppMode = initialMode === 'VIEW' ? 'VIEW' : (activeTab === 'structure' ? 'BUILD' : 'SET');
 
   const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref pour l'input fichier caché (Ctrl+O)
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const state = useEditorState();
   
   const logic = useEditorLogic({
@@ -55,7 +55,31 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     undo, redo, recordAction, state, onHome, onNewWall, cursorPosRef, fileInputRef
   });
 
-  // Timer d'initialisation pour éviter l'écran noir/vide au démarrage
+  // --- AUTO SAVE INTEGRATION ---
+  const { status: autoSaveStatus, triggerImmediateSave } = useAutoSave({
+      isDirty: state.isDirty,
+      saveFunction: async () => {
+          // Si pas connecté, on ne tente pas de sauvegarder en auto (silencieux)
+          if (!user) return false;
+          
+          // Si c'est un nouveau mur (pas de cloudId) et qu'on est en train d'éditer,
+          // on sauvegarde pour CRÉER l'entrée en base.
+          // onSaveCloud gère le INSERT ou le UPDATE selon si cloudId existe.
+          const success = await onSaveCloud();
+          
+          if (success) {
+              state.setIsDirty(false);
+          } else {
+              // Si échec (ex: RLS error), on garde le statut dirty
+              // Mais on ne spamme pas d'alerte visuelle bloquante, le status indicator suffit
+          }
+          return success;
+      },
+      user,
+      cloudId, 
+      delay: 4000 // Délai un peu plus long pour éviter de spammer la création initiale
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitializing(false);
@@ -65,19 +89,73 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   const wrappedSaveCloud = async () => {
       if (!user) { state.setShowAuthModal(true); return false; }
-      
       const success = await onSaveCloud();
-      
-      if (success) {
-          // IMPORTANT : On force l'état "propre" (non modifié) immédiatement après la sauvegarde réussie.
-          // Cela permet de quitter l'éditeur sans voir la popup d'avertissement.
-          state.setIsDirty(false);
-      }
+      if (success) state.setIsDirty(false);
       return success;
   };
 
+  const handleToggleVisibility = async () => {
+      if (!user) { state.setShowAuthModal(true); return; }
+      
+      const newStatus = !metadata.isPublic;
+      
+      // Cas 1 : C'est un mur existant (déjà sauvegardé)
+      if (cloudId) {
+          // Optimistic UI Update
+          setMetadata(prev => ({ ...prev, isPublic: newStatus }));
+          const { error } = await api.toggleWallVisibility(cloudId, newStatus);
+          
+          if (error) {
+              // Rollback en cas d'erreur
+              setMetadata(prev => ({ ...prev, isPublic: !newStatus }));
+              state.setModal({ 
+                  title: "Erreur", 
+                  message: "Impossible de changer la visibilité. Vérifiez votre connexion.", 
+                  isAlert: true 
+              });
+          } else {
+              triggerImmediateSave(); // On force une sauvegarde pour sync le timestamp
+          }
+      } 
+      // Cas 2 : C'est un nouveau mur (jamais sauvegardé)
+      else {
+          // On met à jour la métadonné LOCALE
+          setMetadata(prev => ({ ...prev, isPublic: newStatus }));
+          
+          // On déclenche immédiatement la sauvegarde pour CRÉER le mur avec le bon statut
+          // Note : onSaveCloud utilisera l'état metadata à jour (grâce aux fermetures React, attention ici on doit forcer le refresh)
+          // Astuce : onSaveCloud lit 'metadata' du scope.
+          // Comme setState est asynchrone, on ne peut pas appeler onSaveCloud tout de suite après setMetadata dans la même fonction
+          // Sauf si onSaveCloud utilisait une ref.
+          
+          // Solution : On demande confirmation de sauvegarde/création
+          state.setModal({
+              title: newStatus ? "Publier ce mur ?" : "Enregistrer en Privé ?",
+              message: newStatus 
+                  ? "Votre mur sera créé et visible dans la galerie publique."
+                  : "Votre mur sera créé dans votre espace personnel privé.",
+              confirmText: "Sauvegarder",
+              onConfirm: async () => {
+                  // On force la mise à jour avant sauvegarde
+                  const updatedMeta = { ...metadata, isPublic: newStatus };
+                  setMetadata(updatedMeta);
+                  
+                  // On doit attendre un tick pour que le state se propage, ou passer les data manuellement
+                  // Ici, on fait confiance au flux : on déclenche la modale de sauvegarde générique
+                  // mais on pré-configure le switch.
+                  
+                  // Approche directe : on appelle wrappedSaveCloud qui lira le state au prochain render ? Non.
+                  // On utilise triggerImmediateSave qui dépend de user/cloudId.
+                  
+                  // Le plus simple pour un nouveau mur :
+                  state.setIsDirty(true); // Pour forcer l'auto-save au prochain tick qui verra le nouveau metadata
+              }
+          });
+      }
+  };
+
   const renderableHolds = useMemo(() => holds.map((h) => {
-      if (!h) return null; // Sécurité contre les éléments nulls
+      if (!h) return null; 
       const world = resolveHoldWorldData(h, config); return world ? { ...h, ...world } : null;
     }).filter((h) => h !== null), [holds, config]);
 
@@ -92,7 +170,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     return () => { window.removeEventListener('click', h); window.removeEventListener('contextmenu', h); };
   }, [state.contextMenu]);
 
-  // Construction du lien de partage par défaut (si generatedLink n'est pas encore dispo via le save)
   const defaultShareLink = cloudId ? `https://betablock-3d.fr/view/${cloudId}` : "";
 
   return (
@@ -112,18 +189,20 @@ export const WallEditor: React.FC<WallEditorProps> = ({
           mode={derivedMode} metadata={metadata} setMetadata={(m) => { setMetadata(m); state.setIsDirty(true); }}
           isDirty={state.isDirty} isEditingName={state.isEditingName} setIsEditingName={state.setIsEditingName}
           onExit={() => logic.handleAction('exit')} 
-          onSave={() => logic.handleAction('save')} 
-          onPublish={() => logic.handleAction('publish')}
+          onSave={() => logic.handleAction('save')} // Reste manuel via menu Fichier
+          onPublish={() => logic.handleAction('publish')} // Reste manuel via menu Fichier
           onImport={logic.handleImportFile}
           onExport={handleDownloadLocal}
           onNew={logic.handleNewWallRequest}
           onRemix={onRemix}
+          // Nouveaux props
+          saveStatus={autoSaveStatus}
+          onTogglePublic={handleToggleVisibility}
       />
 
       <div className="flex flex-1 overflow-hidden relative">
         <div className={`relative z-20 h-full bg-gray-900 border-r border-gray-800 transition-all duration-300 ease-in-out flex flex-col ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0'}`}>
              
-             {/* Onglets de navigation (uniquement hors mode VIEW) */}
              {initialMode !== 'VIEW' && (
                 <SidebarTabs activeTab={activeTab} onChange={setActiveTab} />
              )}
@@ -137,7 +216,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         onNext={() => setActiveTab('holds')} 
                         showModal={(c) => state.setModal(c)}
                         onActionStart={logic.saveToHistory} 
-                        // Props conservées pour compatibilité interface mais non utilisées (UI supprimée)
                         onExport={() => logic.handleAction('save')} 
                         onImport={logic.handleImportFile} 
                         onNew={logic.handleNewWallRequest} 
@@ -156,7 +234,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])} onActionStart={logic.saveToHistory} 
                         onReplaceHold={(ids, def) => { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => (h && s.has(h.id)) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}
                         onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)} 
-                        // Props conservées pour compatibilité interface mais non utilisées (UI supprimée)
                         onExport={() => logic.handleAction('save')} 
                         onImport={logic.handleImportFile} 
                         onNew={logic.handleNewWallRequest} 
@@ -187,7 +264,6 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         onColorHold={(id, c) => { logic.saveToHistory(); setHolds(h => h.map(x => (x && x.id === id) ? { ...x, color: c } : x)); }}
         onSegmentUpdate={logic.updateSegmentQuickly}
       />
-      {/* Input caché pour le raccourci Ctrl+O */}
       <input 
           type="file" 
           ref={fileInputRef} 

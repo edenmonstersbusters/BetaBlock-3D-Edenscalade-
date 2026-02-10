@@ -1,4 +1,3 @@
-
 import 'react';
 
 declare global {
@@ -22,24 +21,6 @@ declare global {
       }
     }
   }
-}
-
-// Fix for missing react-router-dom types
-declare module 'react-router-dom' {
-  export const BrowserRouter: any;
-  export const HashRouter: any;
-  export const MemoryRouter: any;
-  export const Routes: any;
-  export const Route: any;
-  export const Navigate: any;
-  export const Outlet: any;
-  export const Link: any;
-  export const NavLink: any;
-  export function useNavigate(): (path: string | number, options?: any) => void;
-  export function useLocation(): { pathname: string; search: string; hash: string; state: any; key: string };
-  export function useParams<T = any>(): T;
-  export function useSearchParams(defaultInit?: any): [URLSearchParams, (updates: any, options?: any) => void];
-  export function useMatch(pattern: any): any;
 }
 
 export interface WallMetadata {

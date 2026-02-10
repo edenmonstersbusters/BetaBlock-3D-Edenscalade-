@@ -20,7 +20,8 @@ const INITIAL_METADATA: WallMetadata = {
     name: "Nouveau Mur",
     timestamp: new Date().toISOString(),
     appVersion: APP_VERSION,
-    remixMode: null
+    remixMode: null,
+    isPublic: false // EXPLICIT : Privé par défaut
 };
 
 export const useWallData = () => {
@@ -49,6 +50,7 @@ export const useWallData = () => {
     const path = location.pathname;
     const searchParams = new URLSearchParams(location.search);
     const queryId = searchParams.get('id');
+    const state = location.state as { fromRemix?: boolean; preventFetch?: boolean } | null;
 
     const loadWallData = async (id: string, targetMode: AppMode) => {
         setCloudId(id);
@@ -68,9 +70,11 @@ export const useWallData = () => {
         if (id) loadWallData(id, 'VIEW');
     } else if (path === '/builder') {
         if (queryId) {
-            loadWallData(queryId, 'BUILD');
+            // On ne recharge pas si on vient de sauvegarder (preventFetch)
+            if (!state?.preventFetch) {
+                loadWallData(queryId, 'BUILD');
+            }
         } else {
-            const state = location.state as { fromRemix?: boolean } | null;
             if (!state?.fromRemix) {
                 resetLocalState();
                 setMode('BUILD');
@@ -78,7 +82,10 @@ export const useWallData = () => {
         }
     } else if (path === '/setter') {
         if (queryId) {
-             loadWallData(queryId, 'SET');
+             // Idem pour le mode setter si besoin, bien que la sauvegarde se fasse en mode builder/setter sur la même URL
+             if (!state?.preventFetch) {
+                loadWallData(queryId, 'SET');
+             }
         } else {
              const state = location.state as { fromRemix?: boolean } | null;
              if (!state?.fromRemix) {
@@ -86,12 +93,12 @@ export const useWallData = () => {
              }
         }
     }
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, location.state]);
 
   const resetLocalState = () => {
     setConfig(INITIAL_CONFIG);
     setHolds([]);
-    setMetadata(INITIAL_METADATA);
+    setMetadata(INITIAL_METADATA); // Réutilise l'objet avec isPublic: false
     setCloudId(null);
     setGeneratedLink(null);
   };
@@ -104,14 +111,27 @@ export const useWallData = () => {
         if (screenshotRef.current) screenshot = await screenshotRef.current();
     } catch(e) { console.error("Screenshot failed", e); }
     
+    // On s'assure que isPublic est bien défini (false par défaut)
+    const currentIsPublic = metadata.isPublic === undefined ? false : metadata.isPublic;
+
+    // Mise à jour immédiate des métadonnées locales avec les infos user (Vital pour l'UI après save)
+    const authorName = user.user_metadata?.display_name || user.email?.split('@')[0];
+    const updatedMetadata = {
+        ...metadata, 
+        isPublic: currentIsPublic,
+        timestamp: new Date().toISOString(),
+        thumbnail: screenshot || undefined,
+        authorId: user.id, // CRITIQUE : On force l'ID pour que isOwner fonctionne tout de suite
+        authorName: authorName,
+        authorAvatarUrl: user.user_metadata?.avatar_url
+    };
+
+    // On met à jour le state React tout de suite pour refléter le changement de propriété
+    setMetadata(updatedMetadata);
+
     const dataToSave = {
       version: APP_VERSION,
-      metadata: { 
-          ...metadata, 
-          timestamp: new Date().toISOString(),
-          thumbnail: screenshot || undefined,
-          authorName: user.user_metadata?.display_name || user.email?.split('@')[0]
-      },
+      metadata: updatedMetadata,
       config, holds
     };
 
@@ -128,14 +148,22 @@ export const useWallData = () => {
         error = saveRes.error;
         if (saveRes.id) {
             setCloudId(saveRes.id);
-            finalId = saveRes.id; // Capture immédiate du nouvel ID
+            finalId = saveRes.id;
+            
+            // Mise à jour de l'URL via le Router (et non window.history) pour éviter les erreurs Blob/Security
+            // On passe preventFetch pour dire au useEffect de ne pas recharger les données qu'on a déjà
+            navigate(`/builder?id=${saveRes.id}`, { replace: true, state: { preventFetch: true } });
         }
     }
     
     setIsSavingCloud(false);
     
-    if (!error && finalId) {
-        // Construction du lien avec l'ID garanti
+    if (error) {
+        console.error("Save Error Detail:", error);
+        return false;
+    }
+    
+    if (finalId) {
         const shareUrl = `https://betablock-3d.fr/view/${finalId}`;
         setGeneratedLink(shareUrl);
         return true;
@@ -155,7 +183,8 @@ export const useWallData = () => {
           remixMode: null,
           authorId: undefined,
           authorName: undefined,
-          authorAvatarUrl: undefined
+          authorAvatarUrl: undefined,
+          isPublic: false // Remix commence toujours en privé
       };
       setMetadata(newMetadata);
       setCloudId(null);

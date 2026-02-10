@@ -23,6 +23,7 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
   const [warning, setWarning] = useState<{ x: number, y: number, message: string } | null>(null);
 
   const fetchComments = async () => {
+    if (!wallId) return; // Protection
     const user = await auth.getUser();
     setCurrentUser(user);
     const data = await api.getComments(wallId, user?.id);
@@ -32,18 +33,24 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
 
   // Chargement et abonnement aux changements d'auth
   useEffect(() => {
-    fetchComments();
+    // 1. Reset immédiat pour éviter d'afficher les commentaires du mur précédent
+    setComments([]);
+    setLoading(true);
+
+    if (wallId) {
+        fetchComments();
+    }
     
-    // Si l'utilisateur se connecte via la modale, on veut rafraîchir la liste (pour mettre à jour les "user_has_liked")
-    // et mettre à jour le currentUser pour permettre de commenter.
     const { data: { subscription } } = auth.onAuthStateChange(async (user) => {
         setCurrentUser(user);
-        const data = await api.getComments(wallId, user?.id);
-        setComments(data || []);
+        if (wallId) {
+            const data = await api.getComments(wallId, user?.id);
+            setComments(data || []);
+        }
     });
 
     return () => subscription.unsubscribe();
-  }, [wallId]);
+  }, [wallId]); // Dépendance cruciale sur wallId
 
   const commentTree = useMemo(() => {
     const map = new Map<string, Comment>();
