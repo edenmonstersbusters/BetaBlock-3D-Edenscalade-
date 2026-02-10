@@ -34,7 +34,7 @@ export const HoldCatalogue: React.FC<HoldCatalogueProps> = ({
 
   const getThumbnailUrl = (filename: string, index: number) => {
     const baseName = filename.replace(/\.[^/.]+$/, "");
-    return `${BASE_URL}screenshot/${baseName}-${index}.png`;
+    return `${BASE_URL}screenshot/${baseName}-v${index}.png`;
   };
 
   const validLibrary = library.filter(h => h && h.id);
