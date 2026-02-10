@@ -6,7 +6,8 @@ export const useEditorState = () => {
   // Sélection & Outils
   const [selectedHold, setSelectedHold] = useState<HoldDefinition | null>(null);
   const [selectedPlacedHoldIds, setSelectedPlacedHoldIds] = useState<string[]>([]);
-  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#111111' });
+  // La couleur par défaut est désormais le bleu de la palette (#008ad4)
+  const [holdSettings, setHoldSettings] = useState({ scale: 1, rotation: 0, color: '#008ad4' });
   
   // Interface
   const [modal, setModal] = useState<ModalConfig | null>(null);
