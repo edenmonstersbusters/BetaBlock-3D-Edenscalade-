@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { ArrowLeft, Edit2, Save, Globe } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Edit2, Save, Globe, FileText, ChevronDown, Upload, Download, Copy, FilePlus } from 'lucide-react';
 import { WallMetadata, AppMode } from '../../../types';
 
 interface EditorTopBarProps {
@@ -13,11 +13,40 @@ interface EditorTopBarProps {
     onExit: () => void;
     onSave: () => void;
     onPublish: () => void;
+    onImport: (file: File) => void;
+    onExport: () => void;
+    onNew: () => void;
+    onRemix?: () => void;
 }
 
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({ 
-    mode, metadata, setMetadata, isDirty, isEditingName, setIsEditingName, onExit, onSave, onPublish 
+    mode, metadata, setMetadata, isDirty, isEditingName, setIsEditingName, 
+    onExit, onSave, onPublish, onImport, onExport, onNew, onRemix
 }) => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Fermer le menu si on clique ailleurs
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            onImport(file);
+            e.target.value = '';
+            setIsMenuOpen(false);
+        }
+    };
+
     if (mode === 'VIEW') return null;
 
     return (
@@ -37,22 +66,75 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             `}</style>
             
             <div className="flex items-center gap-4 justify-start">
-                <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group relative overflow-hidden">
-                    <div className="absolute top-0 -inset-full h-full w-1/2 z-20 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:animate-[shimmer_0.8s_ease-in-out] pointer-events-none" />
-                    
+                <button onClick={onExit} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors flex items-center gap-2 group relative overflow-hidden" title="Quitter l'éditeur">
                     <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                    
                     <img 
                         src="https://i.ibb.co/zTvzzrFM/apple-touch-icon.png" 
                         alt="Logo" 
-                        className="w-6 h-6 object-contain animate-soft-float transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" 
+                        className="w-6 h-6 object-contain hidden md:block" 
                     />
-                    
-                    <span className="font-black italic tracking-tighter text-blue-500 hidden sm:inline animate-soft-float [animation-delay:0.5s] transition-all duration-500 group-hover:text-blue-400 group-hover:scale-105 origin-left">
-                        BetaBlock
-                    </span>
                 </button>
+
+                {/* MENU FICHIER */}
+                <div className="relative" ref={menuRef}>
+                    <button 
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all ${isMenuOpen ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                    >
+                        <FileText size={14} />
+                        <span>Fichier</span>
+                        <ChevronDown size={12} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isMenuOpen && (
+                        <div className="absolute top-full left-0 mt-2 w-56 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[200]">
+                            <div className="py-1">
+                                <button onClick={() => { onNew(); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                                    <FilePlus size={16} className="text-purple-400" /> 
+                                    <span>Nouveau</span>
+                                </button>
+                                <div className="h-px bg-white/5 my-1" />
+                                <button onClick={() => { onSave(); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                                    <Save size={16} className="text-emerald-400" /> 
+                                    <span>Sauvegarder</span>
+                                </button>
+                                <button onClick={() => { onPublish(); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                                    <Globe size={16} className="text-blue-400" /> 
+                                    <span>Publier</span>
+                                </button>
+                                <div className="h-px bg-white/5 my-1" />
+                                <button onClick={() => { fileInputRef.current?.click(); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                                    <Upload size={16} className="text-orange-400" /> 
+                                    <span>Importer JSON</span>
+                                </button>
+                                <button onClick={() => { onExport(); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                                    <Download size={16} className="text-gray-400" /> 
+                                    <span>Exporter JSON</span>
+                                </button>
+                                {onRemix && (
+                                    <>
+                                        <div className="h-px bg-white/5 my-1" />
+                                        <button onClick={() => { onRemix(); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                                            <Copy size={16} className="text-pink-400" /> 
+                                            <span>Créer une copie</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Input caché pour l'import */}
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept=".json" 
+                        onChange={handleFileChange}
+                    />
+                </div>
             </div>
+
             <div className="flex flex-col items-center justify-center min-w-0 px-4">
                 {isEditingName ? (
                   <input 
@@ -78,6 +160,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
                     {isDirty && <span className="ml-2 text-blue-400 font-black">•</span>}
                 </span>
             </div>
+            
             <div className="flex items-center gap-2 justify-end">
                 <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-xl text-xs font-bold transition-all border border-gray-700 hover:border-gray-600">
                     <Save size={14} /> <span className="hidden sm:inline">Sauvegarder</span>

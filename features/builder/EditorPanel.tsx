@@ -3,7 +3,6 @@ import React from 'react';
 import { WallConfig, WallSegment, PlacedHold, WallMetadata } from '../../types';
 import { Plus, ArrowRight, Maximize, GitFork } from 'lucide-react';
 import { SegmentManager } from './components/SegmentManager';
-import { FileControls } from '../../components/ui/FileControls';
 
 interface EditorPanelProps {
   config: WallConfig;
@@ -102,8 +101,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 onActionStart={onActionStart}
             />
         </div>
-
-        <FileControls onExport={onExport} onImport={onImport} onNew={onNew} />
       </div>
 
       <div className="p-4 border-t border-gray-800 bg-gray-950 space-y-2">

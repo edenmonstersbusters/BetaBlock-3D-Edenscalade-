@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Box, RotateCw, Scaling, GitFork } from 'lucide-react';
 import { HoldDefinition, PlacedHold, WallMetadata } from '../../types';
-import { FileControls } from '../../components/ui/FileControls';
 import { ColorPalette } from '../../components/ui/ColorPalette';
 import { HoldCatalogue } from './components/HoldCatalogue';
 import { HoldInspector } from './components/HoldInspector';
@@ -133,7 +132,6 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
             onRemove={onRemoveHold} isLocked={false} onRemoveAll={onRemoveAllHolds} 
             onGlobalColor={onChangeAllHoldsColor}
         />
-        <FileControls onExport={onExport} onImport={onImport} onNew={onNew} />
       </div>
     </div>
   );

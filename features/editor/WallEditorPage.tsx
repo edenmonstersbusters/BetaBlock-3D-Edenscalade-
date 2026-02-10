@@ -111,7 +111,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
       <EditorTopBar 
           mode={derivedMode} metadata={metadata} setMetadata={(m) => { setMetadata(m); state.setIsDirty(true); }}
           isDirty={state.isDirty} isEditingName={state.isEditingName} setIsEditingName={state.setIsEditingName}
-          onExit={() => logic.handleAction('exit')} onSave={() => logic.handleAction('save')} onPublish={() => logic.handleAction('publish')}
+          onExit={() => logic.handleAction('exit')} 
+          onSave={() => logic.handleAction('save')} 
+          onPublish={() => logic.handleAction('publish')}
+          onImport={logic.handleImportFile}
+          onExport={handleDownloadLocal}
+          onNew={logic.handleNewWallRequest}
+          onRemix={onRemix}
       />
 
       <div className="flex flex-1 overflow-hidden relative">
@@ -130,7 +136,13 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         config={config} holds={holds} onUpdate={setConfig} metadata={metadata} 
                         onNext={() => setActiveTab('holds')} 
                         showModal={(c) => state.setModal(c)}
-                        onActionStart={logic.saveToHistory} onExport={() => logic.handleAction('save')} onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest} onHome={() => logic.handleAction('exit')} onRemoveSegment={logic.removeSegmentAction}
+                        onActionStart={logic.saveToHistory} 
+                        // Props conservées pour compatibilité interface mais non utilisées (UI supprimée)
+                        onExport={() => logic.handleAction('save')} 
+                        onImport={logic.handleImportFile} 
+                        onNew={logic.handleNewWallRequest} 
+                        onHome={() => logic.handleAction('exit')} 
+                        onRemoveSegment={logic.removeSegmentAction}
                     />
                 ) : (
                     <RouteEditorPanel 
@@ -143,7 +155,12 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         selectedPlacedHoldIds={state.selectedPlacedHoldIds} onUpdatePlacedHold={(ids, u) => { const s = new Set(ids); setHolds(h => h.map(x => (x && s.has(x.id)) ? { ...x, ...u } : x)); state.setIsDirty(true); }}
                         onSelectPlacedHold={state.handleSelectPlacedHold} onDeselect={() => state.setSelectedPlacedHoldIds([])} onActionStart={logic.saveToHistory} 
                         onReplaceHold={(ids, def) => { logic.saveToHistory(); const s = new Set(ids); setHolds(prev => prev.map(h => (h && s.has(h.id)) ? { ...h, modelId: def.id, filename: def.filename } : h)); }}
-                        onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)} onExport={() => logic.handleAction('save')} onImport={logic.handleImportFile} onNew={logic.handleNewWallRequest} onHome={() => logic.handleAction('exit')}
+                        onRemoveMultiple={() => logic.removeHoldsAction(state.selectedPlacedHoldIds, true)} 
+                        // Props conservées pour compatibilité interface mais non utilisées (UI supprimée)
+                        onExport={() => logic.handleAction('save')} 
+                        onImport={logic.handleImportFile} 
+                        onNew={logic.handleNewWallRequest} 
+                        onHome={() => logic.handleAction('exit')}
                     />
                 )}
              </div>
