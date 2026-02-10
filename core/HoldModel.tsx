@@ -71,35 +71,38 @@ export const HoldModel: React.FC<HoldModelProps> = ({
         offsetZ = -box.min.z + 0.001; 
     }
     
+    const materialColor = new THREE.Color(color || '#111111');
+
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.geometry.computeVertexNormals();
         
-        // AMÉLIORATION DU MATÉRIAU
+        // AMÉLIORATION DU MATÉRIAU : RETOUR AU NATUREL
+        // On supprime l'émissif coloré qui rendait l'objet fluo.
+        // Seule la sélection ajoute de l'émission (en bleu).
         mesh.material = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(color || '#111111'), 
-          roughness: 0.7, // Réduit de 1.0 à 0.7 pour permettre des reflets spéculaires (volume)
-          metalness: 0.1, // Légère touche métallique pour accrocher la lumière
+          color: materialColor, 
+          roughness: 0.5, // Texture légèrement granuleuse typique de la résine
+          metalness: 0.0, 
+          
+          // L'émissif ne s'active QUE si sélectionné, et en bleu uniquement.
+          // Sinon c'est noir (aucune lumière émise par l'objet).
+          emissive: isSelected ? new THREE.Color('#3b82f6') : new THREE.Color(0x000000),
+          emissiveIntensity: isSelected ? 0.5 : 0, 
+          
           flatShading: false,
           transparent: opacity < 1 || isSelected,
-          opacity: isSelected ? 0.7 : opacity,
+          opacity: isSelected ? 0.8 : opacity,
           side: THREE.DoubleSide,
         });
         
-        // FORCE UPDATE pour garantir que la lumière est bien recalculée
         mesh.material.needsUpdate = true;
-        
-        if (preview || isSelected) {
-           (mesh.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(isSelected ? '#3b82f6' : (color || '#111111'));
-           (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = isSelected ? 0.3 : 0.1;
-        }
-        
         mesh.castShadow = true; 
         mesh.receiveShadow = true;
 
         if (isDragging) {
-            mesh.raycast = () => null; // Ignore raycast to allow wall detection behind
+            mesh.raycast = () => null; 
         }
       }
     });

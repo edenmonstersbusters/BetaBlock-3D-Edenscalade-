@@ -3,8 +3,8 @@ import React from 'react';
 
 // Palette Industrielle Standard
 const PALETTE = [
-    '#990000', '#004400', '#002266', '#aa4400', '#ccaa00',
-    '#440066', '#882244', '#444444', '#f8f8f8', '#111111'
+    '#d7ca3d', '#ed7d31', '#2da53d', '#008ad4', '#c01f1c',
+    '#f84159', '#373737', '#804c7d', '#cbc8bd'
 ];
 
 interface ColorPaletteProps {

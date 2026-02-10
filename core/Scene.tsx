@@ -157,8 +157,8 @@ export const Scene: React.FC<SceneProps> = ({
       onCreated={({ gl }) => {
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        gl.toneMapping = THREE.ACESFilmicToneMapping; // Meilleure gestion des couleurs/lumières
-        gl.toneMappingExposure = 1.0;
+        // On garde NoToneMapping pour avoir la couleur brute, mais on réduit l'intensité des lumières
+        gl.toneMapping = THREE.NoToneMapping; 
       }}
     >
       <color attach="background" args={['#0a0a0a']} />
@@ -183,31 +183,31 @@ export const Scene: React.FC<SceneProps> = ({
         orbitRef={orbitRef}
       />
       
-      {/* --- ÉCLAIRAGE STUDIO (3 POINTS + BOUNCE) --- */}
+      {/* --- ÉCLAIRAGE STUDIO CORRIGÉ (MOINS FORT POUR ÉVITER LE FLUO) --- */}
       
-      {/* 1. Ambient Light : Base lumineuse forte pour des couleurs vibrantes */}
-      <ambientLight intensity={1.5} />
+      {/* 1. Ambient Light : Réduite de 1.8 à 0.6 pour que les couleurs ne saturent pas vers le blanc */}
+      <ambientLight intensity={0.6} />
 
-      {/* 2. Key Light (Principal) : Définit la forme et crée les ombres principales */}
+      {/* 2. Key Light (Principal) : Réduite légèrement pour éviter de brûler les faces éclairées */}
       <directionalLight 
         position={[10, 10, 10]} 
-        intensity={2.0} 
+        intensity={1.1} 
         castShadow 
         shadow-mapSize={[2048, 2048]} 
         shadow-bias={-0.0001}
       />
 
-      {/* 3. Fill Light (Remplissage) : Adoucit les ombres du côté opposé */}
+      {/* 3. Fill Light (Remplissage) : Doux débouchage des ombres */}
       <directionalLight 
         position={[-10, 5, -10]} 
-        intensity={1.2} 
+        intensity={0.4} 
       />
 
-      {/* 4. Bounce Light (Rebond) : Éclaire le DESSOUS des prises (crucial pour les dévers) */}
+      {/* 4. Bounce Light (Rebond) : Trés subtil par en dessous */}
       <directionalLight 
         position={[0, -10, 0]} 
-        intensity={0.8} 
-        color="#eef" // Légèrement bleuté pour simuler le reflet du sol/ciel
+        intensity={0.2} 
+        color="#eef" 
       />
 
       {/* --- FIN ÉCLAIRAGE --- */}
@@ -292,7 +292,6 @@ export const Scene: React.FC<SceneProps> = ({
 
       <Grid position={[0, -0.01, 0]} args={[40, 40]} cellColor="#333" sectionColor="#444" infiniteGrid fadeDistance={20} />
       <ContactShadows opacity={0.6} scale={20} blur={2.5} far={4} resolution={512} color="#000000" />
-      {/* Environment supprimé pour éviter l'erreur de chargement HDRI */}
     </Canvas>
   );
 };
