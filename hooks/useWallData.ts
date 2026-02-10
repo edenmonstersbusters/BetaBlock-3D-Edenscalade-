@@ -115,26 +115,32 @@ export const useWallData = () => {
       config, holds
     };
 
-    let result;
+    let error = null;
+    let finalId = cloudId;
+
     if (cloudId) {
-        result = await api.updateWall(cloudId, dataToSave);
+        // Mise à jour d'un mur existant
+        const res = await api.updateWall(cloudId, dataToSave);
+        error = res.error;
     } else {
+        // Création d'un nouveau mur
         const saveRes = await api.saveWall(dataToSave);
-        result = { error: saveRes.error };
-        if (saveRes.id) setCloudId(saveRes.id);
+        error = saveRes.error;
+        if (saveRes.id) {
+            setCloudId(saveRes.id);
+            finalId = saveRes.id; // Capture immédiate du nouvel ID
+        }
     }
     
     setIsSavingCloud(false);
-    if (!result.error) {
-        const targetId = cloudId || result.id;
-        
-        // CORRECTION : On force toujours le lien de production "propre"
-        // Cela évite les liens bizarres .usercontent.goog lors des tests ou previews
-        const shareUrl = `https://betablock-3d.fr/view/${targetId}`;
-          
+    
+    if (!error && finalId) {
+        // Construction du lien avec l'ID garanti
+        const shareUrl = `https://betablock-3d.fr/view/${finalId}`;
         setGeneratedLink(shareUrl);
         return true;
     }
+    
     return false;
   };
 
