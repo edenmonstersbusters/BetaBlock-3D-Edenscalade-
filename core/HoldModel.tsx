@@ -26,7 +26,8 @@ interface HoldModelProps {
   onDimensionsCalculated?: (dims: { width: number; height: number; depth: number }) => void;
 }
 
-const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/';
+// Mise à jour du chemin : Ajout du dossier "Modèles 3D" (encodé pour l'URL)
+const BASE_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/climbing-holds-library/main/Mod%C3%A8les%203D/';
 const DRACO_DECODER_URL = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
 
 export const HoldModel: React.FC<HoldModelProps> = ({ 
