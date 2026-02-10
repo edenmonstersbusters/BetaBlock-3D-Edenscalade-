@@ -30,8 +30,19 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ wallId, onRequestAuth })
     setLoading(false);
   };
 
+  // Chargement et abonnement aux changements d'auth
   useEffect(() => {
     fetchComments();
+    
+    // Si l'utilisateur se connecte via la modale, on veut rafraîchir la liste (pour mettre à jour les "user_has_liked")
+    // et mettre à jour le currentUser pour permettre de commenter.
+    const { data: { subscription } } = auth.onAuthStateChange(async (user) => {
+        setCurrentUser(user);
+        const data = await api.getComments(wallId, user?.id);
+        setComments(data || []);
+    });
+
+    return () => subscription.unsubscribe();
   }, [wallId]);
 
   const commentTree = useMemo(() => {

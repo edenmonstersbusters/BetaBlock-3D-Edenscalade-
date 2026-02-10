@@ -52,15 +52,27 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
     return acc + (s.height * Math.cos(rad));
   }, 0);
 
+  // Gestion dynamique de l'état Auth et Social
   useEffect(() => {
-      auth.getUser().then(user => {
+      const updateAuthAndSocial = async () => {
+          const user = await auth.getUser();
+          
           if (user && metadata.authorId && user.id === metadata.authorId) {
               setIsOwner(true);
           } else {
               setIsOwner(false);
           }
-          if (!wallId) return;
-          api.getWallSocialStatus(wallId, user?.id).then(setSocialStats);
+          if (wallId) {
+              api.getWallSocialStatus(wallId, user?.id).then(setSocialStats);
+          }
+      };
+
+      // 1. Chargement initial
+      updateAuthAndSocial();
+
+      // 2. Écoute des changements d'auth (ex: login via modale)
+      const { data: { subscription } } = auth.onAuthStateChange(() => {
+          updateAuthAndSocial();
       });
 
       if (metadata.authorId) {
@@ -68,6 +80,8 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
               if (profile) setAuthorProfile(profile);
           });
       }
+
+      return () => subscription.unsubscribe();
   }, [wallId, metadata.authorId]);
 
   const handleLikeWall = async (e: React.MouseEvent) => {

@@ -65,8 +65,14 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   const wrappedSaveCloud = async () => {
       if (!user) { state.setShowAuthModal(true); return false; }
+      
       const success = await onSaveCloud();
-      if (success) state.setIsDirty(false);
+      
+      if (success) {
+          // IMPORTANT : On force l'état "propre" (non modifié) immédiatement après la sauvegarde réussie.
+          // Cela permet de quitter l'éditeur sans voir la popup d'avertissement.
+          state.setIsDirty(false);
+      }
       return success;
   };
 
@@ -85,6 +91,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
     window.addEventListener('click', h); window.addEventListener('contextmenu', h);
     return () => { window.removeEventListener('click', h); window.removeEventListener('contextmenu', h); };
   }, [state.contextMenu]);
+
+  // Construction du lien de partage par défaut (si generatedLink n'est pas encore dispo via le save)
+  const defaultShareLink = cloudId ? `https://betablock-3d.fr/view/${cloudId}` : "";
 
   return (
     <div className="flex flex-col h-screen w-screen bg-black overflow-hidden font-sans">
@@ -175,7 +184,16 @@ export const WallEditor: React.FC<WallEditorProps> = ({
               }
           }} 
       />
-      <GlobalModal config={state.modal} onClose={() => state.setModal(null)} isSavingCloud={isSavingCloud} generatedLink={generatedLink || `${window.location.origin}/#/view/${cloudId}`} onSaveCloud={wrappedSaveCloud} onDownload={handleDownloadLocal} wallName={metadata.name} onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} />
+      <GlobalModal 
+        config={state.modal} 
+        onClose={() => state.setModal(null)} 
+        isSavingCloud={isSavingCloud} 
+        generatedLink={generatedLink || defaultShareLink} 
+        onSaveCloud={wrappedSaveCloud} 
+        onDownload={handleDownloadLocal} 
+        wallName={metadata.name} 
+        onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} 
+      />
     </div>
   );
 };

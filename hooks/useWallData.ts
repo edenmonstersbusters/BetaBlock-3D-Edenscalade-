@@ -127,16 +127,10 @@ export const useWallData = () => {
     setIsSavingCloud(false);
     if (!result.error) {
         const targetId = cloudId || result.id;
-        const isProduction = window.location.hostname === 'betablock-3d.fr';
         
-        let shareUrl = '';
-        if (isProduction) {
-            shareUrl = `https://betablock-3d.fr/view/${targetId}`;
-        } else {
-            const origin = window.location.protocol === 'blob:' ? 'https://betablock-3d.fr' : window.location.origin;
-            // En preview on garde le hash pour éviter les erreurs de refresh
-            shareUrl = `${origin.replace(/\/$/, '')}/#/view/${targetId}`;
-        }
+        // CORRECTION : On force toujours le lien de production "propre"
+        // Cela évite les liens bizarres .usercontent.goog lors des tests ou previews
+        const shareUrl = `https://betablock-3d.fr/view/${targetId}`;
           
         setGeneratedLink(shareUrl);
         return true;
