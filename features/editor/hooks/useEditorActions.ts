@@ -8,7 +8,8 @@ interface UseEditorActionsProps {
   user: any;
   setConfig: (c: WallConfig) => void;
   setHolds: (h: PlacedHold[]) => void;
-  setMetadata: (m: any) => void; // Using 'any' briefly to allow flexible updates
+  setMetadata: (m: any) => void;
+  metadata: WallMetadata; // Added to access current state
   state: any;
   saveToHistory: () => void;
   onHome: () => void;
@@ -16,7 +17,7 @@ interface UseEditorActionsProps {
 }
 
 export const useEditorActions = ({
-  mode, user, setConfig, setHolds, setMetadata, state, saveToHistory, onHome, onNewWall
+  mode, user, setConfig, setHolds, setMetadata, metadata, state, saveToHistory, onHome, onNewWall
 }: UseEditorActionsProps) => {
 
   const handleImportFile = useCallback((file: File) => {
@@ -30,11 +31,7 @@ export const useEditorActions = ({
           if (validated) {
             saveToHistory();
             
-            // SECURITY CHECK: Integrity Check
-            // On vérifie que toutes les prises référencent un segment qui existe vraiment dans la nouvelle config
             const validSegmentIds = new Set(validated.config.segments.map(s => s.id));
-            
-            // On filtre les prises orphelines qui feraient crasher le renderer 3D
             const cleanHolds = validated.holds.filter(h => h && h.id && validSegmentIds.has(h.segmentId));
             
             if (cleanHolds.length < validated.holds.length) {
@@ -45,7 +42,6 @@ export const useEditorActions = ({
             setHolds(cleanHolds);
             setMetadata((prev: WallMetadata) => ({
                 ...validated.metadata,
-                // Nouveau propriétaire si importé par un autre
                 authorId: validated.metadata.authorId === user?.id ? user.id : undefined
             }));
             
@@ -87,14 +83,25 @@ export const useEditorActions = ({
           return;
       }
       
-      setMetadata((prev: WallMetadata) => ({ ...prev, isPublic: type === 'publish' }));
+      // LOGIQUE CRITIQUE DE PUBLICATION :
+      // - Si 'publish' : On force isPublic = true.
+      // - Si 'save' : On GARDE l'état actuel (public ou privé). On ne force pas en privé.
       
+      const nextIsPublic = type === 'publish' ? true : metadata.isPublic;
+      
+      if (type === 'publish') {
+          setMetadata((prev: WallMetadata) => ({ ...prev, isPublic: true }));
+      }
+      // Note: pour 'save', on ne touche pas à isPublic, il reste tel quel.
+
       state.setModal({ 
           title: type === 'publish' ? "Publier dans la Galerie" : "Enregistrer le projet", 
-          message: type === 'publish' ? "Votre mur sera visible par toute la communauté." : "Le projet sera sauvegardé dans votre espace privé.",
+          message: nextIsPublic 
+            ? "Votre mur sera mis à jour dans la galerie publique." 
+            : "Le projet sera sauvegardé dans votre espace privé.",
           isSaveDialog: true 
       });
-  }, [mode, state, user, onHome, setMetadata]);
+  }, [mode, state, user, onHome, setMetadata, metadata.isPublic]);
 
   const handleNewWallRequest = useCallback(() => {
       state.setModal({

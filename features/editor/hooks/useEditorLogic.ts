@@ -43,7 +43,7 @@ export const useEditorLogic = ({
 
   // Composition avec les actions globales
   const actions = useEditorActions({
-      mode, user, setConfig, setHolds, setMetadata, state, saveToHistory, onHome, onNewWall
+      mode, user, setConfig, setHolds, setMetadata, metadata, state, saveToHistory, onHome, onNewWall
   });
 
   // --- Interaction Mur ---

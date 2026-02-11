@@ -224,7 +224,17 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         onSegmentUpdate={logic.updateSegmentQuickly}
       />
       <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={(e) => { const f = e.target.files?.[0]; if (f) { logic.handleImportFile(f); e.target.value = ''; } }} />
-      <GlobalModal config={state.modal} onClose={() => state.setModal(null)} isSavingCloud={isSavingCloud} generatedLink={generatedLink || defaultShareLink} onSaveCloud={wrappedSaveCloud} onDownload={handleDownloadLocal} wallName={metadata.name} onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} />
+      <GlobalModal 
+        config={state.modal} 
+        onClose={() => state.setModal(null)} 
+        isSavingCloud={isSavingCloud} 
+        generatedLink={generatedLink || defaultShareLink} 
+        onSaveCloud={wrappedSaveCloud} 
+        onDownload={handleDownloadLocal} 
+        wallName={metadata.name} 
+        onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} 
+        isPublic={metadata.isPublic} // PASSED HERE
+      />
     </div>
   );
 };

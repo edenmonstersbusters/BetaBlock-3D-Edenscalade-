@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Save, Edit3, Cloud, Loader2, Download, Check, Copy } from 'lucide-react';
+import { Save, Edit3, Cloud, Loader2, Download, Check, Copy, Lock, Globe } from 'lucide-react';
 import { ModalConfig } from '../../../types';
 
 interface SaveModalContentProps {
@@ -12,10 +12,11 @@ interface SaveModalContentProps {
   onDownload?: () => void;
   wallName?: string;
   onWallNameChange?: (name: string) => void;
+  isPublic?: boolean;
 }
 
 export const SaveModalContent: React.FC<SaveModalContentProps> = ({ 
-  config, onClose, isSavingCloud, generatedLink, onSaveCloud, onDownload, wallName, onWallNameChange 
+  config, onClose, isSavingCloud, generatedLink, onSaveCloud, onDownload, wallName, onWallNameChange, isPublic
 }) => {
   return (
     <div className="p-6">
@@ -47,11 +48,13 @@ export const SaveModalContent: React.FC<SaveModalContentProps> = ({
              className="w-full p-4 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/50 rounded-xl flex items-center gap-4 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
            >
               <div className="p-3 bg-blue-500 text-white rounded-lg shadow-lg group-hover:scale-110 transition-transform">
-                {isSavingCloud ? <Loader2 size={24} className="animate-spin"/> : <Cloud size={24} />}
+                {isSavingCloud ? <Loader2 size={24} className="animate-spin"/> : (isPublic ? <Globe size={24} /> : <Lock size={24} />)}
               </div>
               <div className="text-left">
                 <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">Sauvegarde Cloud</h3>
-                <p className="text-xs text-gray-400">Publier dans la Galerie publique.</p>
+                <p className="text-xs text-gray-400">
+                    {isPublic ? "Mettre à jour dans la Galerie publique." : "Enregistrer dans l'espace privé."}
+                </p>
               </div>
            </button>
 
@@ -75,16 +78,20 @@ export const SaveModalContent: React.FC<SaveModalContentProps> = ({
                 <Check size={32} />
               </div>
               <h3 className="text-lg font-bold text-white mb-1">Sauvegarde réussie !</h3>
-              <p className="text-xs text-emerald-400">Votre mur est en sécurité dans la galerie.</p>
+              <p className="text-xs text-emerald-400">
+                  {isPublic ? "Votre mur est visible dans la galerie." : "Votre mur est bien sauvegardé en privé."}
+              </p>
             </div>
             
-            <div>
-              <label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Lien de partage</label>
-              <div className="flex gap-2">
-                <input readOnly value={generatedLink} className="flex-1 bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 font-mono select-all focus:border-blue-500 outline-none" />
-                <button onClick={() => { navigator.clipboard.writeText(generatedLink); alert("Lien copié !"); }} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"><Copy size={20}/></button>
-              </div>
-            </div>
+            {isPublic && (
+                <div>
+                <label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Lien de partage</label>
+                <div className="flex gap-2">
+                    <input readOnly value={generatedLink} className="flex-1 bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 font-mono select-all focus:border-blue-500 outline-none" />
+                    <button onClick={() => { navigator.clipboard.writeText(generatedLink); alert("Lien copié !"); }} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"><Copy size={20}/></button>
+                </div>
+                </div>
+            )}
           </div>
        )}
 

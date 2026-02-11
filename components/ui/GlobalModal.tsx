@@ -18,10 +18,11 @@ interface GlobalModalProps {
   onDownload?: () => void;
   wallName?: string;
   onWallNameChange?: (name: string) => void;
+  isPublic?: boolean; // New prop
 }
 
 export const GlobalModal: React.FC<GlobalModalProps> = ({ 
-  config, onClose, isSavingCloud, generatedLink, onSaveCloud, onDownload, wallName, onWallNameChange 
+  config, onClose, isSavingCloud, generatedLink, onSaveCloud, onDownload, wallName, onWallNameChange, isPublic
 }) => {
   if (!config) return null;
 
@@ -59,6 +60,7 @@ export const GlobalModal: React.FC<GlobalModalProps> = ({
             onDownload={onDownload}
             wallName={wallName}
             onWallNameChange={onWallNameChange}
+            isPublic={isPublic} // Passed down
           />
         ) : (
           <AlertModalContent 
