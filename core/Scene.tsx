@@ -63,50 +63,120 @@ export const Scene: React.FC<SceneProps> = ({
     return () => { document.body.style.cursor = 'auto'; };
   }, [draggingId, isHoveringSelected, isDraggingMannequin, isHoveringMannequin]);
 
-  // --- ALGORITHME DE PLACEMENT DU MANNEQUIN (OFFSET) ---
+  // --- ALGORITHME DE PLACEMENT "PONT" DU MANNEQUIN ---
   const calculateMannequinTransform = (
       cursorPoint: THREE.Vector3, 
       segmentId: string, 
       mannequinHeight: number,
       config: WallConfig
   ) => {
-      const segmentIndex = config.segments.findIndex(s => s.id === segmentId);
-      if (segmentIndex === -1) return null;
-      const currentSeg = config.segments[segmentIndex];
+      // 1. Trouver la position métrique (odomètre) du curseur sur le mur
+      const cursorLocal = calculateLocalCoords(cursorPoint, segmentId, config);
+      if (!cursorLocal) return null;
 
-      const angleRad = (currentSeg.angle * Math.PI) / 180;
-
-      // 1. Calcul de la Normale du Mur (Direction vers le vide)
-      // Pour un mur vertical (0°), normale = (0, 0, 1)
-      // Rotation autour de X pour l'inclinaison
-      const wallNormal = new THREE.Vector3(0, 0, 1);
-      wallNormal.applyAxisAngle(new THREE.Vector3(1, 0, 0), angleRad);
-      wallNormal.normalize();
-
-      // 2. POSITION AVEC OFFSET
-      // On décale le point de pivot (ventre) hors du mur de 22cm pour éviter que les fesses rentrent dedans
-      const offsetDistance = 0.22; 
-      const bellyPos = cursorPoint.clone().add(wallNormal.clone().multiplyScalar(offsetDistance));
-
-      // On descend pour trouver les pieds (environ la moitié de la hauteur)
-      // Mais attention, on descend selon la verticalité du corps, pas celle du mur
-      // Si on veut que le corps soit parallèle au mur, "Bas" = vecteur opposé au "Haut" du mur
+      // On calcule la distance cumulée (Y global déroulé) du curseur
+      let cursorCumulativeY = 0;
+      let foundCursor = false;
       
-      const wallUp = new THREE.Vector3(0, 1, 0);
-      wallUp.applyAxisAngle(new THREE.Vector3(1, 0, 0), angleRad);
-      wallUp.normalize();
+      for(const seg of config.segments) {
+          if (seg.id === segmentId) {
+              cursorCumulativeY += cursorLocal.y;
+              foundCursor = true;
+              break;
+          }
+          cursorCumulativeY += seg.height;
+      }
+      if (!foundCursor) return null;
 
-      const halfHeight = mannequinHeight * 0.5;
-      const feetPos = bellyPos.clone().sub(wallUp.multiplyScalar(halfHeight));
+      // 2. Définir les points cibles Pieds et Tête en distance déroulée
+      const feetTargetY = cursorCumulativeY - (mannequinHeight * 0.5);
+      const headTargetY = cursorCumulativeY + (mannequinHeight * 0.5);
 
-      // 3. ROTATION (Dos au vide, parallèle au mur)
-      const wallRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), angleRad);
-      const turn180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
-      const finalRotQ = wallRotation.clone().multiply(turn180);
+      // Helper pour trouver la Pos 3D et la Normale à partir d'une distance déroulée
+      const resolvePointOnWall = (targetY: number, xOffset: number): { pos: THREE.Vector3, normal: THREE.Vector3 } | null => {
+          let currentY = 0;
+          let segmentBasePos = new THREE.Vector3(0, 0, 0);
+
+          // On clamp targetY pour rester dans les limites du mur
+          const totalHeight = config.segments.reduce((acc, s) => acc + s.height, 0);
+          const safeY = Math.max(0.01, Math.min(totalHeight - 0.01, targetY));
+
+          for (const seg of config.segments) {
+              // Si le point est dans ce segment (ou si c'est le dernier et qu'on dépasse)
+              if (safeY <= currentY + seg.height) {
+                  const localY = safeY - currentY;
+                  const rad = (seg.angle * Math.PI) / 180;
+                  
+                  // Calcul Position
+                  // On part de la base du segment
+                  // On avance selon la pente (localY)
+                  // On décale selon X (xOffset)
+                  
+                  // Vecteur Pente (Montée)
+                  const slopeVec = new THREE.Vector3(0, Math.cos(rad), Math.sin(rad));
+                  
+                  const point = segmentBasePos.clone()
+                      .add(slopeVec.multiplyScalar(localY));
+                  point.x = xOffset; // L'axe X est simple (tout droit)
+
+                  // Calcul Normale (Sortante)
+                  // Rotation de -90deg sur X par rapport à la pente
+                  const normal = new THREE.Vector3(0, -Math.sin(rad), Math.cos(rad));
+                  
+                  return { pos: point, normal: normal };
+              }
+
+              // Avancer au prochain segment
+              const rad = (seg.angle * Math.PI) / 180;
+              segmentBasePos.y += seg.height * Math.cos(rad);
+              segmentBasePos.z += seg.height * Math.sin(rad);
+              currentY += seg.height;
+          }
+          return null;
+      };
+
+      // 3. Raycast Analytique (Calcul géométrique)
+      const feetData = resolvePointOnWall(feetTargetY, cursorLocal.x);
+      const headData = resolvePointOnWall(headTargetY, cursorLocal.x);
+
+      if (!feetData || !headData) return null;
+
+      // 4. Calcul de la Position Moyenne (Centre du corps)
+      const centerPos = new THREE.Vector3().addVectors(feetData.pos, headData.pos).multiplyScalar(0.5);
+
+      // 5. Calcul des Vecteurs d'Orientation
+      // Y Local (Vecteur colonne vertébrale) : Des pieds vers la tête
+      const upVec = new THREE.Vector3().subVectors(headData.pos, feetData.pos).normalize();
+
+      // Normale Moyenne (Direction du regard inversée / Dos au vide)
+      const avgNormal = new THREE.Vector3().addVectors(feetData.normal, headData.normal).normalize();
+
+      // Z Local (Vers le mur) = Opposé de la normale moyenne (car la normale sort du mur)
+      // Le mannequin standard regarde vers +Z. Pour qu'il regarde le mur, on aligne +Z sur -Normal.
+      // Mais attendons... Standard GLTF Rig : +Z est l'avant du perso.
+      // Normale mur : Sort du mur.
+      // Donc pour regarder le mur, Forward = -Normal.
+      const forwardVec = avgNormal.clone().negate();
+
+      // 6. Construction de la Matrice de Rotation (LookAt amélioré avec Up vector forcé)
+      // On veut : Y = upVec, Z = -avgNormal (approx).
+      // On recalcul X pour être orthogonal.
+      const rightVec = new THREE.Vector3().crossVectors(upVec, forwardVec).normalize();
+      // On recalcule le vrai Forward orthogonal
+      const trueForwardVec = new THREE.Vector3().crossVectors(rightVec, upVec).normalize();
+
+      const rotationMatrix = new THREE.Matrix4().makeBasis(rightVec, upVec, trueForwardVec);
+      const finalRot = new THREE.Euler().setFromRotationMatrix(rotationMatrix);
+
+      // 7. Offset (Écartement du mur)
+      // On pousse le mannequin le long de la normale moyenne (vers le vide)
+      // 22cm est une bonne valeur pour que les talons/fesses ne rentrent pas.
+      const offsetDistance = 0.22;
+      const finalPos = centerPos.add(avgNormal.multiplyScalar(offsetDistance));
 
       return {
-          pos: feetPos,
-          rot: new THREE.Euler().setFromQuaternion(finalRotQ)
+          pos: finalPos,
+          rot: finalRot
       };
   };
 
