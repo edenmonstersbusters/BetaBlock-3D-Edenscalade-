@@ -30,13 +30,14 @@ interface SceneProps {
   mannequinConfig?: { height: number; posture: number };
   mannequinState?: { pos: [number,number,number], rot: [number,number,number] } | null;
   onUpdateMannequin?: (state: { pos: [number,number,number], rot: [number,number,number] }) => void;
+  placementRef?: React.MutableRefObject<((height: number) => { pos: [number,number,number], rot: [number,number,number] } | null) | null>;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
   config, mode, holds, onPlaceHold, selectedHoldDef, holdSettings,
   selectedPlacedHoldIds, onSelectPlacedHold, onContextMenu, onWallPointerUpdate,
   onHoldDrag, onHoldDragEnd, screenshotRef,
-  mannequinConfig, mannequinState, onUpdateMannequin,
+  mannequinConfig, mannequinState, onUpdateMannequin, placementRef
 }) => {
   const [ghostPos, setGhostPos] = useState<THREE.Vector3 | null>(null);
   const [ghostRot, setGhostRot] = useState<THREE.Euler | null>(null);
@@ -89,6 +90,7 @@ export const Scene: React.FC<SceneProps> = ({
       if (!foundCursor) return null;
 
       // 2. Définir les points cibles Pieds et Tête en distance déroulée
+      // UPDATE : Le curseur est maintenant le VENTRE (centre).
       const feetTargetY = cursorCumulativeY - (mannequinHeight * 0.5);
       const headTargetY = cursorCumulativeY + (mannequinHeight * 0.5);
 
@@ -141,7 +143,7 @@ export const Scene: React.FC<SceneProps> = ({
 
       if (!feetData || !headData) return null;
 
-      // 4. Calcul de la Position Moyenne (Centre du corps)
+      // 4. Calcul de la Position Moyenne (Centre du corps / Pont géométrique)
       const centerPos = new THREE.Vector3().addVectors(feetData.pos, headData.pos).multiplyScalar(0.5);
 
       // 5. Calcul des Vecteurs d'Orientation
@@ -152,10 +154,6 @@ export const Scene: React.FC<SceneProps> = ({
       const avgNormal = new THREE.Vector3().addVectors(feetData.normal, headData.normal).normalize();
 
       // Z Local (Vers le mur) = Opposé de la normale moyenne (car la normale sort du mur)
-      // Le mannequin standard regarde vers +Z. Pour qu'il regarde le mur, on aligne +Z sur -Normal.
-      // Mais attendons... Standard GLTF Rig : +Z est l'avant du perso.
-      // Normale mur : Sort du mur.
-      // Donc pour regarder le mur, Forward = -Normal.
       const forwardVec = avgNormal.clone().negate();
 
       // 6. Construction de la Matrice de Rotation (LookAt amélioré avec Up vector forcé)
@@ -168,16 +166,61 @@ export const Scene: React.FC<SceneProps> = ({
       const rotationMatrix = new THREE.Matrix4().makeBasis(rightVec, upVec, trueForwardVec);
       const finalRot = new THREE.Euler().setFromRotationMatrix(rotationMatrix);
 
-      // 7. Offset (Écartement du mur)
-      // On pousse le mannequin le long de la normale moyenne (vers le vide)
-      // 22cm est une bonne valeur pour que les talons/fesses ne rentrent pas.
-      const offsetDistance = 0.22;
-      const finalPos = centerPos.add(avgNormal.multiplyScalar(offsetDistance));
+      // 7. Offset et Placement final
+      // UPDATE : Offset de 3cm (quasi collé)
+      const offsetDistance = 0.03;
+      
+      // On pousse le centre géométrique vers le vide
+      const adjustedCenter = centerPos.add(avgNormal.multiplyScalar(offsetDistance));
+      
+      // UPDATE ALIGNEMENT VENTRE :
+      // Le composant Mannequin a son origine (0,0,0) aux PIEDS.
+      // Si on lui passe 'adjustedCenter' comme position, ses pieds seront au centre (ventre), et sa tête à +height.
+      // Il faut donc décaler la position finale vers le bas, le long de la colonne vertébrale (-upVec), de height/2.
+      const feetOriginPos = adjustedCenter.clone().add(upVec.clone().multiplyScalar(-mannequinHeight * 0.5));
 
       return {
-          pos: finalPos,
+          pos: feetOriginPos,
           rot: finalRot
       };
+  };
+
+  const MannequinController = () => {
+      const { camera, scene } = useThree();
+      const raycaster = new THREE.Raycaster();
+
+      // Hook pour exposer la logique de placement au parent
+      useEffect(() => {
+          if (placementRef) {
+              placementRef.current = (height: number) => {
+                  // Raycast depuis le centre de l'écran (0,0 en coords normalisées)
+                  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                  const intersects = raycaster.intersectObjects(scene.children, true);
+                  // On cherche le premier mur touché
+                  const wallHit = intersects.find(h => h.object.name === 'climbing-wall-panel');
+                  
+                  if (wallHit && wallHit.point && wallHit.object.userData.segmentId) {
+                      // On calcule directement le pont
+                      const transform = calculateMannequinTransform(
+                          wallHit.point,
+                          wallHit.object.userData.segmentId,
+                          height,
+                          config
+                      );
+                      
+                      if (transform) {
+                          return {
+                              pos: [transform.pos.x, transform.pos.y, transform.pos.z],
+                              rot: [transform.rot.x, transform.rot.y, transform.rot.z]
+                          };
+                      }
+                  }
+                  return null;
+              };
+          }
+      }, [camera, scene, config]); // Dépendances pour mettre à jour la ref si la config change
+
+      return null;
   };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
@@ -302,6 +345,9 @@ export const Scene: React.FC<SceneProps> = ({
       <color attach="background" args={['#0a0a0a']} />
       
       {screenshotRef && <ScreenshotHandler onScreenshotRef={screenshotRef} />}
+      
+      {/* Composant logique invisible pour le placement du mannequin */}
+      <MannequinController />
 
       <OrbitControls 
         ref={orbitRef}

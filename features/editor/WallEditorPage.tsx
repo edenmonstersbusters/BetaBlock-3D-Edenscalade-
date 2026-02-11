@@ -49,6 +49,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Ref pour demander à la scène de calculer la position centrale
+  const placementRef = useRef<((height: number) => { pos: [number,number,number], rot: [number,number,number] } | null) | null>(null);
+
   const state = useEditorState();
   
   const logic = useEditorLogic({
@@ -190,8 +193,16 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                             if (mannequinOnWall) {
                                 setMannequinOnWall(null);
                             } else {
-                                // Position initiale (Centre, un peu en haut)
-                                setMannequinOnWall({ pos: [0, 1, 0], rot: [0, 0, 0] });
+                                // On utilise la ref pour calculer la position idéale (centre écran)
+                                if (placementRef.current) {
+                                    const startState = placementRef.current(mannequinHeight);
+                                    if (startState) {
+                                        setMannequinOnWall(startState);
+                                    } else {
+                                        // Fallback si pas de mur au centre
+                                        setMannequinOnWall({ pos: [0, 1, 0], rot: [0, 0, 0] });
+                                    }
+                                }
                             }
                         }}
                     />
@@ -211,6 +222,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 mannequinConfig={{ height: mannequinHeight, posture: mannequinPosture }}
                 mannequinState={mannequinOnWall}
                 onUpdateMannequin={setMannequinOnWall}
+                placementRef={placementRef}
             />
         </div>
       </div>
