@@ -12,6 +12,12 @@ import { WallConfig, PlacedHold, AppMode, HoldDefinition, WallSegment } from '..
 import { calculateLocalCoords, resolveHoldWorldData } from '../utils/geometry';
 import '../types'; 
 
+// Extension du type pour stocker l'ancrage logique du mannequin
+type MannequinAnchor = {
+    cumulativeY: number; // Distance depuis le bas du mur (odomètre)
+    xOffset: number;     // Position latérale
+};
+
 interface SceneProps {
   config: WallConfig;
   mode: AppMode;
@@ -28,8 +34,17 @@ interface SceneProps {
   screenshotRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
   
   mannequinConfig?: { height: number; posture: number };
-  mannequinState?: { pos: [number,number,number], rot: [number,number,number] } | null;
-  onUpdateMannequin?: (state: { pos: [number,number,number], rot: [number,number,number] }) => void;
+  // Mise à jour du state pour inclure l'ancre logique
+  mannequinState?: { 
+      pos: [number,number,number], 
+      rot: [number,number,number],
+      anchor?: MannequinAnchor 
+  } | null;
+  onUpdateMannequin?: (state: { 
+      pos: [number,number,number], 
+      rot: [number,number,number],
+      anchor?: MannequinAnchor 
+  }) => void;
   placementRef?: React.MutableRefObject<((height: number) => { pos: [number,number,number], rot: [number,number,number] } | null) | null>;
 }
 
@@ -64,161 +79,215 @@ export const Scene: React.FC<SceneProps> = ({
     return () => { document.body.style.cursor = 'auto'; };
   }, [draggingId, isHoveringSelected, isDraggingMannequin, isHoveringMannequin]);
 
-  // --- ALGORITHME DE PLACEMENT "PONT" DU MANNEQUIN ---
-  const calculateMannequinTransform = (
-      cursorPoint: THREE.Vector3, 
-      segmentId: string, 
-      mannequinHeight: number,
-      config: WallConfig
-  ) => {
-      // 1. Trouver la position métrique (odomètre) du curseur sur le mur
-      const cursorLocal = calculateLocalCoords(cursorPoint, segmentId, config);
-      if (!cursorLocal) return null;
+  // --- MOTEUR PHYSIQUE DU MANNEQUIN ---
 
-      // On calcule la distance cumulée (Y global déroulé) du curseur
-      let cursorCumulativeY = 0;
-      let foundCursor = false;
-      
-      for(const seg of config.segments) {
-          if (seg.id === segmentId) {
-              cursorCumulativeY += cursorLocal.y;
-              foundCursor = true;
-              break;
-          }
-          cursorCumulativeY += seg.height;
-      }
-      if (!foundCursor) return null;
+  // Fonction utilitaire : Convertit une distance cumulée (odomètre) en Point 3D + Normale
+  const getPointFromOdometer = (targetY: number, xOffset: number, currentConfig: WallConfig) => {
+      let currentY = 0;
+      let segmentBasePos = new THREE.Vector3(0, 0, 0);
+      const totalHeight = currentConfig.segments.reduce((acc, s) => acc + s.height, 0);
+      const safeY = Math.max(0.01, Math.min(totalHeight - 0.01, targetY));
 
-      // 2. Définir les points cibles Pieds et Tête en distance déroulée
-      // UPDATE : Le curseur est maintenant le VENTRE (centre).
-      const feetTargetY = cursorCumulativeY - (mannequinHeight * 0.5);
-      const headTargetY = cursorCumulativeY + (mannequinHeight * 0.5);
-
-      // Helper pour trouver la Pos 3D et la Normale à partir d'une distance déroulée
-      const resolvePointOnWall = (targetY: number, xOffset: number): { pos: THREE.Vector3, normal: THREE.Vector3 } | null => {
-          let currentY = 0;
-          let segmentBasePos = new THREE.Vector3(0, 0, 0);
-
-          // On clamp targetY pour rester dans les limites du mur
-          const totalHeight = config.segments.reduce((acc, s) => acc + s.height, 0);
-          const safeY = Math.max(0.01, Math.min(totalHeight - 0.01, targetY));
-
-          for (const seg of config.segments) {
-              // Si le point est dans ce segment (ou si c'est le dernier et qu'on dépasse)
-              if (safeY <= currentY + seg.height) {
-                  const localY = safeY - currentY;
-                  const rad = (seg.angle * Math.PI) / 180;
-                  
-                  // Calcul Position
-                  // On part de la base du segment
-                  // On avance selon la pente (localY)
-                  // On décale selon X (xOffset)
-                  
-                  // Vecteur Pente (Montée)
-                  const slopeVec = new THREE.Vector3(0, Math.cos(rad), Math.sin(rad));
-                  
-                  const point = segmentBasePos.clone()
-                      .add(slopeVec.multiplyScalar(localY));
-                  point.x = xOffset; // L'axe X est simple (tout droit)
-
-                  // Calcul Normale (Sortante)
-                  // Rotation de -90deg sur X par rapport à la pente
-                  const normal = new THREE.Vector3(0, -Math.sin(rad), Math.cos(rad));
-                  
-                  return { pos: point, normal: normal };
-              }
-
-              // Avancer au prochain segment
+      for (const seg of currentConfig.segments) {
+          if (safeY <= currentY + seg.height) {
+              const localY = safeY - currentY;
               const rad = (seg.angle * Math.PI) / 180;
-              segmentBasePos.y += seg.height * Math.cos(rad);
-              segmentBasePos.z += seg.height * Math.sin(rad);
-              currentY += seg.height;
+              const slopeVec = new THREE.Vector3(0, Math.cos(rad), Math.sin(rad));
+              const point = segmentBasePos.clone().add(slopeVec.multiplyScalar(localY));
+              point.x = xOffset;
+              const normal = new THREE.Vector3(0, -Math.sin(rad), Math.cos(rad));
+              return { pos: point, normal: normal };
           }
-          return null;
-      };
+          const rad = (seg.angle * Math.PI) / 180;
+          segmentBasePos.y += seg.height * Math.cos(rad);
+          segmentBasePos.z += seg.height * Math.sin(rad);
+          currentY += seg.height;
+      }
+      return null;
+  };
 
-      // 3. Raycast Analytique (Calcul géométrique)
-      const feetData = resolvePointOnWall(feetTargetY, cursorLocal.x);
-      const headData = resolvePointOnWall(headTargetY, cursorLocal.x);
+  // Coeur du calcul de positionnement (Analytique)
+  const computeMannequinTransform = (
+      centerCumulativeY: number,
+      xOffset: number,
+      height: number,
+      posture: number,
+      currentConfig: WallConfig
+  ) => {
+      // 1. Définir les points cibles Pieds et Tête/Mains
+      let topExtension = 0;
+      if (posture > 0.5) {
+          const factor = (posture - 0.5) * 2;
+          topExtension = height * 0.30 * factor;
+      }
 
-      if (!feetData || !headData) return null;
+      const feetTargetY = centerCumulativeY - (height * 0.5);
+      const topTargetY = centerCumulativeY + (height * 0.5) + topExtension;
 
-      // 4. Calcul de la Position Moyenne (Centre du corps / Pont géométrique)
-      const centerPos = new THREE.Vector3().addVectors(feetData.pos, headData.pos).multiplyScalar(0.5);
+      // 2. Récupérer les coords 3D
+      const feetData = getPointFromOdometer(feetTargetY, xOffset, currentConfig);
+      const topData = getPointFromOdometer(topTargetY, xOffset, currentConfig);
 
-      // 5. Calcul des Vecteurs d'Orientation
-      // Y Local (Vecteur colonne vertébrale) : Des pieds vers la tête
-      const upVec = new THREE.Vector3().subVectors(headData.pos, feetData.pos).normalize();
+      if (!feetData || !topData) return null;
 
-      // Normale Moyenne (Direction du regard inversée / Dos au vide)
-      const avgNormal = new THREE.Vector3().addVectors(feetData.normal, headData.normal).normalize();
+      // 3. Vecteurs de base
+      const upVec = new THREE.Vector3().subVectors(topData.pos, feetData.pos).normalize();
+      const rawCenterPos = new THREE.Vector3().addVectors(feetData.pos, topData.pos).multiplyScalar(0.5);
+      const avgNormal = new THREE.Vector3().addVectors(feetData.normal, topData.normal).normalize();
 
-      // Z Local (Vers le mur) = Opposé de la normale moyenne (car la normale sort du mur)
+      // 4. --- ANTI-COLLISION & HEAD SAFETY ---
+      let maxPenetration = 0;
+      
+      // A. Collision Arêtes (Thorax/Ventre)
+      const BODY_RADIUS = 0.18; 
+      let currentSegY = 0;
+      let segBasePos = new THREE.Vector3(0, 0, 0);
+      const bodyLine = new THREE.Line3(feetData.pos, topData.pos);
+      const closestPointOnBody = new THREE.Vector3();
+
+      for (const seg of currentConfig.segments) {
+          // Si le coin est entre pieds et tête
+          if (currentSegY > feetTargetY && currentSegY < topTargetY) {
+              const jointPos = segBasePos.clone();
+              jointPos.x = xOffset;
+              bodyLine.closestPointToPoint(jointPos, true, closestPointOnBody);
+              const dist = jointPos.distanceTo(closestPointOnBody);
+              if (dist < BODY_RADIUS) {
+                  const penetration = BODY_RADIUS - dist;
+                  if (penetration > maxPenetration) maxPenetration = penetration;
+              }
+          }
+          const rad = (seg.angle * Math.PI) / 180;
+          segBasePos.y += seg.height * Math.cos(rad);
+          segBasePos.z += seg.height * Math.sin(rad);
+          currentSegY += seg.height;
+      }
+
+      // B. Collision Tête (Head Probe)
+      // La tête est à une position fixe par rapport aux pieds, peu importe où sont les mains.
+      // Position théorique de la tête le long du vecteur corps
+      const headHeightRatio = 0.9; // Tête à ~90% de la hauteur du corps (sans les bras)
+      const theoreticalHeadPos = feetData.pos.clone().add(upVec.clone().multiplyScalar(height * headHeightRatio));
+      
+      // Point du mur correspondant à la hauteur de la tête
+      const wallHeadY = feetTargetY + (height * headHeightRatio);
+      const wallHeadData = getPointFromOdometer(wallHeadY, xOffset, currentConfig);
+
+      if (wallHeadData) {
+          // Vecteur allant du Mur vers la Tête Théorique
+          const wallToHead = new THREE.Vector3().subVectors(theoreticalHeadPos, wallHeadData.pos);
+          
+          // On projette ce vecteur sur la normale du mur pour voir la distance "sortante"
+          const distanceOut = wallToHead.dot(wallHeadData.normal);
+          
+          // Marge de sécurité pour la tête (plus large que le corps car le modèle 3D a du volume en haut)
+          const HEAD_SAFETY_MARGIN = 0.05; // 5cm
+
+          if (distanceOut < HEAD_SAFETY_MARGIN) {
+              // Si la tête est "dans" le mur (distanceOut négatif) ou trop près (< 22cm)
+              // On ajoute le manque à la pénétration globale pour repousser tout le corps
+              const neededPush = HEAD_SAFETY_MARGIN - distanceOut;
+              if (neededPush > maxPenetration) {
+                  maxPenetration = neededPush;
+              }
+          }
+      }
+
+      // 5. Offset Final
+      // Base offset (3cm) + Pénétration détectée (Corps ou Tête)
+      const baseOffset = 0.03;
+      const totalOffset = baseOffset + maxPenetration;
+      
+      const adjustedCenter = rawCenterPos.add(avgNormal.multiplyScalar(totalOffset));
+
+      // 6. Orientation
       const forwardVec = avgNormal.clone().negate();
-
-      // 6. Construction de la Matrice de Rotation (LookAt amélioré avec Up vector forcé)
-      // On veut : Y = upVec, Z = -avgNormal (approx).
-      // On recalcul X pour être orthogonal.
       const rightVec = new THREE.Vector3().crossVectors(upVec, forwardVec).normalize();
-      // On recalcule le vrai Forward orthogonal
       const trueForwardVec = new THREE.Vector3().crossVectors(rightVec, upVec).normalize();
-
       const rotationMatrix = new THREE.Matrix4().makeBasis(rightVec, upVec, trueForwardVec);
       const finalRot = new THREE.Euler().setFromRotationMatrix(rotationMatrix);
 
-      // 7. Offset et Placement final
-      // UPDATE : Offset de 3cm (quasi collé)
-      const offsetDistance = 0.03;
-      
-      // On pousse le centre géométrique vers le vide
-      const adjustedCenter = centerPos.add(avgNormal.multiplyScalar(offsetDistance));
-      
-      // UPDATE ALIGNEMENT VENTRE :
-      // Le composant Mannequin a son origine (0,0,0) aux PIEDS.
-      // Si on lui passe 'adjustedCenter' comme position, ses pieds seront au centre (ventre), et sa tête à +height.
-      // Il faut donc décaler la position finale vers le bas, le long de la colonne vertébrale (-upVec), de height/2.
-      const feetOriginPos = adjustedCenter.clone().add(upVec.clone().multiplyScalar(-mannequinHeight * 0.5));
+      // 7. Origine (Pieds)
+      const bridgeLength = feetData.pos.distanceTo(topData.pos);
+      const feetOriginPos = adjustedCenter.clone().add(upVec.clone().multiplyScalar(-bridgeLength * 0.5));
 
       return {
           pos: feetOriginPos,
-          rot: finalRot
+          rot: finalRot,
+          anchor: {
+              cumulativeY: centerCumulativeY,
+              xOffset: xOffset
+          }
       };
   };
 
+  // Wrapper pour l'interaction Souris -> Calcul
+  const calculateTransformFromCursor = (cursorPoint: THREE.Vector3, segmentId: string) => {
+      const cursorLocal = calculateLocalCoords(cursorPoint, segmentId, config);
+      if (!cursorLocal) return null;
+
+      let cumulativeY = 0;
+      for(const seg of config.segments) {
+          if (seg.id === segmentId) {
+              cumulativeY += cursorLocal.y;
+              break;
+          }
+          cumulativeY += seg.height;
+      }
+
+      // Utilisation de la config actuelle ou d'une config T-Pose si nécessaire
+      const h = mannequinConfig?.height || 1.75;
+      const p = mannequinConfig?.posture ?? 0.5;
+
+      return computeMannequinTransform(cumulativeY, cursorLocal.x, h, p, config);
+  };
+
+  // --- CONTROLLEUR LOGIQUE ---
   const MannequinController = () => {
       const { camera, scene } = useThree();
       const raycaster = new THREE.Raycaster();
 
-      // Hook pour exposer la logique de placement au parent
+      // 1. Placement initial (Centre écran)
       useEffect(() => {
           if (placementRef) {
               placementRef.current = (height: number) => {
-                  // Raycast depuis le centre de l'écran (0,0 en coords normalisées)
                   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
                   const intersects = raycaster.intersectObjects(scene.children, true);
-                  // On cherche le premier mur touché
                   const wallHit = intersects.find(h => h.object.name === 'climbing-wall-panel');
                   
                   if (wallHit && wallHit.point && wallHit.object.userData.segmentId) {
-                      // On calcule directement le pont
-                      const transform = calculateMannequinTransform(
-                          wallHit.point,
-                          wallHit.object.userData.segmentId,
-                          height,
-                          config
-                      );
-                      
-                      if (transform) {
-                          return {
-                              pos: [transform.pos.x, transform.pos.y, transform.pos.z],
-                              rot: [transform.rot.x, transform.rot.y, transform.rot.z]
-                          };
-                      }
+                      const res = calculateTransformFromCursor(wallHit.point, wallHit.object.userData.segmentId);
+                      if (res) return { pos: [res.pos.x, res.pos.y, res.pos.z], rot: [res.rot.x, res.rot.y, res.rot.z], anchor: res.anchor };
                   }
                   return null;
               };
           }
-      }, [camera, scene, config]); // Dépendances pour mettre à jour la ref si la config change
+      }, [camera, scene, config, mannequinConfig]);
+
+      // 2. MISE À JOUR TEMPS RÉEL (Réactivité aux changements de mur)
+      useEffect(() => {
+          // Si le mannequin est placé et qu'il possède une ancre
+          if (mannequinState && mannequinState.anchor && onUpdateMannequin && !isDraggingMannequin) {
+              const { cumulativeY, xOffset } = mannequinState.anchor;
+              const h = mannequinConfig?.height || 1.75;
+              const p = mannequinConfig?.posture ?? 0.5;
+
+              // Recalcul pur basé sur l'odomètre et la nouvelle config
+              const newTransform = computeMannequinTransform(cumulativeY, xOffset, h, p, config);
+              
+              if (newTransform) {
+                  // On vérifie si la position a changé significativement pour éviter les boucles
+                  const oldPos = new THREE.Vector3(...mannequinState.pos);
+                  if (oldPos.distanceTo(newTransform.pos) > 0.001) { // 1mm tolérance
+                      onUpdateMannequin({
+                          pos: [newTransform.pos.x, newTransform.pos.y, newTransform.pos.z],
+                          rot: [newTransform.rot.x, newTransform.rot.y, newTransform.rot.z],
+                          anchor: newTransform.anchor
+                      });
+                  }
+              }
+          }
+      }, [config, mannequinConfig]); // Se déclenche quand la géométrie ou la config du mannequin change
 
       return null;
   };
@@ -226,27 +295,20 @@ export const Scene: React.FC<SceneProps> = ({
   const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
     if (draggingId) return;
 
-    // --- MANNEQUIN DRAG ---
-    if (isDraggingMannequin && onUpdateMannequin && mannequinConfig) {
+    if (isDraggingMannequin && onUpdateMannequin) {
         e.stopPropagation();
-
-        const transform = calculateMannequinTransform(
-            e.point.clone(), 
-            segmentId, 
-            mannequinConfig.height, 
-            config
-        );
-
+        const transform = calculateTransformFromCursor(e.point.clone(), segmentId);
+        
         if (transform) {
             onUpdateMannequin({
                 pos: [transform.pos.x, transform.pos.y, transform.pos.z],
-                rot: [transform.rot.x, transform.rot.y, transform.rot.z]
+                rot: [transform.rot.x, transform.rot.y, transform.rot.z],
+                anchor: transform.anchor
             });
         }
         return; 
     }
 
-    // --- GHOST PRISE ---
     const coords = calculateLocalCoords(e.point, segmentId, config);
     if (coords) {
       onWallPointerUpdate?.({ ...coords, segmentId });
