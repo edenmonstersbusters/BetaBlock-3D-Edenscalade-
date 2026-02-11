@@ -51,7 +51,6 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       const lastTime = logicalDebounceRef.current.get(eventKey);
 
       // Si le même événement survient moins de 500ms après le précédent, on l'ignore visuellement
-      // (Réduit de 2000ms à 500ms pour autoriser le like rapide de plusieurs items différents tout en bloquant le double-clic)
       if (lastTime && (now - lastTime < 500)) {
           processedIdsRef.current.add(newId); // On le marque comme "vu" pour ne pas le traiter plus tard
           return;
@@ -84,9 +83,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     let channel: any = null;
+    let isMounted = true;
 
     const init = async () => {
         const user = await auth.getUser();
+        if (!isMounted) return;
+
         if (!user) {
             setNotifications([]);
             setLoading(false);
@@ -99,6 +101,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         setLoading(true);
 
         const existingData = await api.getNotifications(user.id);
+        if (!isMounted) return;
         
         // Dédoublonnage initial de la liste existante (au cas où la DB est sale)
         const uniqueData = existingData.filter((notif, index, self) => 
@@ -131,8 +134,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     init();
 
     const { data: { subscription } } = auth.onAuthStateChange((user) => {
+        if (!isMounted) return;
         if (user?.id !== userRef.current) {
             if (channel) supabase.removeChannel(channel);
+            channel = null; // Important: reset local var
             processedIdsRef.current.clear();
             logicalDebounceRef.current.clear();
             init();
@@ -140,6 +145,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => {
+        isMounted = false;
         if (channel) supabase.removeChannel(channel);
         subscription.unsubscribe();
     };
