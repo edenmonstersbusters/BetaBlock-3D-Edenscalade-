@@ -12,13 +12,8 @@ import { MannequinController } from './scene/MannequinController';
 import { SceneEnvironment } from './scene/SceneEnvironment';
 import { useSceneInteraction } from './scene/useSceneInteraction';
 import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
+import { MannequinPhysicsState } from './scene/useMannequinPhysics';
 import '../types'; 
-
-// Type local réutilisé
-type MannequinAnchor = {
-    cumulativeY: number;
-    xOffset: number;
-};
 
 interface SceneProps {
   config: WallConfig;
@@ -36,17 +31,9 @@ interface SceneProps {
   screenshotRef?: React.MutableRefObject<(() => Promise<string | null>) | null>;
   
   mannequinConfig?: { height: number; posture: number };
-  mannequinState?: { 
-      pos: [number,number,number], 
-      rot: [number,number,number],
-      anchor?: MannequinAnchor 
-  } | null;
-  onUpdateMannequin?: (state: { 
-      pos: [number,number,number], 
-      rot: [number,number,number],
-      anchor?: MannequinAnchor 
-  }) => void;
-  placementRef?: React.MutableRefObject<((height: number) => { pos: [number,number,number], rot: [number,number,number] } | null) | null>;
+  mannequinState?: MannequinPhysicsState | null;
+  onUpdateMannequin?: (state: MannequinPhysicsState) => void;
+  placementRef?: React.MutableRefObject<any>;
 }
 
 export const Scene: React.FC<SceneProps> = ({ 
@@ -173,10 +160,18 @@ export const Scene: React.FC<SceneProps> = ({
             
             {mannequinState && mannequinConfig && (
                 <Mannequin 
-                    position={mannequinState.pos}
-                    rotation={mannequinState.rot}
+                    position={[mannequinState.pos.x, mannequinState.pos.y, mannequinState.pos.z]}
+                    rotation={[mannequinState.rot.x, mannequinState.rot.y, mannequinState.rot.z]}
                     height={mannequinConfig.height}
                     armPosture={mannequinConfig.posture}
+                    
+                    // NOUVEAU : Transmission des angles IK
+                    ikFlexion={mannequinState.ik ? {
+                        hip: mannequinState.ik.hipFlexion,
+                        spine: mannequinState.ik.spineFlexion,
+                        knee: mannequinState.ik.kneeFlexion
+                    } : undefined}
+
                     opacity={isDraggingMannequin ? 0.7 : 1}
                     transparent={isDraggingMannequin}
                     onPointerOver={(e) => { e.stopPropagation(); interaction.setIsHoveringMannequin(true); }}

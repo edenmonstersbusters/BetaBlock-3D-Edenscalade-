@@ -15,11 +15,12 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay';
 import { GlobalModal } from '../../components/ui/GlobalModal';
 import { ContextMenu } from '../../components/ui/ContextMenu';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { ScaleGuideWidget } from './components/ScaleGuideWidget'; // Import Widget
+import { ScaleGuideWidget } from './components/ScaleGuideWidget';
 import { Undo2, Redo2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WallConfig, AppMode, PlacedHold, WallMetadata } from '../../types';
 import { SEO } from '../../components/SEO';
 import { api } from '../../core/api';
+import { MannequinPhysicsState } from '../../core/scene/useMannequinPhysics';
 
 interface WallEditorProps {
   mode: AppMode; user: any;
@@ -49,8 +50,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
 
   const cursorPosRef = useRef<{ x: number, y: number, segmentId: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Ref pour demander à la scène de calculer la position centrale
-  const placementRef = useRef<((height: number) => { pos: [number,number,number], rot: [number,number,number] } | null) | null>(null);
+  const placementRef = useRef<((height: number) => MannequinPhysicsState | null) | null>(null);
 
   const state = useEditorState();
   
@@ -62,11 +62,11 @@ export const WallEditor: React.FC<WallEditorProps> = ({
   // --- MANNEQUIN STATE ---
   const [showMannequinWidget, setShowMannequinWidget] = useState(false);
   const [mannequinHeight, setMannequinHeight] = useState(1.75);
-  const [mannequinPosture, setMannequinPosture] = useState(0.5); // T-Pose defaut
-  // State: null = pas sur le mur, Object = sur le mur à la position donnée
-  const [mannequinOnWall, setMannequinOnWall] = useState<{ pos: [number, number, number], rot: [number, number, number] } | null>(null);
+  const [mannequinPosture, setMannequinPosture] = useState(0.5);
+  
+  // State typé correctement avec les données IK
+  const [mannequinOnWall, setMannequinOnWall] = useState<MannequinPhysicsState | null>(null);
 
-  // --- AUTO SAVE INTEGRATION ---
   const { status: autoSaveStatus, triggerImmediateSave } = useAutoSave({
       isDirty: state.isDirty,
       saveFunction: async () => {
@@ -182,7 +182,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                         <button disabled={!canUndo} onClick={logic.performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
                         <button disabled={!canRedo} onClick={logic.performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
                     </div>
-                    {/* WIDGET MANNEQUIN */}
+                    
                     <ScaleGuideWidget 
                         show={showMannequinWidget}
                         onToggle={() => setShowMannequinWidget(!showMannequinWidget)}
@@ -193,15 +193,9 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                             if (mannequinOnWall) {
                                 setMannequinOnWall(null);
                             } else {
-                                // On utilise la ref pour calculer la position idéale (centre écran)
                                 if (placementRef.current) {
                                     const startState = placementRef.current(mannequinHeight);
-                                    if (startState) {
-                                        setMannequinOnWall(startState);
-                                    } else {
-                                        // Fallback si pas de mur au centre
-                                        setMannequinOnWall({ pos: [0, 1, 0], rot: [0, 0, 0] });
-                                    }
+                                    if (startState) setMannequinOnWall(startState);
                                 }
                             }
                         }}
@@ -218,10 +212,10 @@ export const WallEditor: React.FC<WallEditorProps> = ({
                 onHoldDrag={(id, x, y, segId) => { setHolds(prev => prev.map(h => (h && h.id === id) ? { ...h, x, y, segmentId: segId } : h)); state.setIsDirty(true); }} 
                 onHoldDragEnd={logic.saveToHistory} screenshotRef={screenshotRef} 
                 
-                // MANNEQUIN PROPS
+                // MANNEQUIN PROPS MIS A JOUR
                 mannequinConfig={{ height: mannequinHeight, posture: mannequinPosture }}
                 mannequinState={mannequinOnWall}
-                onUpdateMannequin={setMannequinOnWall}
+                onUpdateMannequin={setMannequinOnWall as any}
                 placementRef={placementRef}
             />
         </div>
@@ -245,7 +239,7 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         onDownload={handleDownloadLocal} 
         wallName={metadata.name} 
         onWallNameChange={(n) => { setMetadata(p => ({ ...p, name: n })); state.setIsDirty(true); }} 
-        isPublic={metadata.isPublic} // PASSED HERE
+        isPublic={metadata.isPublic}
       />
     </div>
   );

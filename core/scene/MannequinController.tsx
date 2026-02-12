@@ -4,17 +4,13 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { calculateLocalCoords } from '../../utils/geometry';
 import { WallConfig } from '../../types';
-import { computeMannequinTransform } from './useMannequinPhysics';
+import { computeMannequinTransform, MannequinPhysicsState } from './useMannequinPhysics';
 
 interface MannequinControllerProps {
     config: WallConfig;
     mannequinConfig?: { height: number; posture: number };
-    mannequinState?: { 
-        pos: [number,number,number], 
-        rot: [number,number,number],
-        anchor?: { cumulativeY: number; xOffset: number } 
-    } | null;
-    onUpdateMannequin?: (state: any) => void;
+    mannequinState?: MannequinPhysicsState | null;
+    onUpdateMannequin?: (state: MannequinPhysicsState) => void;
     placementRef?: React.MutableRefObject<any>;
     isDragging: boolean;
 }
@@ -25,8 +21,7 @@ export const MannequinController: React.FC<MannequinControllerProps> = ({
     const { camera, scene } = useThree();
     const raycaster = new THREE.Raycaster();
 
-    // Fonction centralisée pour appeler la physique
-    const resolvePhysics = (cumulativeY: number, xOffset: number) => {
+    const resolvePhysics = (cumulativeY: number, xOffset: number): MannequinPhysicsState | null => {
         const h = mannequinConfig?.height || 1.75;
         const p = mannequinConfig?.posture ?? 0.5;
         return computeMannequinTransform(cumulativeY, xOffset, h, p, config);
@@ -53,35 +48,36 @@ export const MannequinController: React.FC<MannequinControllerProps> = ({
                         cumulativeY += seg.height;
                     }
 
-                    const res = computeMannequinTransform(cumulativeY, cursorLocal.x, height, 0.5, config);
-                    if (res) return { pos: [res.pos.x, res.pos.y, res.pos.z], rot: [res.rot.x, res.rot.y, res.rot.z], anchor: res.anchor };
+                    return computeMannequinTransform(cumulativeY, cursorLocal.x, height, 0.5, config);
                 }
                 
-                // Fallback si pas de mur touché : on place au sol au centre
-                return { pos: [0, 0, 0], rot: [0, 0, 0], anchor: { cumulativeY: height/2, xOffset: 0 } };
+                return { 
+                    pos: new THREE.Vector3(0,0,0), 
+                    rot: new THREE.Euler(0,0,0), 
+                    anchor: { cumulativeY: height/2, xOffset: 0 },
+                    ik: { hipFlexion: 0, spineFlexion: 0, kneeFlexion: 0 }
+                };
             };
         }
     }, [camera, scene, config, mannequinConfig]);
 
-    // 2. MISE À JOUR TEMPS RÉEL (Réactivité aux changements de mur ou de config mannequin)
+    // 2. MISE À JOUR TEMPS RÉEL
     useEffect(() => {
         if (mannequinState && mannequinState.anchor && onUpdateMannequin && !isDragging) {
             const { cumulativeY, xOffset } = mannequinState.anchor;
             const newTransform = resolvePhysics(cumulativeY, xOffset);
             
             if (newTransform) {
-                // On vérifie si ça a bougé significativement pour éviter les loops infinis
-                const oldPos = new THREE.Vector3(...mannequinState.pos);
-                if (oldPos.distanceTo(newTransform.pos) > 0.0001) { 
-                    onUpdateMannequin({
-                        pos: [newTransform.pos.x, newTransform.pos.y, newTransform.pos.z],
-                        rot: [newTransform.rot.x, newTransform.rot.y, newTransform.rot.z],
-                        anchor: newTransform.anchor
-                    });
+                const oldPos = new THREE.Vector3(mannequinState.pos.x, mannequinState.pos.y, mannequinState.pos.z);
+                // On check aussi si l'IK a changé significativement
+                const ikChanged = Math.abs(newTransform.ik.hipFlexion - mannequinState.ik.hipFlexion) > 0.01;
+                
+                if (oldPos.distanceTo(newTransform.pos) > 0.0001 || ikChanged) { 
+                    onUpdateMannequin(newTransform);
                 }
             }
         }
-    }, [config, mannequinConfig, isDragging]); // On enlève mannequinState des deps pour éviter le spam, on se fie au config
+    }, [config, mannequinConfig, isDragging]); 
 
     return null;
 };

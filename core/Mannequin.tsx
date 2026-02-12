@@ -10,6 +10,12 @@ interface MannequinProps {
   rotation: [number, number, number];
   height: number;
   armPosture: number;
+  // Nouvelles props IK optionnelles
+  ikFlexion?: {
+      hip: number;
+      spine: number;
+      knee: number;
+  };
   opacity?: number;
   transparent?: boolean;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
@@ -21,7 +27,7 @@ const MANNEQUIN_URL = 'https://raw.githubusercontent.com/edenmonstersbusters/cli
 const DRACO_URL = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
 
 export const Mannequin: React.FC<MannequinProps> = ({ 
-  position, rotation, height, armPosture, opacity = 1, transparent = false,
+  position, rotation, height, armPosture, ikFlexion, opacity = 1, transparent = false,
   onPointerDown, onPointerOver, onPointerOut
 }) => {
   const { scene } = useGLTF(MANNEQUIN_URL, DRACO_URL);
@@ -37,6 +43,7 @@ export const Mannequin: React.FC<MannequinProps> = ({
 
   const enableShadows = !transparent;
 
+  // Configuration initiale des matériaux et ombres
   useEffect(() => {
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -44,52 +51,43 @@ export const Mannequin: React.FC<MannequinProps> = ({
         mesh.material = whiteMaterial;
         mesh.castShadow = enableShadows;
         mesh.receiveShadow = enableShadows;
-        
-        // CRUCIAL POUR LA FLUIDITÉ :
-        // Si 'transparent' est vrai (donc en cours de déplacement), on désactive le raycast.
-        // Cela permet à la souris de "traverser" le mannequin pour détecter le mur derrière.
         mesh.raycast = transparent ? () => null : THREE.Mesh.prototype.raycast;
       }
     });
   }, [clone, whiteMaterial, enableShadows, transparent]);
 
   // Calcul de l'échelle
-  const baseScale = useMemo(() => {
+  const finalScale = useMemo(() => {
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
     const naturalHeight = Math.max(size.y, size.z); 
-    return naturalHeight > 0 ? (1 / naturalHeight) : 1; 
-  }, [clone]);
+    const baseScale = naturalHeight > 0 ? (1 / naturalHeight) : 1; 
+    return baseScale * height;
+  }, [clone, height]);
 
-  const finalScale = baseScale * height;
-
-  // --- LOGIQUE DE MOUVEMENT DES BRAS (Axe Corrigé : X) ---
+  // --- GESTION DES OS (ARMATURE) ---
   useEffect(() => {
-    const findBoneLike = (root: THREE.Object3D, exactNamePart: string): THREE.Bone | null => {
-        let result: THREE.Bone | null = null;
-        root.traverse((child) => {
-            if (result) return;
-            if (child instanceof THREE.Bone) {
-                // Recherche partielle mais spécifique (ex: "L_Upper_Arm")
-                if (child.name.includes(exactNamePart)) {
-                    result = child;
-                }
+    // Helper pour trouver les os de manière flexible
+    const getBone = (namePart: string) => {
+        let bone: THREE.Bone | null = null;
+        clone.traverse((child) => {
+            if (bone) return;
+            if (child instanceof THREE.Bone && child.name.includes(namePart)) {
+                bone = child;
             }
         });
-        return result;
+        return bone;
     };
 
-    // Noms basés sur votre liste fournie
-    const leftArm = findBoneLike(clone, 'L_Upper_Arm');
-    const rightArm = findBoneLike(clone, 'R_Upper_Arm');
+    const leftArm = getBone('L_Upper_Arm');
+    const rightArm = getBone('R_Upper_Arm');
+    const hips = getBone('Hips'); // Racine du mouvement
+    const spine = getBone('Spine');
+    const leftUpLeg = getBone('L_Upper_Leg');
+    const rightUpLeg = getBone('R_Upper_Leg');
 
+    // 1. POSTURE DES BRAS
     if (leftArm && rightArm) {
-      // Rotation : Bas (1.3) -> T-Pose (0) -> Haut (-2.5)
-      // TENTATIVE 3 : AXE X
-      // Z = Zombie (Avant/Arrière)
-      // Y = Twist (Rotation sur l'os)
-      // X = Abduction (Levée latérale)
-      
       const startAngle = 1.3; 
       const tPoseAngle = 0;   
       const upAngle = -2.5;   
@@ -102,22 +100,39 @@ export const Mannequin: React.FC<MannequinProps> = ({
          const t = (armPosture - 0.5) * 2;
          targetAngle = tPoseAngle * (1 - t) + upAngle * t;
       }
-
-      // Application sur l'axe X (Le vrai axe de levée pour ce rig)
-      // On remet Y et Z à 0 pour nettoyer les rotations parasites
       
       leftArm.rotation.x = targetAngle;
-      leftArm.rotation.y = 0; 
-      leftArm.rotation.z = 0; 
-      
-      rightArm.rotation.x = targetAngle; // Souvent symétrique sur X pour les rigs, sinon tenter -targetAngle
-      rightArm.rotation.y = 0;
-      rightArm.rotation.z = 0;
-      
-      leftArm.updateMatrixWorld(true);
-      rightArm.updateMatrixWorld(true);
+      rightArm.rotation.x = targetAngle;
     }
-  }, [clone, armPosture]);
+
+    // 2. FLEXION DU CORPS (IK)
+    if (ikFlexion && hips && spine && leftUpLeg && rightUpLeg) {
+        // Réinitialisation prudente (pour éviter l'accumulation si le composant ne remonte pas)
+        hips.rotation.x = 0;
+        spine.rotation.x = 0;
+        leftUpLeg.rotation.x = 0;
+        rightUpLeg.rotation.x = 0;
+
+        // Application
+        // Note: Les axes peuvent varier selon le Rigging (Mixamo est souvent standard)
+        // Hips X+ = Penche en avant
+        // Legs X- = Lève les genoux
+        
+        // Application douce
+        hips.rotation.x = ikFlexion.hip;
+        
+        // Les jambes doivent compenser la rotation du bassin + ajouter leur propre flexion
+        // Si le bassin tourne de 20°, les jambes tournent de 20° pour rester droites, + X° pour plier.
+        leftUpLeg.rotation.x = -ikFlexion.hip + ikFlexion.knee;
+        rightUpLeg.rotation.x = -ikFlexion.hip + ikFlexion.knee;
+
+        spine.rotation.x = ikFlexion.spine;
+    }
+
+    // Force update
+    clone.traverse((obj) => obj.updateMatrixWorld(true));
+
+  }, [clone, armPosture, ikFlexion]);
 
   return (
     <primitive 
@@ -131,5 +146,3 @@ export const Mannequin: React.FC<MannequinProps> = ({
     />
   );
 };
-
-useGLTF.preload(MANNEQUIN_URL, DRACO_URL);

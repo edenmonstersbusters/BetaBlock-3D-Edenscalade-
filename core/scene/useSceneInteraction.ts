@@ -4,7 +4,7 @@ import { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { calculateLocalCoords } from '../../utils/geometry';
 import { WallConfig, AppMode, HoldDefinition } from '../../types';
-import { computeMannequinTransform } from './useMannequinPhysics';
+import { computeMannequinTransform, MannequinPhysicsState } from './useMannequinPhysics';
 
 interface SceneInteractionProps {
     config: WallConfig;
@@ -20,7 +20,7 @@ interface SceneInteractionProps {
     // Mannequin interactif
     isDraggingMannequin: boolean;
     setIsDraggingMannequin: (v: boolean) => void;
-    onUpdateMannequin?: (state: any) => void;
+    onUpdateMannequin?: (state: MannequinPhysicsState) => void;
     mannequinConfig?: { height: number; posture: number };
 }
 
@@ -78,11 +78,7 @@ export const useSceneInteraction = ({
                 );
                 
                 if (transform) {
-                    onUpdateMannequin({
-                        pos: [transform.pos.x, transform.pos.y, transform.pos.z],
-                        rot: [transform.rot.x, transform.rot.y, transform.rot.z],
-                        anchor: transform.anchor
-                    });
+                    onUpdateMannequin(transform);
                 }
             }
             return; 
