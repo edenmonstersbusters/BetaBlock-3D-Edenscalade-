@@ -36,8 +36,10 @@ export const SEO: React.FC<SEOProps> = ({
   breadcrumbs,
   schema
 }) => {
-  const siteTitle = "BetaBlock 3D";
-  // Format du titre : "Nom de Page | BetaBlock 3D" ou juste "BetaBlock 3D" si c'est l'accueil
+  // Modification demandée : Ajout du suffixe descriptif global
+  const siteTitle = "BetaBlock 3D | Ouverture de murs d'escalade 3D";
+  
+  // Format du titre : "Nom de Page | BetaBlock 3D | Ouverture de murs d'escalade 3D"
   const fullTitle = title === "Accueil" ? siteTitle : `${title} | ${siteTitle}`;
   
   const prodBase = 'https://betablock-3d.fr';
@@ -83,7 +85,7 @@ export const SEO: React.FC<SEOProps> = ({
         <meta property="og:description" content={description} />
         <meta property="og:image" content={image} />
         <meta property="og:image:alt" content={`Aperçu de ${title}`} />
-        <meta property="og:site_name" content={siteTitle} />
+        <meta property="og:site_name" content="BetaBlock 3D" />
         {publishedTime && <meta property="article:published_time" content={publishedTime} />}
         {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
 

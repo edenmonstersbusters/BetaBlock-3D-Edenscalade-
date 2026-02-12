@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../../core/api';
 import { auth } from '../../../core/auth';
 import { Comment } from '../../../types';
