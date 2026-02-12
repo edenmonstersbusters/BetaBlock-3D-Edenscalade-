@@ -25,24 +25,11 @@ export const MannequinController: React.FC<MannequinControllerProps> = ({
     const { camera, scene } = useThree();
     const raycaster = new THREE.Raycaster();
 
-    // Helper: Calcul depuis curseur
-    const calculateTransformFromCursor = (cursorPoint: THREE.Vector3, segmentId: string) => {
-        const cursorLocal = calculateLocalCoords(cursorPoint, segmentId, config);
-        if (!cursorLocal) return null;
-
-        let cumulativeY = 0;
-        for(const seg of config.segments) {
-            if (seg.id === segmentId) {
-                cumulativeY += cursorLocal.y;
-                break;
-            }
-            cumulativeY += seg.height;
-        }
-
+    // Fonction centralisée pour appeler la physique
+    const resolvePhysics = (cumulativeY: number, xOffset: number) => {
         const h = mannequinConfig?.height || 1.75;
         const p = mannequinConfig?.posture ?? 0.5;
-
-        return computeMannequinTransform(cumulativeY, cursorLocal.x, h, p, config);
+        return computeMannequinTransform(cumulativeY, xOffset, h, p, config);
     };
 
     // 1. Placement initial (Centre écran)
@@ -54,26 +41,38 @@ export const MannequinController: React.FC<MannequinControllerProps> = ({
                 const wallHit = intersects.find(h => h.object.name === 'climbing-wall-panel');
                 
                 if (wallHit && wallHit.point && wallHit.object.userData.segmentId) {
-                    const res = calculateTransformFromCursor(wallHit.point, wallHit.object.userData.segmentId);
+                    const cursorLocal = calculateLocalCoords(wallHit.point, wallHit.object.userData.segmentId, config);
+                    if (!cursorLocal) return null;
+
+                    let cumulativeY = 0;
+                    for(const seg of config.segments) {
+                        if (seg.id === wallHit.object.userData.segmentId) {
+                            cumulativeY += cursorLocal.y;
+                            break;
+                        }
+                        cumulativeY += seg.height;
+                    }
+
+                    const res = computeMannequinTransform(cumulativeY, cursorLocal.x, height, 0.5, config);
                     if (res) return { pos: [res.pos.x, res.pos.y, res.pos.z], rot: [res.rot.x, res.rot.y, res.rot.z], anchor: res.anchor };
                 }
-                return null;
+                
+                // Fallback si pas de mur touché : on place au sol au centre
+                return { pos: [0, 0, 0], rot: [0, 0, 0], anchor: { cumulativeY: height/2, xOffset: 0 } };
             };
         }
     }, [camera, scene, config, mannequinConfig]);
 
-    // 2. MISE À JOUR TEMPS RÉEL (Réactivité aux changements de mur)
+    // 2. MISE À JOUR TEMPS RÉEL (Réactivité aux changements de mur ou de config mannequin)
     useEffect(() => {
         if (mannequinState && mannequinState.anchor && onUpdateMannequin && !isDragging) {
             const { cumulativeY, xOffset } = mannequinState.anchor;
-            const h = mannequinConfig?.height || 1.75;
-            const p = mannequinConfig?.posture ?? 0.5;
-
-            const newTransform = computeMannequinTransform(cumulativeY, xOffset, h, p, config);
+            const newTransform = resolvePhysics(cumulativeY, xOffset);
             
             if (newTransform) {
+                // On vérifie si ça a bougé significativement pour éviter les loops infinis
                 const oldPos = new THREE.Vector3(...mannequinState.pos);
-                if (oldPos.distanceTo(newTransform.pos) > 0.001) { 
+                if (oldPos.distanceTo(newTransform.pos) > 0.0001) { 
                     onUpdateMannequin({
                         pos: [newTransform.pos.x, newTransform.pos.y, newTransform.pos.z],
                         rot: [newTransform.rot.x, newTransform.rot.y, newTransform.rot.z],
@@ -82,7 +81,7 @@ export const MannequinController: React.FC<MannequinControllerProps> = ({
                 }
             }
         }
-    }, [config, mannequinConfig]); 
+    }, [config, mannequinConfig, isDragging]); // On enlève mannequinState des deps pour éviter le spam, on se fie au config
 
     return null;
 };

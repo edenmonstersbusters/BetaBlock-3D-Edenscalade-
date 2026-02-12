@@ -56,7 +56,7 @@ export const useSceneInteraction = ({
     const handlePointerMove = (e: ThreeEvent<PointerEvent>, segmentId: string) => {
         if (draggingId) return;
     
-        // Logique spécifique Drag Mannequin
+        // Logique Drag Mannequin
         if (isDraggingMannequin && onUpdateMannequin) {
             e.stopPropagation();
             const cursorLocal = calculateLocalCoords(e.point.clone(), segmentId, config);
