@@ -120,7 +120,20 @@ export const RouteEditorPanel: React.FC<RouteEditorPanelProps> = ({
         <div>
             <HoldCatalogue 
                library={library} loading={loading} selectedHoldId={selectedHold?.id}
-               onSelectHold={(h) => { if(anyHoldSelected && isReplacingMode) { onReplaceHold(selectedPlacedHoldIds, h); setIsReplacingMode(false); } else { onSelectHold(h); } }}
+               onSelectHold={(h) => { 
+                   if(anyHoldSelected && isReplacingMode) { 
+                       // Mode Remplacement Actif : On remplace la prise
+                       onReplaceHold(selectedPlacedHoldIds, h); 
+                       setIsReplacingMode(false); 
+                   } else if (anyHoldSelected && !isReplacingMode) {
+                       // Mode Remplacement INACTIF : On sort de l'édition et on sélectionne la prise catalogue
+                       onDeselect();
+                       onSelectHold(h);
+                   } else { 
+                       // Comportement standard (pas de prise murale sélectionnée)
+                       onSelectHold(h); 
+                   } 
+               }}
                expanded={catalogueExpanded} onToggleExpand={() => { setCatalogueExpanded(!catalogueExpanded); if(catalogueExpanded) setIsReplacingMode(false); }}
                isReplacingMode={isReplacingMode}
             />
