@@ -81,9 +81,9 @@
     "react": "https://esm.sh/react@18.2.0",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "three": "https://esm.sh/three@0.164.1",
-    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.16.6?external=three,react,react-dom",
-    "@react-three/drei": "https://esm.sh/@react-three/drei@9.105.6?external=three,react,react-dom,@react-three/fiber",
+    "three": "https://esm.sh/three@0.150.1",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.13.0?external=three,react,react-dom",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@9.68.3?external=three,react,react-dom,@react-three/fiber",
     "lucide-react": "https://esm.sh/lucide-react@0.292.0?external=react,react-dom",
     "clsx": "https://esm.sh/clsx@2.0.0",
     "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?external=react,react-dom",
@@ -95,11 +95,12 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
     "react-helmet-async": "https://esm.sh/react-helmet-async@2.0.4?external=react,react-dom",
     "@vercel/node": "https://esm.sh/@vercel/node@^5.5.28",
-    "three-stdlib": "https://esm.sh/three-stdlib@2.29.11?external=three",
-    "three/": "https://esm.sh/three@0.164.1/"
+    "three-stdlib": "https://esm.sh/three-stdlib@^2.36.1",
+    "three/": "https://esm.sh/three@^0.182.0/"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <!-- Google Tag Manager (noscript) -->
@@ -172,5 +173,6 @@
 
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

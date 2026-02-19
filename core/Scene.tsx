@@ -1,7 +1,7 @@
 
 import React, { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Html, Line } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WallMesh } from './WallMesh';
 import { HoldModel } from './HoldModel';
@@ -36,33 +36,6 @@ interface SceneProps {
   placementRef?: React.MutableRefObject<any>;
 }
 
-// Indicateur visuel pour le mode édition
-const SelectionIndicator: React.FC<{ position: [number, number, number] }> = ({ position }) => {
-    const offset: [number, number, number] = [0.3, 0.4, 0.3];
-    const endPos: [number, number, number] = [
-        position[0] + offset[0],
-        position[1] + offset[1],
-        position[2] + offset[2]
-    ];
-
-    return (
-        <group>
-            <Line
-                points={[position, endPos]}
-                color="red"
-                lineWidth={1.5}
-                transparent
-                opacity={0.8}
-            />
-            <Html position={endPos} center style={{ pointerEvents: 'none', width: '200px' }}>
-                <div className="text-red-500 font-black text-[10px] uppercase bg-black/80 border border-red-500/50 px-2 py-1 rounded shadow-xl backdrop-blur-sm tracking-tighter text-center">
-                    VOUS ETES EN TRAIN DE MODIFIER CETTE PRISE
-                </div>
-            </Html>
-        </group>
-    );
-};
-
 export const Scene: React.FC<SceneProps> = ({ 
   config, mode, holds, onPlaceHold, selectedHoldDef, holdSettings,
   selectedPlacedHoldIds, onSelectPlacedHold, onContextMenu, onWallPointerUpdate,
@@ -77,11 +50,6 @@ export const Scene: React.FC<SceneProps> = ({
       onSelectPlacedHold, onPlaceHold, onContextMenu, onWallPointerUpdate,
       isDraggingMannequin, setIsDraggingMannequin, onUpdateMannequin, mannequinConfig
   });
-
-  // Identifier la prise active si une seule est sélectionnée
-  const singleSelectedHold = selectedPlacedHoldIds.length === 1 
-      ? holds.find(h => h.id === selectedPlacedHoldIds[0]) 
-      : null;
 
   return (
     <Canvas 
@@ -189,11 +157,6 @@ export const Scene: React.FC<SceneProps> = ({
                     }}
                 />
             ))}
-            
-            {/* INDICATEUR DE SÉLECTION (MODE ÉDITION) */}
-            {singleSelectedHold && (
-                <SelectionIndicator position={singleSelectedHold.position} />
-            )}
             
             {mannequinState && mannequinConfig && (
                 <Mannequin 
