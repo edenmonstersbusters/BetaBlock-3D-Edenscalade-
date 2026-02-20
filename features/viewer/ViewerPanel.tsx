@@ -91,15 +91,6 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
           return;
       }
       
-      if (user.id === metadata.authorId) {
-          setWarning({ 
-              x: e.clientX, 
-              y: e.clientY, 
-              message: "Vous ne pouvez pas liker votre mur !" 
-          });
-          return;
-      }
-
       const wasLiked = socialStats.hasLiked;
       setSocialStats(prev => ({
           hasLiked: !wasLiked,

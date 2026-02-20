@@ -81,11 +81,6 @@ export const useSocialLogic = (wallId: string, onRequestAuth: () => void) => {
             return;
         }
 
-        if (currentUser.id === authorId) {
-            setWarning({ x: e.clientX, y: e.clientY, message: "Vous ne pouvez pas liker votre commentaire !" });
-            return;
-        }
-
         // Optimistic update
         setComments(prev => prev.map(c => {
             if (c.id === commentId) {
