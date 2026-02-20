@@ -15,6 +15,8 @@ import { WallConfig, PlacedHold, AppMode, HoldDefinition } from '../types';
 import { MannequinPhysicsState } from './scene/useMannequinPhysics';
 import '../types'; 
 
+import { EditModeIndicator } from '../components/ui/3d/EditModeIndicator';
+
 interface SceneProps {
   config: WallConfig;
   mode: AppMode;
@@ -50,6 +52,15 @@ export const Scene: React.FC<SceneProps> = ({
       onSelectPlacedHold, onPlaceHold, onContextMenu, onWallPointerUpdate,
       isDraggingMannequin, setIsDraggingMannequin, onUpdateMannequin, mannequinConfig
   });
+
+  // Calculer la position de la prise sélectionnée pour l'indicateur
+  const selectedHoldPosition = React.useMemo(() => {
+    if (selectedPlacedHoldIds.length === 1) {
+      const hold = holds.find(h => h.id === selectedPlacedHoldIds[0]);
+      return hold ? hold.position : null;
+    }
+    return null;
+  }, [selectedPlacedHoldIds, holds]);
 
   return (
     <Canvas 
@@ -114,6 +125,14 @@ export const Scene: React.FC<SceneProps> = ({
           onPointerDown={interaction.handlePointerDown}
           onPointerUp={interaction.handlePointerUp}
         />
+        
+        {/* INDICATEUR D'ÉDITION DE PRISE */}
+        {mode === 'SET' && selectedHoldPosition && (
+          <EditModeIndicator 
+            position={selectedHoldPosition} 
+            onDismiss={() => onSelectPlacedHold(null)} 
+          />
+        )}
         
         <Suspense fallback={null}>
             {holds.map((hold) => (
