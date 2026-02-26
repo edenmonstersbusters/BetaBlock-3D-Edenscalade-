@@ -18,11 +18,12 @@ export const notificationsApi = {
           const enriched = await Promise.all(data.map(async (n: any) => {
              const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
              let resourceName = undefined;
-             let textContent = undefined;
+             let textContent = n.text_content; // Utiliser le contenu texte déjà présent en base si dispo (ex: pour les commentaires)
              let isReply = false;
              let parentText = undefined;
              
-             // 1. Cas d'un Mur (Nouveau mur, Like sur mur, Commentaire sur mur)
+             // 1. Cas d'un Mur (Nouveau mur, Like sur mur)
+             // resource_id = wall_id
              if (n.type === 'new_wall' || n.type === 'like_wall') {
                  if (n.resource_id) {
                     const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
@@ -31,12 +32,15 @@ export const notificationsApi = {
              }
              
              // 2. Cas d'un Commentaire (Nouveau commentaire)
+             // resource_id = comment_id
              if (n.type === 'comment') {
                  if (n.resource_id) {
-                     // On récupère le commentaire pour avoir le texte, l'ID du mur et le parent_id
+                     // On récupère le commentaire pour avoir l'ID du mur et le parent_id
+                     // Note: text_content est souvent déjà dans la notif, mais on le récupère au cas où il manque
                      const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
+                     
                      if (comment) {
-                         textContent = comment.text;
+                         if (!textContent) textContent = comment.text;
                          isReply = !!comment.parent_id;
                          
                          // Si c'est une réponse, on récupère le texte du parent pour le contexte
@@ -53,11 +57,12 @@ export const notificationsApi = {
              }
 
              // 3. Cas d'un Like sur Commentaire
+             // resource_id = comment_id
              if (n.type === 'like_comment') {
                  if (n.resource_id) {
                      const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
                      if (comment) {
-                         textContent = comment.text;
+                         textContent = comment.text; // Pour un like, le text_content de la notif est null, on prend celui du commentaire
                          const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
                          if (wall) resourceName = wall.name;
                      }
@@ -91,7 +96,7 @@ export const notificationsApi = {
 
           const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
           let resourceName = undefined;
-          let textContent = undefined;
+          let textContent = n.text_content;
           let isReply = false;
           let parentText = undefined;
           
@@ -106,7 +111,7 @@ export const notificationsApi = {
                 if (n.resource_id) {
                     const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
                     if (comment) {
-                        textContent = comment.text;
+                        if (!textContent) textContent = comment.text;
                         isReply = !!comment.parent_id;
 
                         if (isReply) {
