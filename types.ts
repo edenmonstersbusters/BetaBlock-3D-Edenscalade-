@@ -151,6 +151,8 @@ export interface AppNotification {
   resource_id?: string;
   resource_name?: string; 
   text_content?: string; 
+  is_reply?: boolean;
+  parent_text?: string;
   is_read: boolean;
   created_at: string;
 }

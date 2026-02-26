@@ -77,7 +77,14 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
               color: 'bg-emerald-500', 
               text: (
                   <span>
-                      a commenté <span className="font-bold text-white">{n.resource_name || "votre mur"}</span>
+                      {n.is_reply ? (
+                          <>
+                              a répondu à votre commentaire sur <span className="font-bold text-white">{n.resource_name || "un mur"}</span>
+                              {n.parent_text && <span className="block mt-1 text-gray-500 text-[10px] border-l-2 border-gray-700 pl-1 line-clamp-1">En réponse à : "{n.parent_text}"</span>}
+                          </>
+                      ) : (
+                          <>a commenté <span className="font-bold text-white">{n.resource_name || "votre mur"}</span></>
+                      )}
                       {n.text_content && <span className="block mt-1 text-gray-400 italic font-normal">"{n.text_content}"</span>}
                   </span>
               )

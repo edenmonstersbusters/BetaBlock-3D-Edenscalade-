@@ -19,6 +19,8 @@ export const notificationsApi = {
              const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
              let resourceName = undefined;
              let textContent = undefined;
+             let isReply = false;
+             let parentText = undefined;
              
              // 1. Cas d'un Mur (Nouveau mur, Like sur mur, Commentaire sur mur)
              if (n.type === 'new_wall' || n.type === 'like_wall') {
@@ -31,10 +33,18 @@ export const notificationsApi = {
              // 2. Cas d'un Commentaire (Nouveau commentaire)
              if (n.type === 'comment') {
                  if (n.resource_id) {
-                     // On récupère le commentaire pour avoir le texte et l'ID du mur
-                     const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
+                     // On récupère le commentaire pour avoir le texte, l'ID du mur et le parent_id
+                     const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
                      if (comment) {
                          textContent = comment.text;
+                         isReply = !!comment.parent_id;
+                         
+                         // Si c'est une réponse, on récupère le texte du parent pour le contexte
+                         if (isReply) {
+                             const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
+                             if (parent) parentText = parent.text;
+                         }
+
                          // On récupère le nom du mur associé
                          const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
                          if (wall) resourceName = wall.name;
@@ -59,7 +69,9 @@ export const notificationsApi = {
                  actor_name: actor?.display_name || "Utilisateur inconnu",
                  actor_avatar_url: actor?.avatar_url,
                  resource_name: resourceName,
-                 text_content: textContent
+                 text_content: textContent,
+                 is_reply: isReply,
+                 parent_text: parentText
              };
           }));
 
@@ -80,6 +92,8 @@ export const notificationsApi = {
           const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
           let resourceName = undefined;
           let textContent = undefined;
+          let isReply = false;
+          let parentText = undefined;
           
           if (n.type === 'new_wall' || n.type === 'like_wall') {
                 if (n.resource_id) {
@@ -90,9 +104,16 @@ export const notificationsApi = {
 
           if (n.type === 'comment') {
                 if (n.resource_id) {
-                    const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
+                    const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
                     if (comment) {
                         textContent = comment.text;
+                        isReply = !!comment.parent_id;
+
+                        if (isReply) {
+                             const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
+                             if (parent) parentText = parent.text;
+                        }
+
                         const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
                         if (wall) resourceName = wall.name;
                     }
@@ -115,7 +136,9 @@ export const notificationsApi = {
                 actor_name: actor?.display_name || "Utilisateur inconnu",
                 actor_avatar_url: actor?.avatar_url,
                 resource_name: resourceName,
-                text_content: textContent
+                text_content: textContent,
+                is_reply: isReply,
+                parent_text: parentText
           } as AppNotification;
       } catch (e) { return null; }
   },

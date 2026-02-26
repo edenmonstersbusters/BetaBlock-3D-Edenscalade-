@@ -70,6 +70,18 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({ notificati
                 text: <span>a aimé votre commentaire sur <span className="font-bold text-white">{notification.resource_name}</span>.</span> 
             };
         case 'comment': 
+            if (notification.is_reply) {
+                return { 
+                    icon: <MessageCircle size={12} fill="currentColor" />, 
+                    badgeBg: 'bg-emerald-500', 
+                    text: (
+                        <span>
+                            a répondu à votre commentaire sur <span className="font-bold text-white">{notification.resource_name}</span>.
+                            {notification.parent_text && <span className="block mt-1 text-gray-500 text-[10px] italic border-l-2 border-gray-700 pl-1 line-clamp-1">En réponse à : "{notification.parent_text}"</span>}
+                        </span>
+                    )
+                };
+            }
             return { 
                 icon: <MessageCircle size={12} fill="currentColor" />, 
                 badgeBg: 'bg-emerald-500', 
