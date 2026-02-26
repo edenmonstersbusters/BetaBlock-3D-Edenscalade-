@@ -36,7 +36,6 @@ export const notificationsApi = {
              if (n.type === 'comment') {
                  if (n.resource_id) {
                      // On récupère le commentaire pour avoir l'ID du mur et le parent_id
-                     // Note: text_content est souvent déjà dans la notif, mais on le récupère au cas où il manque
                      const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
                      
                      if (comment) {
@@ -44,27 +43,33 @@ export const notificationsApi = {
                          isReply = !!comment.parent_id;
                          
                          // Si c'est une réponse, on récupère le texte du parent pour le contexte
-                         if (isReply) {
+                         if (isReply && comment.parent_id) {
                              const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
                              if (parent) parentText = parent.text;
                          }
 
-                         // On récupère le nom du mur associé
-                         const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                         if (wall) resourceName = wall.name;
+                         // On récupère le nom du mur associé via wall_id du commentaire
+                         if (comment.wall_id) {
+                             const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                             if (wall) resourceName = wall.name;
+                         }
                      }
                  }
              }
 
              // 3. Cas d'un Like sur Commentaire
-             // resource_id = comment_id
+             // resource_id = comment_id (le commentaire qui a été liké)
              if (n.type === 'like_comment') {
                  if (n.resource_id) {
                      const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
                      if (comment) {
-                         textContent = comment.text; // Pour un like, le text_content de la notif est null, on prend celui du commentaire
-                         const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                         if (wall) resourceName = wall.name;
+                         textContent = comment.text; // Le texte du commentaire liké
+                         
+                         // On récupère le nom du mur associé via wall_id du commentaire
+                         if (comment.wall_id) {
+                             const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                             if (wall) resourceName = wall.name;
+                         }
                      }
                  }
              }
@@ -102,8 +107,8 @@ export const notificationsApi = {
           
           if (n.type === 'new_wall' || n.type === 'like_wall') {
                 if (n.resource_id) {
-                const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
-                if (wall) resourceName = wall.name;
+                    const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
+                    if (wall) resourceName = wall.name;
                 }
           }
 
@@ -114,13 +119,15 @@ export const notificationsApi = {
                         if (!textContent) textContent = comment.text;
                         isReply = !!comment.parent_id;
 
-                        if (isReply) {
+                        if (isReply && comment.parent_id) {
                              const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
                              if (parent) parentText = parent.text;
                         }
 
-                        const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                        if (wall) resourceName = wall.name;
+                        if (comment.wall_id) {
+                            const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                            if (wall) resourceName = wall.name;
+                        }
                     }
                 }
           }
@@ -130,8 +137,10 @@ export const notificationsApi = {
                     const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
                     if (comment) {
                         textContent = comment.text;
-                        const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                        if (wall) resourceName = wall.name;
+                        if (comment.wall_id) {
+                            const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                            if (wall) resourceName = wall.name;
+                        }
                     }
                 }
           }
