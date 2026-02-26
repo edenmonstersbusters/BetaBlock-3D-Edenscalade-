@@ -32,8 +32,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   
   const userRef = useRef<string | null>(null);
   const processedIdsRef = useRef<Set<string>>(new Set());
-  // Anti-doublon logique (ex: même user like le même mur 2 fois en 1 seconde à cause d'un bug DB)
-  const logicalDebounceRef = useRef<Map<string, number>>(new Map());
+  const recentSignaturesRef = useRef<Set<string>>(new Set());
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -44,9 +43,25 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       // 1. Filtrage par ID (doublon technique WebSocket)
       if (processedIdsRef.current.has(newId)) return;
       
-      processedIdsRef.current.add(newId);
+      // 2. Filtrage par Signature (Anti-doublon logique pour événements multiples identiques)
+      // Signature = type + actor + resource. 
+      // Si on reçoit 3 notifs "X a commenté Y" en 100ms, on n'en garde qu'une.
+      const signature = `${raw.type}-${raw.actor_id}-${raw.resource_id}`;
+      if (recentSignaturesRef.current.has(signature)) {
+          // On marque l'ID comme traité pour ne pas le revoir, mais on ne l'affiche pas
+          processedIdsRef.current.add(newId);
+          return;
+      }
 
-      // 2. Récupération des données
+      processedIdsRef.current.add(newId);
+      recentSignaturesRef.current.add(signature);
+      
+      // Nettoyage de la signature après 2 secondes pour autoriser une nouvelle action identique plus tard
+      setTimeout(() => {
+          recentSignaturesRef.current.delete(signature);
+      }, 2000);
+
+      // 3. Récupération des données
       const fullNotif = await api.getSingleNotification(newId);
       if (!fullNotif) return;
 

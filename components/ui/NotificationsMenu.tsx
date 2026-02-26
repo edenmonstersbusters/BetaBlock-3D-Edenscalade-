@@ -65,12 +65,22 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
           case 'like_comment': return { 
               icon: <ThumbsUp size={10} fill="currentColor" />, 
               color: 'bg-pink-500', 
-              text: <span>a aimé votre commentaire.</span> 
+              text: (
+                  <span>
+                      a aimé votre commentaire sur <span className="font-bold text-white">{n.resource_name || "un mur"}</span>
+                      {n.text_content && <span className="block mt-1 text-gray-400 italic font-normal">"{n.text_content}"</span>}
+                  </span>
+              )
           };
           case 'comment': return { 
               icon: <MessageCircle size={10} fill="currentColor" />, 
               color: 'bg-emerald-500', 
-              text: <span>a commenté <span className="font-bold text-white">{n.resource_name || "votre mur"}</span>.</span> 
+              text: (
+                  <span>
+                      a commenté <span className="font-bold text-white">{n.resource_name || "votre mur"}</span>
+                      {n.text_content && <span className="block mt-1 text-gray-400 italic font-normal">"{n.text_content}"</span>}
+                  </span>
+              )
           };
           default: return { 
               icon: <Bell size={10} />, 
@@ -167,13 +177,6 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
                                         <div className="text-xs text-gray-400 leading-snug mb-1">
                                             {details.text}
                                         </div>
-                                        
-                                        {/* Preview Commentaire */}
-                                        {notif.type === 'comment' && notif.text_content && (
-                                            <div className="mt-2 p-2 rounded-lg bg-gray-800/50 border border-white/5 text-xs text-gray-300 italic truncate group-hover:bg-gray-800 transition-colors">
-                                                "{notif.text_content}"
-                                            </div>
-                                        )}
                                     </div>
                                     
                                     {/* Indicateur Non-Lu (Point Bleu) */}
