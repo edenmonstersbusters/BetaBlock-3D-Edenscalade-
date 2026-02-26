@@ -51,7 +51,13 @@ export const useRealtimeNotifications = () => {
             break;
           case 'comment':
             title = "Nouveau commentaire";
-            body = `${notif.actor_name} a commenté votre mur "${notif.resource_name || 'sans nom'}"`;
+            const commentText = notif.text_content ? `"${notif.text_content.substring(0, 50)}${notif.text_content.length > 50 ? '...' : ''}"` : '';
+            body = `${notif.actor_name} a commenté "${notif.resource_name || 'un mur'}" : ${commentText}`;
+            break;
+          case 'like_comment':
+            title = "Like sur commentaire";
+            const likedCommentText = notif.text_content ? `"${notif.text_content.substring(0, 50)}${notif.text_content.length > 50 ? '...' : ''}"` : '';
+            body = `${notif.actor_name} a aimé votre commentaire sur "${notif.resource_name || 'un mur'}" : ${likedCommentText}`;
             break;
       }
 

@@ -43,23 +43,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // 1. Filtrage par ID (doublon technique WebSocket)
       if (processedIdsRef.current.has(newId)) return;
-
-      // 2. Filtrage logique (Anti-spam / Anti-bug DB)
-      // On crée une clé unique : "acteur-action-cible"
-      const eventKey = `${raw.actor_id}-${raw.type}-${raw.resource_id}`;
-      const now = Date.now();
-      const lastTime = logicalDebounceRef.current.get(eventKey);
-
-      // Si le même événement survient moins de 500ms après le précédent, on l'ignore visuellement
-      if (lastTime && (now - lastTime < 500)) {
-          processedIdsRef.current.add(newId); // On le marque comme "vu" pour ne pas le traiter plus tard
-          return;
-      }
       
-      logicalDebounceRef.current.set(eventKey, now);
       processedIdsRef.current.add(newId);
 
-      // 3. Récupération des données
+      // 2. Récupération des données
       const fullNotif = await api.getSingleNotification(newId);
       if (!fullNotif) return;
 
@@ -139,7 +126,6 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
             if (channel) supabase.removeChannel(channel);
             channel = null; // Important: reset local var
             processedIdsRef.current.clear();
-            logicalDebounceRef.current.clear();
             init();
         }
     });

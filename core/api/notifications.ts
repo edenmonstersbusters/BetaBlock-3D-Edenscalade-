@@ -14,16 +14,43 @@ export const notificationsApi = {
             
           if (error) throw error;
 
-          // Enrichir avec les infos de l'acteur (nom, avatar)
+          // Enrichir avec les infos de l'acteur (nom, avatar) et le contexte
           const enriched = await Promise.all(data.map(async (n: any) => {
              const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
              let resourceName = undefined;
+             let textContent = undefined;
              
-             // Si c'est un mur, on cherche son nom
-             if (n.type === 'new_wall' || n.type === 'comment' || n.type === 'like_wall') {
+             // 1. Cas d'un Mur (Nouveau mur, Like sur mur, Commentaire sur mur)
+             if (n.type === 'new_wall' || n.type === 'like_wall') {
                  if (n.resource_id) {
                     const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
                     if (wall) resourceName = wall.name;
+                 }
+             }
+             
+             // 2. Cas d'un Commentaire (Nouveau commentaire)
+             if (n.type === 'comment') {
+                 if (n.resource_id) {
+                     // On récupère le commentaire pour avoir le texte et l'ID du mur
+                     const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
+                     if (comment) {
+                         textContent = comment.text;
+                         // On récupère le nom du mur associé
+                         const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                         if (wall) resourceName = wall.name;
+                     }
+                 }
+             }
+
+             // 3. Cas d'un Like sur Commentaire
+             if (n.type === 'like_comment') {
+                 if (n.resource_id) {
+                     const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
+                     if (comment) {
+                         textContent = comment.text;
+                         const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                         if (wall) resourceName = wall.name;
+                     }
                  }
              }
 
@@ -31,7 +58,8 @@ export const notificationsApi = {
                  ...n,
                  actor_name: actor?.display_name || "Utilisateur inconnu",
                  actor_avatar_url: actor?.avatar_url,
-                 resource_name: resourceName
+                 resource_name: resourceName,
+                 text_content: textContent
              };
           }));
 
@@ -51,11 +79,34 @@ export const notificationsApi = {
 
           const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
           let resourceName = undefined;
+          let textContent = undefined;
           
-          if (n.type === 'new_wall' || n.type === 'comment' || n.type === 'like_wall') {
+          if (n.type === 'new_wall' || n.type === 'like_wall') {
                 if (n.resource_id) {
                 const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
                 if (wall) resourceName = wall.name;
+                }
+          }
+
+          if (n.type === 'comment') {
+                if (n.resource_id) {
+                    const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
+                    if (comment) {
+                        textContent = comment.text;
+                        const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                        if (wall) resourceName = wall.name;
+                    }
+                }
+          }
+
+          if (n.type === 'like_comment') {
+                if (n.resource_id) {
+                    const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
+                    if (comment) {
+                        textContent = comment.text;
+                        const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                        if (wall) resourceName = wall.name;
+                    }
                 }
           }
 
@@ -63,7 +114,8 @@ export const notificationsApi = {
                 ...n,
                 actor_name: actor?.display_name || "Utilisateur inconnu",
                 actor_avatar_url: actor?.avatar_url,
-                resource_name: resourceName
+                resource_name: resourceName,
+                text_content: textContent
           } as AppNotification;
       } catch (e) { return null; }
   },

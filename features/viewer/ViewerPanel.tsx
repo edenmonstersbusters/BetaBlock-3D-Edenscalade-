@@ -54,6 +54,9 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
 
   // Gestion dynamique de l'état Auth et Social
   useEffect(() => {
+      // Reset immédiat pour éviter l'affichage des stats du mur précédent
+      setSocialStats({ likes: 0, hasLiked: false });
+
       const updateAuthAndSocial = async () => {
           const user = await auth.getUser();
           
@@ -218,7 +221,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ wallId, metadata, conf
                     <MessageSquare size={12} />
                     <span>Commentaires & Bétas</span>
                 </div>
-                <SocialFeed wallId={wallId} onRequestAuth={() => setShowAuth(true)} />
+                <SocialFeed key={wallId} wallId={wallId} onRequestAuth={() => setShowAuth(true)} />
             </section>
         </div>
 
