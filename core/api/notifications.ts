@@ -116,7 +116,7 @@ export const notificationsApi = {
 
           // --- RECUPERATION DU COMMENTAIRE ---
           let commentId = n.comment_resource_id;
-          if (!commentId && (n.type === 'comment' || n.type === 'like_comment')) {
+          if (!commentId && (n.type === 'comment' || n.type === 'like_comment' || n.type === 'answer_comment')) {
               commentId = n.resource_id;
           }
 
