@@ -41,7 +41,7 @@ export const notificationsApi = {
              let commentId = n.comment_resource_id;
              
              // Fallback compatibilité
-             if (!commentId && (n.type === 'comment' || n.type === 'like_comment')) {
+             if (!commentId && (n.type === 'comment' || n.type === 'like_comment' || n.type === 'answer_comment')) {
                  commentId = n.resource_id;
              }
 
@@ -52,6 +52,7 @@ export const notificationsApi = {
                      if (!textContent) textContent = comment.text;
                      
                      // Si on n'avait pas le mur via wall_resource_id, on le chope ici
+                     // C'est souvent le cas pour les likes de commentaires où le trigger n'avait peut-être pas mis le wall_id
                      if (!resourceName && comment.wall_id) {
                          const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
                          if (wall) resourceName = wall.name;
