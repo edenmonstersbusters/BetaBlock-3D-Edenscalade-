@@ -28,8 +28,11 @@ export const notificationsApi = {
              
              // Fallback compatibilité ancienne structure
              if (!wallId) {
-                 if (n.type === 'new_wall' || n.type === 'like_wall') wallId = n.resource_id;
-                 // Pour les commentaires, on ne peut pas deviner facilement sans fetch le commentaire, on le fera plus bas si besoin
+                 if (n.type === 'new_wall' || n.type === 'like_wall') {
+                     wallId = n.resource_id;
+                 }
+                 // Pour like_comment, comment, answer_comment, le resource_id est un comment_id, 
+                 // donc on ne peut pas déduire le wallId tout de suite, on le fera via le commentaire.
              }
 
              if (wallId) {
@@ -52,7 +55,7 @@ export const notificationsApi = {
                      if (!textContent) textContent = comment.text;
                      
                      // Si on n'avait pas le mur via wall_resource_id, on le chope ici
-                     // C'est souvent le cas pour les likes de commentaires où le trigger n'avait peut-être pas mis le wall_id
+                     // C'est CRUCIAL pour les like_comment et answer_comment
                      if (!resourceName && comment.wall_id) {
                          const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
                          if (wall) resourceName = wall.name;
