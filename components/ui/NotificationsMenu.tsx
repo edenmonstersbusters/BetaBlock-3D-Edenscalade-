@@ -72,12 +72,14 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = () => {
                   </span>
               )
           };
-          case 'comment': return { 
+          case 'comment': 
+          case 'answer_comment':
+              return { 
               icon: <MessageCircle size={10} fill="currentColor" />, 
               color: 'bg-emerald-500', 
               text: (
                   <span>
-                      {n.is_reply ? (
+                      {n.type === 'answer_comment' || n.is_reply ? (
                           <>
                               a répondu à votre commentaire sur <span className="font-bold text-white">{n.resource_name || "un mur"}</span>
                               {n.parent_text && <span className="block mt-1 text-gray-500 text-[10px] border-l-2 border-gray-700 pl-1 line-clamp-1">En réponse à : "{n.parent_text}"</span>}

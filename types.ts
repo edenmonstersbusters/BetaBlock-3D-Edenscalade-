@@ -147,8 +147,10 @@ export interface AppNotification {
   actor_id: string;
   actor_name?: string;     
   actor_avatar_url?: string; 
-  type: 'follow' | 'unfollow' | 'new_wall' | 'comment' | 'like_wall' | 'like_comment';
-  resource_id?: string;
+  type: 'follow' | 'unfollow' | 'new_wall' | 'comment' | 'like_wall' | 'like_comment' | 'answer_comment';
+  resource_id?: string; // Gardé pour compatibilité, mais on préfère les spécifiques
+  wall_resource_id?: string;
+  comment_resource_id?: string;
   resource_name?: string; 
   text_content?: string; 
   is_reply?: boolean;

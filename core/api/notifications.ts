@@ -18,57 +18,51 @@ export const notificationsApi = {
           const enriched = await Promise.all(data.map(async (n: any) => {
              const { data: actor } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', n.actor_id).maybeSingle();
              let resourceName = undefined;
-             let textContent = n.text_content; // Utiliser le contenu texte déjà présent en base si dispo (ex: pour les commentaires)
+             let textContent = n.text_content; 
              let isReply = false;
              let parentText = undefined;
              
-             // 1. Cas d'un Mur (Nouveau mur, Like sur mur)
-             // resource_id = wall_id
-             if (n.type === 'new_wall' || n.type === 'like_wall') {
-                 if (n.resource_id) {
-                    const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
-                    if (wall) resourceName = wall.name;
-                 }
-             }
+             // --- RECUPERATION DU MUR (Pour tous les types sauf follow) ---
+             // On utilise wall_resource_id s'il existe (nouvelle structure), sinon on tente de déduire
+             let wallId = n.wall_resource_id;
              
-             // 2. Cas d'un Commentaire (Nouveau commentaire)
-             // resource_id = comment_id
-             if (n.type === 'comment') {
-                 if (n.resource_id) {
-                     // On récupère le commentaire pour avoir l'ID du mur et le parent_id
-                     const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
+             // Fallback compatibilité ancienne structure
+             if (!wallId) {
+                 if (n.type === 'new_wall' || n.type === 'like_wall') wallId = n.resource_id;
+                 // Pour les commentaires, on ne peut pas deviner facilement sans fetch le commentaire, on le fera plus bas si besoin
+             }
+
+             if (wallId) {
+                 const { data: wall } = await supabase.from('walls').select('name').eq('id', wallId).maybeSingle();
+                 if (wall) resourceName = wall.name;
+             }
+
+             // --- RECUPERATION DU COMMENTAIRE ---
+             let commentId = n.comment_resource_id;
+             
+             // Fallback compatibilité
+             if (!commentId && (n.type === 'comment' || n.type === 'like_comment')) {
+                 commentId = n.resource_id;
+             }
+
+             if (commentId) {
+                 const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', commentId).maybeSingle();
+                 if (comment) {
+                     // Si on n'avait pas le texte (like_comment ou answer_comment), on le prend
+                     if (!textContent) textContent = comment.text;
                      
-                     if (comment) {
-                         if (!textContent) textContent = comment.text;
-                         isReply = !!comment.parent_id;
-                         
-                         // Si c'est une réponse, on récupère le texte du parent pour le contexte
-                         if (isReply && comment.parent_id) {
+                     // Si on n'avait pas le mur via wall_resource_id, on le chope ici
+                     if (!resourceName && comment.wall_id) {
+                         const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                         if (wall) resourceName = wall.name;
+                     }
+
+                     // Gestion des réponses
+                     if (n.type === 'answer_comment' || (n.type === 'comment' && comment.parent_id)) {
+                         isReply = true;
+                         if (comment.parent_id) {
                              const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
                              if (parent) parentText = parent.text;
-                         }
-
-                         // On récupère le nom du mur associé via wall_id du commentaire
-                         if (comment.wall_id) {
-                             const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                             if (wall) resourceName = wall.name;
-                         }
-                     }
-                 }
-             }
-
-             // 3. Cas d'un Like sur Commentaire
-             // resource_id = comment_id (le commentaire qui a été liké)
-             if (n.type === 'like_comment') {
-                 if (n.resource_id) {
-                     const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
-                     if (comment) {
-                         textContent = comment.text; // Le texte du commentaire liké
-                         
-                         // On récupère le nom du mur associé via wall_id du commentaire
-                         if (comment.wall_id) {
-                             const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                             if (wall) resourceName = wall.name;
                          }
                      }
                  }
@@ -105,44 +99,41 @@ export const notificationsApi = {
           let isReply = false;
           let parentText = undefined;
           
-          if (n.type === 'new_wall' || n.type === 'like_wall') {
-                if (n.resource_id) {
-                    const { data: wall } = await supabase.from('walls').select('name').eq('id', n.resource_id).maybeSingle();
-                    if (wall) resourceName = wall.name;
-                }
+          // --- RECUPERATION DU MUR ---
+          let wallId = n.wall_resource_id;
+          if (!wallId) {
+              if (n.type === 'new_wall' || n.type === 'like_wall') wallId = n.resource_id;
           }
 
-          if (n.type === 'comment') {
-                if (n.resource_id) {
-                    const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', n.resource_id).maybeSingle();
-                    if (comment) {
-                        if (!textContent) textContent = comment.text;
-                        isReply = !!comment.parent_id;
-
-                        if (isReply && comment.parent_id) {
-                             const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
-                             if (parent) parentText = parent.text;
-                        }
-
-                        if (comment.wall_id) {
-                            const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                            if (wall) resourceName = wall.name;
-                        }
-                    }
-                }
+          if (wallId) {
+              const { data: wall } = await supabase.from('walls').select('name').eq('id', wallId).maybeSingle();
+              if (wall) resourceName = wall.name;
           }
 
-          if (n.type === 'like_comment') {
-                if (n.resource_id) {
-                    const { data: comment } = await supabase.from('comments').select('text, wall_id').eq('id', n.resource_id).maybeSingle();
-                    if (comment) {
-                        textContent = comment.text;
-                        if (comment.wall_id) {
-                            const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
-                            if (wall) resourceName = wall.name;
-                        }
-                    }
-                }
+          // --- RECUPERATION DU COMMENTAIRE ---
+          let commentId = n.comment_resource_id;
+          if (!commentId && (n.type === 'comment' || n.type === 'like_comment')) {
+              commentId = n.resource_id;
+          }
+
+          if (commentId) {
+              const { data: comment } = await supabase.from('comments').select('text, wall_id, parent_id').eq('id', commentId).maybeSingle();
+              if (comment) {
+                  if (!textContent) textContent = comment.text;
+                  
+                  if (!resourceName && comment.wall_id) {
+                      const { data: wall } = await supabase.from('walls').select('name').eq('id', comment.wall_id).maybeSingle();
+                      if (wall) resourceName = wall.name;
+                  }
+
+                  if (n.type === 'answer_comment' || (n.type === 'comment' && comment.parent_id)) {
+                      isReply = true;
+                      if (comment.parent_id) {
+                          const { data: parent } = await supabase.from('comments').select('text').eq('id', comment.parent_id).maybeSingle();
+                          if (parent) parentText = parent.text;
+                      }
+                  }
+              }
           }
 
           return {
