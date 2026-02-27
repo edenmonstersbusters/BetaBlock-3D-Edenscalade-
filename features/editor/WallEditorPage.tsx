@@ -177,31 +177,29 @@ export const WallEditor: React.FC<WallEditorProps> = ({
         
         <div className="flex-1 relative h-full bg-black">
             {initialMode !== 'VIEW' && (
-                <>
-                    <div className="fixed bottom-6 right-6 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
-                        <button disabled={!canUndo} onClick={logic.performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
-                        <button disabled={!canRedo} onClick={logic.performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
-                    </div>
-                    
-                    <ScaleGuideWidget 
-                        show={showMannequinWidget}
-                        onToggle={() => setShowMannequinWidget(!showMannequinWidget)}
-                        height={mannequinHeight} setHeight={setMannequinHeight}
-                        armPosture={mannequinPosture} setArmPosture={setMannequinPosture}
-                        isPlacedOnWall={!!mannequinOnWall}
-                        onTogglePlacement={() => {
-                            if (mannequinOnWall) {
-                                setMannequinOnWall(null);
-                            } else {
-                                if (placementRef.current) {
-                                    const startState = placementRef.current(mannequinHeight);
-                                    if (startState) setMannequinOnWall(startState);
-                                }
-                            }
-                        }}
-                    />
-                </>
+                <div className="fixed bottom-6 right-6 z-[100] flex gap-2 p-1 bg-gray-950/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-2xl">
+                    <button disabled={!canUndo} onClick={logic.performUndo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Undo2 size={20} /></button>
+                    <button disabled={!canRedo} onClick={logic.performRedo} className="p-3 hover:bg-white/10 rounded-xl text-white disabled:opacity-30 transition-all"><Redo2 size={20} /></button>
+                </div>
             )}
+            
+            <ScaleGuideWidget 
+                show={showMannequinWidget}
+                onToggle={() => setShowMannequinWidget(!showMannequinWidget)}
+                height={mannequinHeight} setHeight={setMannequinHeight}
+                armPosture={mannequinPosture} setArmPosture={setMannequinPosture}
+                isPlacedOnWall={!!mannequinOnWall}
+                onTogglePlacement={() => {
+                    if (mannequinOnWall) {
+                        setMannequinOnWall(null);
+                    } else {
+                        if (placementRef.current) {
+                            const startState = placementRef.current(mannequinHeight);
+                            if (startState) setMannequinOnWall(startState);
+                        }
+                    }
+                }}
+            />
             
             <Scene 
                 config={config} mode={derivedMode} holds={renderableHolds as any} 
